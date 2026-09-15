@@ -163,6 +163,11 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 }
 
 @media (max-width: 639px) {
+  .hero { min-height: auto; padding: 72px 24px 76px; }
+  .hero > .hero-marble, .hero > .stamp { display: none; }
+  .hero::after { background: linear-gradient(126deg, rgba(247,239,229,.96), rgba(232,217,197,.82)); }
+  .portfolio nav button { padding: 9px 11px; border: 1px solid rgba(193,113,72,.42); border-radius: 5px; background: rgba(193,113,72,.08); }
+
   .private-main { padding: 16px !important; }
   .private-topbar { min-height: auto !important; padding: 10px 16px !important; }
   .private-brand { font-size: 20px !important; }
