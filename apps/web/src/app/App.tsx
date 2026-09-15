@@ -114,7 +114,8 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
   return (
     <header className="private-topbar" style={{ display: "flex", justifyContent: "space-between", minHeight: 70, padding: "14px 32px", borderBottom: "1px solid var(--line)", background: "rgba(247,239,229,.92)", alignItems: "center", position: "sticky", top: 0, zIndex: 20, backdropFilter: "blur(12px)" }}>
       <a className="private-brand" href={user ? `#/${user.rol}` : "#/"} style={{ color: "var(--graphite)", fontWeight: 700, fontSize: 22, textDecoration: "none" }}>
-        Hogaria
+        <img className="private-brand-symbol" src="/brand/hogaria-isotipo.png" alt="" />
+        <img className="private-brand-wordmark" src="/brand/hogaria-wordmark.png" alt="Hogaria Reformas Integrales" />
       </a>
 
       {user ? (

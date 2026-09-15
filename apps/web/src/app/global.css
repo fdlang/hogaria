@@ -136,6 +136,11 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 /* Private area: tablet-first structure. Inline layout values are intentionally
    overridden here so screens with a keyboard-width viewport never compress. */
 .private-table-scroll, .data-table-scroll { -webkit-overflow-scrolling: touch; }
+.private-topbar { display: grid !important; grid-template-columns: 1fr auto 1fr; }
+.private-brand { display: flex; align-items: center; gap: 9px; justify-self: start; }
+.private-brand-symbol { width: 42px; height: 42px; object-fit: contain; }
+.private-brand-wordmark { width: 160px; height: 39px; object-fit: contain; }
+.private-nav { justify-self: center; }
 .login-page { display: grid; min-height: 100vh; place-items: center; padding: 32px; }
 .login-card { width: min(100%, 400px); }
 .login-brand { display: flex; align-items: center; justify-content: center; gap: 10px; }
@@ -147,7 +152,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .portfolio nav .nav-brand { width: 100%; }
 
   .private-main { padding: 24px !important; }
-  .private-topbar { align-items: flex-start !important; flex-wrap: wrap; gap: 10px 18px; padding: 12px 24px !important; }
+  .private-topbar { display: flex !important; align-items: flex-start !important; flex-wrap: wrap; gap: 10px 18px; padding: 12px 24px !important; }
   .private-nav { order: 3; width: 100%; flex-wrap: wrap; gap: 8px 10px !important; overflow: visible; padding: 3px 0 7px; }
   .private-nav > a, .private-nav > button { flex: 0 0 auto; }
   .private-nav-link { padding: 9px 10px !important; }
@@ -170,7 +175,8 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 
   .private-main { padding: 16px !important; }
   .private-topbar { min-height: auto !important; padding: 10px 16px !important; }
-  .private-brand { font-size: 20px !important; }
+  .private-brand-symbol { width: 36px; height: 36px; }
+  .private-brand-wordmark { width: 136px; height: 33px; }
   .private-nav { margin-inline: 0; width: 100%; padding-inline: 0; }
   .private-nav > span { display: none; }
   .private-nav-link { font-size: 12px !important; }
