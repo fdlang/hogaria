@@ -102,7 +102,7 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
   const submitting = mutations.create.loading || mutations.update.loading;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 24, alignItems: "flex-start" }}>
+    <div className="budget-form-layout" style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 24, alignItems: "flex-start" }}>
       {/* ─── MAIN COLUMN ──────────────────────────────── */}
       <div>
         <nav role="tablist" style={{ display: "flex", gap: 4, borderBottom: "1px solid #d8c4ad", marginBottom: 20 }}>
@@ -148,7 +148,7 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
             </Select>
             {form.state.errors.clienteId && <p role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: -10, marginBottom: 10 }}>{form.state.errors.clienteId}</p>}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="private-form-grid-two" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <Select label="IVA por defecto"
                 value={form.state.ivaDefault}
                 onChange={e => form.setField("ivaDefault", parseFloat(e.target.value))}>
@@ -211,7 +211,7 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
           </>
         )}
 
-        <footer style={{ display: "flex", justifyContent: "space-between", marginTop: 24, paddingTop: 16, borderTop: "1px solid #d8c4ad" }}>
+        <footer className="private-form-actions" style={{ display: "flex", justifyContent: "space-between", marginTop: 24, paddingTop: 16, borderTop: "1px solid #d8c4ad" }}>
           <Button variant="ghost" onClick={onCancel} disabled={submitting}>Cancelar</Button>
           <Button onClick={handleSubmit} loading={submitting}>
             {initialBudget ? "Guardar cambios" : "Crear presupuesto"}
@@ -220,7 +220,7 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
       </div>
 
       {/* ─── SIDEBAR: LIVE TOTALS ──────────────────────── */}
-      <aside style={{ position: "sticky", top: 20, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, padding: 18 }}>
+      <aside className="budget-summary" style={{ position: "sticky", top: 20, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, padding: 18 }}>
         <h4 style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", color: "#71685e", marginBottom: 12 }}>
           Resumen en vivo
         </h4>

@@ -64,7 +64,7 @@ export function AdminSolicitudes({ api }: Props) {
 
   return (
     <section>
-      <header style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
+      <header className="private-page-header" style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 38, fontWeight: 700, color: "#302d29" }}>Solicitudes</h1>
           <p style={{ fontSize: 13, color: "#71685e", marginTop: 6 }}>
@@ -78,7 +78,7 @@ export function AdminSolicitudes({ api }: Props) {
         ? <EmptyState icon="✉" title="Sin solicitudes" hint="Aparecerán aquí cuando lleguen desde la landing" />
         : <div role="list" style={{ display: "grid", gap: 10 }}>
             {items.map(s => (
-              <article key={s.id} role="listitem"
+              <article key={s.id} role="listitem" className="private-action-card"
                 style={{ padding: 16, background: "#fffaf4", border: `1px solid ${s.estado === "pendiente" ? "#fbbf24" : "#d8c4ad"}`, borderRadius: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>

@@ -80,9 +80,9 @@ export function App({ apis }: { apis: AllApis }) {
     : <EmptyState icon="◎" title="Página no encontrada" hint="Usa el menú para navegar" />;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--marble-light)", color: "var(--ink)" }}>
+    <div className={user ? "app-shell app-shell--private" : "app-shell"} style={{ minHeight: "100vh", background: "var(--marble-light)", color: "var(--ink)" }}>
       {user && <TopBar user={user} onSignOut={signOut} />}
-      <main style={user ? { maxWidth: 1200, margin: "0 auto", padding: 32 } : undefined}>
+      <main className={user ? "private-main" : undefined} style={user ? { maxWidth: 1200, margin: "0 auto", padding: 32 } : undefined}>
         <Router routes={routes} fallback={fallback} />
       </main>
     </div>
@@ -112,13 +112,13 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
     ] : [];
 
   return (
-    <header style={{ display: "flex", justifyContent: "space-between", minHeight: 70, padding: "14px 32px", borderBottom: "1px solid var(--line)", background: "rgba(247,239,229,.92)", alignItems: "center", position: "sticky", top: 0, zIndex: 20, backdropFilter: "blur(12px)" }}>
-      <a href={user ? `#/${user.rol}` : "#/"} style={{ color: "var(--graphite)", fontWeight: 700, fontSize: 22, textDecoration: "none" }}>
+    <header className="private-topbar" style={{ display: "flex", justifyContent: "space-between", minHeight: 70, padding: "14px 32px", borderBottom: "1px solid var(--line)", background: "rgba(247,239,229,.92)", alignItems: "center", position: "sticky", top: 0, zIndex: 20, backdropFilter: "blur(12px)" }}>
+      <a className="private-brand" href={user ? `#/${user.rol}` : "#/"} style={{ color: "var(--graphite)", fontWeight: 700, fontSize: 22, textDecoration: "none" }}>
         Hogaria
       </a>
 
       {user ? (
-        <nav className="private-nav" style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <nav className="private-nav" aria-label="Navegación privada" style={{ display: "flex", alignItems: "center", gap: 18 }}>
           {links.map(l => (
             <a key={l.to} href={l.to}
               className="private-nav-link"

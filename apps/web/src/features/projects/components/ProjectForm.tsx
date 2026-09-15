@@ -43,7 +43,7 @@ export function ProjectForm({ api, initialProject, clients, onSaved, onCancel }:
         value={form.state.descripcion}
         onChange={e => form.setField("descripcion", e.target.value)} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="private-form-grid-two" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Select label="Cliente" required
           value={form.state.clienteId ?? ""} 
           onChange={e => form.setField("clienteId", parseInt(e.target.value, 10))}>
@@ -63,7 +63,7 @@ export function ProjectForm({ api, initialProject, clients, onSaved, onCancel }:
         value={form.state.direccion} error={form.errors.direccion}
         onChange={e => form.setField("direccion", e.target.value)} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+      <div className="private-form-grid-three" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
         <Input label="Presupuesto (€)" type="number" min="0" step="100"
           value={form.state.presupuesto} error={form.errors.presupuesto}
           onChange={e => form.setField("presupuesto", parseFloat(e.target.value) || 0)} />
@@ -94,7 +94,7 @@ export function ProjectForm({ api, initialProject, clients, onSaved, onCancel }:
         </label>
       )}
 
-      <footer style={{ display: "flex", justifyContent: "space-between", marginTop: 20, paddingTop: 16, borderTop: "1px solid #d8c4ad" }}>
+      <footer className="private-form-actions" style={{ display: "flex", justifyContent: "space-between", marginTop: 20, paddingTop: 16, borderTop: "1px solid #d8c4ad" }}>
         <Button variant="ghost" onClick={onCancel} disabled={form.submitting}>Cancelar</Button>
         <Button onClick={handleSubmit} loading={form.submitting}>
           {initialProject ? "Guardar cambios" : "Crear proyecto"}

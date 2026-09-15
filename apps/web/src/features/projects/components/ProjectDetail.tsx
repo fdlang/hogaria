@@ -91,7 +91,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
         actions={<ProjectStatusBadge estado={p.estado} />}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24, alignItems: "flex-start" }}>
+      <div className="project-detail-layout" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24, alignItems: "flex-start" }}>
         {/* ─── MAIN ──────────────────────────────────── */}
         <div>
           {/* Progress */}
@@ -145,7 +145,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
 
           {/* Files */}
           <section>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div className="project-documents-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <h2 style={sectionTitle}>Documentos ({files.data.length})</h2>
               {canUploadFiles && <FileUploadButton onUpload={handleFileUpload} canMarkSensitive={canManageProject} />}
             </div>
@@ -218,7 +218,7 @@ function FileUploadButton({ onUpload, canMarkSensitive }: {
 }) {
   const [sensitive, setSensitive] = useState(false);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    <div className="file-upload-controls" style={{ display: "flex", alignItems: "center", gap: 10 }}>
       {canMarkSensitive && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#71685e" }}>
           <input type="checkbox" checked={sensitive} onChange={e => setSensitive(e.target.checked)} />

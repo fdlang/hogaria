@@ -24,7 +24,7 @@ export function LoginPage({ onSuccess, onBack }: Props) {
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: "80px auto", padding: 40, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 12 }}>
+    <div className="login-card" style={{ maxWidth: 400, margin: "80px auto", padding: 40, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 12 }}>
       <header style={{ marginBottom: 24, textAlign: "center" }}>
         <h1 style={{ fontSize: 26, fontWeight: 700, color: "#302d29" }}>
           Hogaria

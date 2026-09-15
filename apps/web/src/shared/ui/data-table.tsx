@@ -57,7 +57,7 @@ export function DataTable<T>({ data, columns, rowKey, onRowClick, loading, error
   if (data.length === 0) return <EmptyState title={emptyMessage ?? "Sin datos"} />;
 
   return (
-    <div style={{ overflowX: "auto", border: "1px solid #d8c4ad", borderRadius: 10 }}>
+    <div className="data-table-scroll" style={{ overflowX: "auto", border: "1px solid #d8c4ad", borderRadius: 10 }}>
       <table role="table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
           <tr style={{ background: "#fffaf4", borderBottom: "1px solid #d8c4ad" }}>

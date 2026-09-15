@@ -72,7 +72,7 @@ export function ClientBudgets({ apis }: Props) {
         ? <EmptyState icon="✍" title="No hay presupuestos" hint="Aún no tienes presupuestos asignados" />
         : <div role="list" style={{ display: "grid", gap: 10 }}>
             {sorted.map(b => (
-              <article key={b.id} role="listitem"
+              <article key={b.id} role="listitem" className="private-action-card"
                 style={{ padding: 16, background: "#fffaf4", border: `1px solid ${b.estado === "enviado" ? "#fbbf24" : "#d8c4ad"}`, borderRadius: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>

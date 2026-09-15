@@ -34,7 +34,7 @@ export function BudgetDetail({ budget, clientName, projectName, onDownloadPDF, o
       </header>
 
       {/* Metadata grid */}
-      <dl style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, fontSize: 12, marginBottom: 20, padding: 14, background: "#f8efe4", borderRadius: 8 }}>
+      <dl className="budget-detail-meta" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, fontSize: 12, marginBottom: 20, padding: 14, background: "#f8efe4", borderRadius: 8 }}>
         <Meta k="Cliente"    v={clientName} />
         <Meta k="Proyecto"   v={projectName} />
         <Meta k="Creado"     v={formatDate(budget.fechaCreacion)} />
@@ -47,7 +47,7 @@ export function BudgetDetail({ budget, clientName, projectName, onDownloadPDF, o
       <h3 style={{ fontSize: 13, fontWeight: 700, color: "#c17248", marginBottom: 10, textTransform: "uppercase", letterSpacing: ".05em" }}>
         Partidas ({budget.partidas.length})
       </h3>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 20 }}>
+      <div className="private-table-scroll"><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 20 }}>
         <thead>
           <tr style={{ borderBottom: "1px solid #d8c4ad" }}>
             <th style={thStyle}>Concepto</th>
@@ -75,7 +75,7 @@ export function BudgetDetail({ budget, clientName, projectName, onDownloadPDF, o
             );
           }) as ReactNode}
         </tbody>
-      </table>
+      </table></div>
 
       {/* Totals */}
       <div style={{ marginLeft: "auto", maxWidth: 320, fontSize: 13 }}>

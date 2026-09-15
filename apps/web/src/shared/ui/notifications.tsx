@@ -58,7 +58,7 @@ export function useNotifications(): Ctx {
 function NotificationStack({ items, onDismiss }: { items: Notif[]; onDismiss: (id: string) => void }) {
   const colorFor: Record<NotifType, string> = { info: "#60a5fa", success: "#34d399", warn: "#fbbf24", error: "#f87171" };
   return (
-    <div role="region" aria-live="polite" aria-label="Notificaciones"
+    <div className="notification-stack" role="region" aria-live="polite" aria-label="Notificaciones"
       style={{ position: "fixed", top: 20, right: 20, display: "flex", flexDirection: "column", gap: 8, zIndex: 3000, maxWidth: 360 }}>
       {items.map(n => (
         <div key={n.id} role="status"

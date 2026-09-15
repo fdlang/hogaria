@@ -23,7 +23,7 @@ export function BudgetLineEditor({ partida, globalIva, index, errors, onChange, 
   const ivaAmount    = base * (effectiveIVA / 100);
 
   return (
-    <article style={{
+    <article className="budget-line-editor" style={{
       border: "1px solid #d8c4ad", borderRadius: 10, padding: 14, marginBottom: 10, background: "#f8efe4",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
@@ -41,7 +41,7 @@ export function BudgetLineEditor({ partida, globalIva, index, errors, onChange, 
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 10 }}>
+      <div className="budget-line-main-grid" style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 10 }}>
         <Input
           label="Categoría" value={partida.categoria}
           onChange={e => onChange(partida.id, "categoria", e.target.value)}
@@ -53,7 +53,7 @@ export function BudgetLineEditor({ partida, globalIva, index, errors, onChange, 
         />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+      <div className="budget-line-fields-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
         <Input
           label="Cantidad" type="number" step="0.01" min="0"
           value={partida.cantidad}
@@ -100,7 +100,7 @@ export function BudgetLineEditor({ partida, globalIva, index, errors, onChange, 
         onChange={e => onChange(partida.id, "nota", e.target.value)}
       />
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 20, fontSize: 12, color: "#71685e", paddingTop: 8, borderTop: "1px solid #decdb8" }}>
+      <div className="budget-line-totals" style={{ display: "flex", justifyContent: "flex-end", gap: 20, fontSize: 12, color: "#71685e", paddingTop: 8, borderTop: "1px solid #decdb8" }}>
         <span>Base: <strong style={{ color: "#302d29" }}>{formatMoney(base)}</strong></span>
         <span>IVA {effectiveIVA}%: <strong style={{ color: "#302d29" }}>{formatMoney(ivaAmount)}</strong></span>
         <span>Total: <strong style={{ color: "#c17248" }}>{formatMoney(base + ivaAmount)}</strong></span>
