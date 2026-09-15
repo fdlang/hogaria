@@ -93,7 +93,7 @@ export function SignatureWizard({ open, budgetId, budgetsApi, onClose, onSigned,
           <Input label="Contraseña" type="password" autoComplete="current-password"
             value={password} onChange={e => setPassword(e.target.value)} />
 
-          <p style={{ fontSize: 11, color: "#71685e", marginTop: -6, marginBottom: 16 }}>
+          <p style={{ fontSize: 12, color: "#71685e", marginTop: -6, marginBottom: 16 }}>
             Tu contraseña se usa para confirmar tu identidad en el momento de la firma.
             Se hashea con bcrypt; nunca se almacena en claro.
           </p>
@@ -119,7 +119,7 @@ export function SignatureWizard({ open, budgetId, budgetsApi, onClose, onSigned,
           <div style={{ fontSize: 48, color: "#34d399", marginBottom: 12 }}>✓</div>
           <h3 style={{ fontSize: 18, color: "#302d29", marginBottom: 8 }}>Firma completada</h3>
           <p style={{ fontSize: 12, color: "#71685e", marginBottom: 10 }}>Hash del documento:</p>
-          <code style={{ display: "block", fontFamily: "monospace", fontSize: 10, color: "#c17248", wordBreak: "break-all", padding: 8, background: "#f8efe4", borderRadius: 6 }}>
+          <code style={{ display: "block", fontFamily: "monospace", fontSize: 12, color: "#c17248", wordBreak: "break-all", padding: 8, background: "#f8efe4", borderRadius: 6 }}>
             {flow.state.hash}
           </code>
         </div>

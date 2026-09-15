@@ -61,10 +61,10 @@ export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
 
       {perms && (
         <aside style={{ padding: 14, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, marginBottom: 24, fontSize: 12, color: "#71685e" }}>
-          <strong style={{ color: "#c17248", display: "block", marginBottom: 6, fontSize: 11, letterSpacing: ".05em", textTransform: "uppercase" }}>Tus permisos</strong>
+          <strong style={{ color: "#c17248", display: "block", marginBottom: 6, fontSize: 12, letterSpacing: ".05em", textTransform: "uppercase" }}>Tus permisos</strong>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {Object.entries(perms).map(([k, v]) => (
-              <code key={k} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: v ? "#34d39918" : "#f8717118", color: v ? "#34d399" : "#f87171" }}>
+              <code key={k} style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, background: v ? "#34d39918" : "#f8717118", color: v ? "#34d399" : "#f87171" }}>
                 {v ? "✓" : "✗"} {k.replace(/([A-Z])/g, " $1").toLowerCase()}
               </code>
             ))}

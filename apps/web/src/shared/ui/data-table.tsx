@@ -68,7 +68,7 @@ export function DataTable<T>({ data, columns, rowKey, onRowClick, loading, error
                 aria-sort={sort?.key === c.key ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}
                 style={{
                   padding: "12px 14px", textAlign: c.align ?? "left",
-                  fontSize: 11, fontWeight: 700, color: "#71685e",
+                  fontSize: 12, fontWeight: 700, color: "#71685e",
                   textTransform: "uppercase", letterSpacing: ".07em",
                   width: c.width,
                   cursor: c.sortBy ? "pointer" : "default",

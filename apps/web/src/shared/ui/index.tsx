@@ -81,7 +81,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
 }
 
-export function Button({ variant = "primary", loading, small, children, disabled, style, ...rest }: ButtonProps) {
+export function Button({ variant = "primary", loading, small, children, disabled, style, className, ...rest }: ButtonProps) {
   const colors: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
     primary: { bg: "#c17248", fg: "#f7efe5", border: "#c17248" },
     ghost:   { bg: "transparent", fg: "#545048", border: "#a8947e" },
@@ -89,7 +89,7 @@ export function Button({ variant = "primary", loading, small, children, disabled
   };
   const c = colors[variant];
   return (
-    <button {...rest} disabled={disabled || loading}
+    <button {...rest} className={`ui-button ui-button--${variant}${className ? ` ${className}` : ""}`} data-variant={variant} disabled={disabled || loading}
       style={{
         background: c.bg, color: c.fg, border: `1px solid ${c.border}`,
         padding: small ? "6px 12px" : "9px 18px",
@@ -118,14 +118,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ l
   const errId       = `${inputId}-err`;
   return (
     <div style={{ marginBottom: 14 }}>
-      {label && <label htmlFor={inputId} style={{ display: "block", fontSize: 11, fontWeight: 600, color: error ? "#f87171" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
+      {label && <label htmlFor={inputId} style={{ display: "block", fontSize: 12, fontWeight: 600, color: error ? "#f87171" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
       <input
         {...props} id={inputId} ref={ref}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errId : undefined}
         style={{ width: "100%", background: "#fffaf4", border: `1px solid ${error ? "#f87171" : "#cdb69d"}`, borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", ...props.style }}
       />
-      {error && <p id={errId} role="alert" style={{ fontSize: 11, color: "#f87171", marginTop: 3 }}>{error}</p>}
+      {error && <p id={errId} role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: 3 }}>{error}</p>}
     </div>
   );
 });
@@ -140,12 +140,12 @@ export function Textarea({ label, error, id: explicitId, ...props }: TextareaPro
   const errId = `${taId}-err`;
   return (
     <div style={{ marginBottom: 14 }}>
-      {label && <label htmlFor={taId} style={{ display: "block", fontSize: 11, fontWeight: 600, color: error ? "#b5483f" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
+      {label && <label htmlFor={taId} style={{ display: "block", fontSize: 12, fontWeight: 600, color: error ? "#b5483f" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
       <textarea {...props} id={taId}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errId : undefined}
         style={{ width: "100%", background: "#fffaf4", border: `1px solid ${error ? "#b5483f" : "#cdb69d"}`, borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", resize: "vertical", minHeight: 80, ...props.style }} />
-      {error && <p id={errId} role="alert" style={{ fontSize: 11, color: "#b5483f", marginTop: 3 }}>{error}</p>}
+      {error && <p id={errId} role="alert" style={{ fontSize: 12, color: "#b5483f", marginTop: 3 }}>{error}</p>}
     </div>
   );
 }
@@ -156,7 +156,7 @@ export function Select({ label, children, id: explicitId, ...props }: SelectProp
   const selId = explicitId ?? generatedId;
   return (
     <div style={{ marginBottom: 14 }}>
-      {label && <label htmlFor={selId} style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
+      {label && <label htmlFor={selId} style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
       <select {...props} id={selId}
         style={{ width: "100%", background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", cursor: "pointer", ...props.style }}>{children}</select>
     </div>
@@ -175,7 +175,7 @@ export function Spinner({ size = 20 }: { size?: number }) {
 
 export function Badge({ children, color = "#c17248" }: { children: ReactNode; color?: string }) {
   return (
-    <span style={{ display: "inline-block", padding: "2px 8px", fontSize: 10, fontWeight: 700, background: `${color}18`, color, borderRadius: 4, letterSpacing: ".05em", textTransform: "uppercase" }}>
+    <span style={{ display: "inline-block", padding: "2px 8px", fontSize: 12, fontWeight: 700, background: `${color}18`, color, borderRadius: 4, letterSpacing: ".05em", textTransform: "uppercase" }}>
       {children}
     </span>
   );

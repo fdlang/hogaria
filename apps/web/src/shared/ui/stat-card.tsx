@@ -25,12 +25,12 @@ export function StatCard({ label, value, hint, accent = "#c17248", icon }: Props
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
         {icon && <span style={{ color: accent, fontSize: 14 }}>{icon}</span>}
-        <span style={{ fontSize: 10, color: "#71685e", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: 12, color: "#71685e", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600 }}>{label}</span>
       </div>
       <div style={{ fontSize: 26, color: "#302d29", fontWeight: 600, fontFamily: "Cormorant Garamond, serif", lineHeight: 1 }}>
         {value}
       </div>
-      {hint && <div style={{ fontSize: 11, color: "#71685e", marginTop: 6 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 12, color: "#71685e", marginTop: 6 }}>{hint}</div>}
     </div>
   );
 }

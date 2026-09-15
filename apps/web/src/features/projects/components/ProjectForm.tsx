@@ -57,7 +57,7 @@ export function ProjectForm({ api, initialProject, clients, onSaved, onCancel }:
           {PROJECT_TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
         </Select>
       </div>
-      {form.errors.clienteId && <p role="alert" style={{ fontSize: 11, color: "#f87171", marginTop: -10, marginBottom: 10 }}>{form.errors.clienteId}</p>}
+      {form.errors.clienteId && <p role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: -10, marginBottom: 10 }}>{form.errors.clienteId}</p>}
 
       <Input label="Dirección" required
         value={form.state.direccion} error={form.errors.direccion}

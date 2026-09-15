@@ -9,6 +9,13 @@
 
 import { ApiClient } from "@/shared/lib/api-client";
 
+export interface BudgetSignatureDTO {
+  firmante: string;
+  fechaFirma: string;
+  ip: string;
+  hash: string;
+}
+
 export interface BudgetDTO {
   id: number; proyectoId: number; clienteId: number;
   nombre: string; referencia: string;
@@ -22,7 +29,7 @@ export interface BudgetDTO {
     descuento: number; iva: number | null;
     ref?: string; nota?: string;
   }>;
-  firma: unknown | null;
+  firma: BudgetSignatureDTO | null;
 }
 
 export class BudgetsApi {

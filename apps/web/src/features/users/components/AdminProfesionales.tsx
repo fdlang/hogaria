@@ -72,13 +72,13 @@ export function AdminProfesionales({ apis }: Props) {
                         <h3 style={{ fontSize: 14, fontWeight: 600, color: "#302d29" }}>{u.nombre}</h3>
                         {u.profesion && <ProfesionBadge profesion={u.profesion as Profesion} />}
                         <Badge color="#60a5fa">{assigned} proyectos</Badge>
-                        {!u.activo && <code style={{ fontSize: 10, color: "#f87171", background: "#f8717118", padding: "1px 5px", borderRadius: 3 }}>INACTIVO</code>}
+                        {!u.activo && <code style={{ fontSize: 12, color: "#f87171", background: "#f8717118", padding: "1px 5px", borderRadius: 3 }}>INACTIVO</code>}
                       </div>
                       <p style={{ fontSize: 12, color: "#71685e" }}>{u.email}{u.telefono && ` · ${u.telefono}`} · desde {formatDate(u.createdAt)}</p>
                       {perms && (
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
                           {Object.entries(perms).filter(([, v]) => v).map(([k]) => (
-                            <code key={k} style={{ fontSize: 9, background: "#fffaf4", color: "#71685e", padding: "1px 5px", borderRadius: 3 }}>
+                            <code key={k} style={{ fontSize: 12, background: "#fffaf4", color: "#71685e", padding: "1px 5px", borderRadius: 3 }}>
                               {k.replace(/([A-Z])/g, " $1").toLowerCase()}
                             </code>
                           ))}

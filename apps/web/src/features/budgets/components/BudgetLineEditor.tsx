@@ -29,11 +29,11 @@ export function BudgetLineEditor({ partida, globalIva, index, errors, onChange, 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {partida.ref && (
-            <code style={{ fontSize: 10, background: "#fffaf4", color: "#c17248", padding: "2px 6px", borderRadius: 4 }}>
+            <code style={{ fontSize: 12, background: "#fffaf4", color: "#c17248", padding: "2px 6px", borderRadius: 4 }}>
               {partida.ref}
             </code>
           )}
-          <span style={{ fontSize: 11, color: "#71685e" }}>#{index + 1}</span>
+          <span style={{ fontSize: 12, color: "#71685e" }}>#{index + 1}</span>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           {onDuplicate && <Button small variant="ghost" onClick={() => onDuplicate(partida.id)} aria-label="Duplicar">⎘</Button>}
@@ -76,7 +76,7 @@ export function BudgetLineEditor({ partida, globalIva, index, errors, onChange, 
           onChange={e => onChange(partida.id, "descuento", parseFloat(e.target.value) || 0)}
         />
         <div>
-          <label htmlFor={`iva-${partida.id}`} style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>
+          <label htmlFor={`iva-${partida.id}`} style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>
             IVA (%)
           </label>
           <select

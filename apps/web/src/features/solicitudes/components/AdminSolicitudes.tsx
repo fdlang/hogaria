@@ -115,7 +115,7 @@ export function AdminSolicitudes({ api }: Props) {
               <MetaRow k="IP"          v={detail.ip} />
             </dl>
             <div>
-              <p style={{ fontSize: 10, color: "#71685e", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6 }}>Descripción</p>
+              <p style={{ fontSize: 12, color: "#71685e", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6 }}>Descripción</p>
               <p style={{ fontSize: 13, color: "#302d29", lineHeight: 1.6, padding: 14, background: "#f8efe4", borderRadius: 8, whiteSpace: "pre-wrap" }}>
                 {detail.descripcion}
               </p>
@@ -133,7 +133,7 @@ function MetaRow({ k, v, copyable }: { k: string; v: string; copyable?: boolean 
       <dt style={{ color: "#71685e" }}>{k}</dt>
       <dd style={{ color: "#302d29", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
         {v}
-        {copyable && <button onClick={() => navigator.clipboard.writeText(v)} style={{ background: "none", border: "none", color: "#c17248", cursor: "pointer", fontSize: 11 }}>📋</button>}
+        {copyable && <button onClick={() => navigator.clipboard.writeText(v)} style={{ background: "none", border: "none", color: "#c17248", cursor: "pointer", fontSize: 12 }}>📋</button>}
       </dd>
     </div>
   );

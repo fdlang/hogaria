@@ -112,20 +112,21 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
     ] : [];
 
   return (
-    <header style={{ display: "flex", justifyContent: "space-between", padding: "14px 32px", borderBottom: "1px solid var(--line)", background: "rgba(247,239,229,.92)", alignItems: "center", position: "sticky", top: 0, zIndex: 20, backdropFilter: "blur(12px)" }}>
-      <a href={user ? `#/${user.rol}` : "#/"} style={{ color: "var(--graphite)", fontWeight: 700, fontSize: 18, textDecoration: "none" }}>
+    <header style={{ display: "flex", justifyContent: "space-between", minHeight: 70, padding: "14px 32px", borderBottom: "1px solid var(--line)", background: "rgba(247,239,229,.92)", alignItems: "center", position: "sticky", top: 0, zIndex: 20, backdropFilter: "blur(12px)" }}>
+      <a href={user ? `#/${user.rol}` : "#/"} style={{ color: "var(--graphite)", fontWeight: 700, fontSize: 22, textDecoration: "none" }}>
         Hogaria
       </a>
 
       {user ? (
-        <nav style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <nav className="private-nav" style={{ display: "flex", alignItems: "center", gap: 18 }}>
           {links.map(l => (
             <a key={l.to} href={l.to}
-              style={{ fontSize: 12, color: "#71685e", textDecoration: "none", textTransform: "uppercase", letterSpacing: ".05em" }}>
+              className="private-nav-link"
+              style={{ fontSize: 13, fontWeight: 700, color: "#71685e", textDecoration: "none", textTransform: "uppercase", letterSpacing: ".05em", transition: "color .18s ease" }}>
               {l.label}
             </a>
           ))}
-          <span style={{ fontSize: 11, color: "#85786b" }}>·</span>
+          <span style={{ fontSize: 12, color: "#85786b" }}>·</span>
           <span style={{ fontSize: 12, color: "#71685e" }}>{user.nombre}</span>
           <Button small variant="ghost" onClick={onSignOut}>Salir</Button>
         </nav>
@@ -170,7 +171,7 @@ function Tile({ href, title, subtitle }: { href: string; title: string; subtitle
   return (
     <a href={href} style={{ display: "block", padding: 20, background: "rgba(255,250,244,.86)", border: "1px solid var(--line)", borderRadius: 10, textDecoration: "none", boxShadow: "0 8px 24px rgba(72,59,44,.08)" }}>
       <h3 style={{ color: "#c17248", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>{title}</h3>
-      <p style={{ fontSize: 11, color: "#71685e" }}>{subtitle}</p>
+      <p style={{ fontSize: 12, color: "#71685e" }}>{subtitle}</p>
     </a>
   );
 }

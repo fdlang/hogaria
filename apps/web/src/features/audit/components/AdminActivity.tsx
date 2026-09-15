@@ -82,15 +82,15 @@ export function AdminActivity({ api }: Props) {
                 </div>
                 <div style={{ flex: 1, paddingBottom: 18 }}>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", color: ACTION_COLORS[entry.action] ?? "#71685e", background: `${ACTION_COLORS[entry.action] ?? "#71685e"}18`, padding: "2px 7px", borderRadius: 4 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "monospace", color: ACTION_COLORS[entry.action] ?? "#71685e", background: `${ACTION_COLORS[entry.action] ?? "#71685e"}18`, padding: "2px 7px", borderRadius: 4 }}>
                       {entry.action}
                     </span>
-                    <span style={{ fontSize: 10, color: "#85786b" }}>{formatDateTime(entry.timestamp)}</span>
-                    <span style={{ fontSize: 10, color: "#545048" }}>IP: {entry.ip}</span>
+                    <span style={{ fontSize: 12, color: "#85786b" }}>{formatDateTime(entry.timestamp)}</span>
+                    <span style={{ fontSize: 12, color: "#545048" }}>IP: {entry.ip}</span>
                   </div>
                   <p style={{ fontSize: 12, color: "#71685e" }}>
                     Usuario: <strong style={{ color: "#302d29" }}>{entry.userName}</strong>
-                    {" "}<span style={{ fontFamily: "monospace", fontSize: 10, color: "#85786b" }}>
+                    {" "}<span style={{ fontFamily: "monospace", fontSize: 12, color: "#85786b" }}>
                       · {JSON.stringify(entry.details)}
                     </span>
                   </p>

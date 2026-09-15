@@ -138,7 +138,7 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
               <option value="">— Selecciona proyecto —</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </Select>
-            {form.state.errors.proyectoId && <p role="alert" style={{ fontSize: 11, color: "#f87171", marginTop: -10, marginBottom: 10 }}>{form.state.errors.proyectoId}</p>}
+            {form.state.errors.proyectoId && <p role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: -10, marginBottom: 10 }}>{form.state.errors.proyectoId}</p>}
 
             <Select label="Cliente"
               value={form.state.clienteId ?? ""}
@@ -146,7 +146,7 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
               <option value="">— Selecciona cliente —</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.nombre} ({c.email})</option>)}
             </Select>
-            {form.state.errors.clienteId && <p role="alert" style={{ fontSize: 11, color: "#f87171", marginTop: -10, marginBottom: 10 }}>{form.state.errors.clienteId}</p>}
+            {form.state.errors.clienteId && <p role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: -10, marginBottom: 10 }}>{form.state.errors.clienteId}</p>}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <Select label="IVA por defecto"
@@ -221,7 +221,7 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
 
       {/* ─── SIDEBAR: LIVE TOTALS ──────────────────────── */}
       <aside style={{ position: "sticky", top: 20, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, padding: 18 }}>
-        <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", color: "#71685e", marginBottom: 12 }}>
+        <h4 style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", color: "#71685e", marginBottom: 12 }}>
           Resumen en vivo
         </h4>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13 }}>
@@ -237,7 +237,7 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
           <Row label="TOTAL" value={formatMoney(form.totals.total.amount)} bold />
         </div>
 
-        <p style={{ fontSize: 10, color: "#85786b", marginTop: 12, textAlign: "center" }}>
+        <p style={{ fontSize: 12, color: "#85786b", marginTop: 12, textAlign: "center" }}>
           {form.state.partidas.length} partidas · {form.state.validezDias} días validez
         </p>
       </aside>

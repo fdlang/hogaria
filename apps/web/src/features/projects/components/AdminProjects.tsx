@@ -62,7 +62,7 @@ export function AdminProjects({ api, onOpenProject, onCreateProject }: Props) {
       render: p => (
         <div>
           <strong style={{ color: "#302d29" }}>{p.nombre}</strong>
-          <div style={{ fontSize: 11, color: "#71685e", marginTop: 2 }}>{p.direccion}</div>
+          <div style={{ fontSize: 12, color: "#71685e", marginTop: 2 }}>{p.direccion}</div>
         </div>
       )
     },
@@ -73,7 +73,7 @@ export function AdminProjects({ api, onOpenProject, onCreateProject }: Props) {
           <div style={{ flex: 1, height: 4, background: "#d8c4ad", borderRadius: 2, overflow: "hidden" }}>
             <div style={{ width: `${p.progreso}%`, height: "100%", background: "#c17248" }} />
           </div>
-          <span style={{ fontSize: 11, color: "#71685e", minWidth: 30 }}>{p.progreso}%</span>
+          <span style={{ fontSize: 12, color: "#71685e", minWidth: 30 }}>{p.progreso}%</span>
         </div>
       )
     },

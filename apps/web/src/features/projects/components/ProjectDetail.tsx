@@ -135,7 +135,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                         style={{ cursor: canEditMilestones ? "pointer" : "not-allowed" }} />
                       <div style={{ flex: 1 }}>
                         <p style={{ fontSize: 13, color: h.completado ? "#34d399" : "#302d29", textDecoration: h.completado ? "line-through" : "none" }}>{h.nombre}</p>
-                        <p style={{ fontSize: 11, color: "#71685e" }}>{formatDate(h.fecha)}</p>
+                        <p style={{ fontSize: 12, color: "#71685e" }}>{formatDate(h.fecha)}</p>
                       </div>
                     </li>
                   ))}
@@ -159,7 +159,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                         <span style={{ fontSize: 18 }}>{f.tipo.startsWith("image/") ? "🖼" : f.tipo === "application/pdf" ? "📄" : "📎"}</span>
                         <div style={{ minWidth: 0 }}>
                           <p style={{ fontSize: 13, color: "#302d29", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.nombre}</p>
-                          <p style={{ fontSize: 10, color: "#71685e" }}>{formatBytes(f.tamaño)} · {formatDate(f.uploadedAt)}</p>
+                          <p style={{ fontSize: 12, color: "#71685e" }}>{formatBytes(f.tamaño)} · {formatDate(f.uploadedAt)}</p>
                         </div>
                         {f.sensitive && <Badge color="#f87171">SENSIBLE</Badge>}
                       </div>
@@ -220,7 +220,7 @@ function FileUploadButton({ onUpload, canMarkSensitive }: {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       {canMarkSensitive && (
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#71685e" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#71685e" }}>
           <input type="checkbox" checked={sensitive} onChange={e => setSensitive(e.target.checked)} />
           Sensible
         </label>

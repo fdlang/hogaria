@@ -114,7 +114,7 @@ export function AdminBudgets({ apis }: Props) {
         <div>
           <strong style={{ color: "#302d29" }}>{b.nombre}</strong>
           {b.referencia && (
-            <code style={{ marginLeft: 8, fontSize: 10, background: "#fffaf4", color: "#71685e", padding: "2px 6px", borderRadius: 4 }}>{b.referencia}</code>
+            <code style={{ marginLeft: 8, fontSize: 12, background: "#fffaf4", color: "#71685e", padding: "2px 6px", borderRadius: 4 }}>{b.referencia}</code>
           )}
         </div>
       )
@@ -146,7 +146,7 @@ export function AdminBudgets({ apis }: Props) {
         {(["all", "borrador", "enviado", "firmado", "rechazado"] as const).map(s => (
           <button key={s} onClick={() => setFilterEstado(s)}
             style={{
-              padding: "6px 12px", fontSize: 11, fontWeight: 600, borderRadius: 6,
+              padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6,
               background: filterEstado === s ? "#c1724818" : "transparent",
               color:      filterEstado === s ? "#c17248" : "#71685e",
               border: `1px solid ${filterEstado === s ? "#c17248" : "#d8c4ad"}`,

@@ -68,7 +68,7 @@ export function AdminUsers({ api }: Props) {
       render: u => (
         <div>
           <strong style={{ color: u.activo ? "#302d29" : "#71685e" }}>{u.nombre}</strong>
-          <div style={{ fontSize: 11, color: "#71685e", marginTop: 2 }}>{u.email}</div>
+          <div style={{ fontSize: 12, color: "#71685e", marginTop: 2 }}>{u.email}</div>
         </div>
       )
     },
@@ -78,8 +78,8 @@ export function AdminUsers({ api }: Props) {
     { key: "telefono",  header: "Teléfono",  render: u => u.telefono || <span style={{ color: "#85786b" }}>—</span> },
     { key: "activo",    header: "Estado",    sortBy: u => (u.activo ? 1 : 0),
       render: u => u.activo
-        ? <span style={{ fontSize: 11, color: "#34d399" }}>● Activo</span>
-        : <span style={{ fontSize: 11, color: "#f87171" }}>● Inactivo</span> },
+        ? <span style={{ fontSize: 12, color: "#34d399" }}>● Activo</span>
+        : <span style={{ fontSize: 12, color: "#f87171" }}>● Inactivo</span> },
     { key: "desde", header: "Desde", sortBy: u => u.createdAt, align: "right",
       render: u => formatDate(u.createdAt) },
   ];

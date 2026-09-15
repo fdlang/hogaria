@@ -80,7 +80,7 @@ export function ClientDashboard({ apis, onOpenProject, onOpenBudget, onSignBudge
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12, background: "#fffaf4", borderRadius: 8 }}>
                 <div>
                   <h3 style={{ fontSize: 13, fontWeight: 600, color: "#302d29" }}>{b.nombre}</h3>
-                  <p style={{ fontSize: 11, color: "#71685e" }}>Recibido {formatDate(b.fechaEnvio)} · Validez {b.validezDias} días</p>
+                  <p style={{ fontSize: 12, color: "#71685e" }}>Recibido {formatDate(b.fechaEnvio)} · Validez {b.validezDias} días</p>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <Button small variant="ghost" onClick={() => onOpenBudget(b.id)}>Revisar</Button>
@@ -105,7 +105,7 @@ export function ClientDashboard({ apis, onOpenProject, onOpenBudget, onSignBudge
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
                   <div>
                     <h3 style={{ fontSize: 15, fontWeight: 600, color: "#302d29" }}>{p.nombre}</h3>
-                    <p style={{ fontSize: 11, color: "#71685e", marginTop: 2 }}>{p.direccion}</p>
+                    <p style={{ fontSize: 12, color: "#71685e", marginTop: 2 }}>{p.direccion}</p>
                   </div>
                   <ProjectStatusBadge estado={p.estado} />
                 </div>
@@ -114,7 +114,7 @@ export function ClientDashboard({ apis, onOpenProject, onOpenBudget, onSignBudge
                   <div style={{ height: 4, background: "#d8c4ad", borderRadius: 2, overflow: "hidden" }}>
                     <div style={{ width: `${p.progreso}%`, height: "100%", background: "#c17248", transition: "width .3s" }} />
                   </div>
-                  <p style={{ fontSize: 11, color: "#71685e", marginTop: 4 }}>
+                  <p style={{ fontSize: 12, color: "#71685e", marginTop: 4 }}>
                     {p.progreso}% completado · entrega prevista {formatDate(p.fechaFinPrevista)}
                   </p>
                 </div>

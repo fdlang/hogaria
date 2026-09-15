@@ -51,13 +51,13 @@ export function CatalogPicker({ onPickItem, onImportCategory }: Props) {
               <li key={item.ref}
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-                  <code style={{ fontSize: 10, background: "#fffaf4", color: "#c17248", padding: "2px 6px", borderRadius: 4 }}>{item.ref}</code>
+                  <code style={{ fontSize: 12, background: "#fffaf4", color: "#c17248", padding: "2px 6px", borderRadius: 4 }}>{item.ref}</code>
                   <span style={{ fontSize: 12, color: "#302d29", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.descripcion}</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <Badge color="#60a5fa">{item.iva}% IVA</Badge>
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#302d29" }}>
-                    {formatMoney(item.precio)} <span style={{ color: "#71685e", fontSize: 11 }}>/ {item.unidad}</span>
+                    {formatMoney(item.precio)} <span style={{ color: "#71685e", fontSize: 12 }}>/ {item.unidad}</span>
                   </span>
                   <Button small onClick={() => onPickItem(item.ref)}>+ Añadir</Button>
                 </div>

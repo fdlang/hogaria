@@ -54,7 +54,7 @@ export function LoginPage({ onSuccess, onBack }: Props) {
         )}
       </form>
 
-      <p style={{ fontSize: 10, color: "#85786b", textAlign: "center", marginTop: 20 }}>
+      <p style={{ fontSize: 12, color: "#85786b", textAlign: "center", marginTop: 20 }}>
         ¿Problemas para acceder? Contacta con el administrador
       </p>
     </div>

@@ -4,6 +4,7 @@
  */
 
 import { BudgetDTO } from "../api/budgets.api";
+import type { ReactNode } from "react";
 import { useBudgetCalculator } from "../hooks/useBudgets";
 import { Button } from "@/shared/ui";
 import { BudgetStatusBadge } from "@/shared/ui/badges";
@@ -27,7 +28,7 @@ export function BudgetDetail({ budget, clientName, projectName, onDownloadPDF, o
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 600, color: "#302d29", marginBottom: 4 }}>{budget.nombre}</h2>
-          {budget.referencia && <code style={{ fontSize: 11, color: "#71685e" }}>{budget.referencia}</code>}
+          {budget.referencia && <code style={{ fontSize: 12, color: "#71685e" }}>{budget.referencia}</code>}
         </div>
         <BudgetStatusBadge estado={budget.estado} />
       </header>
@@ -62,9 +63,9 @@ export function BudgetDetail({ budget, clientName, projectName, onDownloadPDF, o
             return (
               <tr key={p.id} style={{ borderBottom: "1px solid #decdb8" }}>
                 <td style={tdStyle}>
-                  {p.ref && <code style={{ fontSize: 9, background: "#fffaf4", color: "#c17248", padding: "1px 5px", borderRadius: 3, marginRight: 6 }}>{p.ref}</code>}
+                  {p.ref && <code style={{ fontSize: 12, background: "#fffaf4", color: "#c17248", padding: "1px 5px", borderRadius: 3, marginRight: 6 }}>{p.ref}</code>}
                   <strong style={{ color: "#302d29" }}>{p.categoria}</strong> — {p.descripcion}
-                  {p.nota && <div style={{ fontStyle: "italic", color: "#71685e", fontSize: 11, marginTop: 2 }}>↳ {p.nota}</div>}
+                  {p.nota && <div style={{ fontStyle: "italic", color: "#71685e", fontSize: 12, marginTop: 2 }}>↳ {p.nota}</div>}
                 </td>
                 <td style={{ ...tdStyle, textAlign: "right", color: "#302d29" }}>{p.cantidad} {p.unidad}</td>
                 <td style={{ ...tdStyle, textAlign: "right", color: "#302d29" }}>{formatMoney(p.precioUnit)}</td>
@@ -72,7 +73,7 @@ export function BudgetDetail({ budget, clientName, projectName, onDownloadPDF, o
                 <td style={{ ...tdStyle, textAlign: "right", color: "#c17248", fontWeight: 600 }}>{formatMoney(base)}</td>
               </tr>
             );
-          })}
+          }) as ReactNode}
         </tbody>
       </table>
 
@@ -105,11 +106,11 @@ export function BudgetDetail({ budget, clientName, projectName, onDownloadPDF, o
           <h4 style={{ color: "#c17248", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 8 }}>
             ✓ Firmado electrónicamente
           </h4>
-          <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", fontSize: 11, color: "#71685e" }}>
-            <dt>Firmante:</dt><dd style={{ color: "#302d29" }}>{(budget.firma as { firmante: string }).firmante}</dd>
-            <dt>Fecha:</dt>   <dd style={{ color: "#302d29" }}>{formatDateTime((budget.firma as { fechaFirma: string }).fechaFirma)}</dd>
-            <dt>IP:</dt>      <dd style={{ color: "#302d29" }}>{(budget.firma as { ip: string }).ip}</dd>
-            <dt>Hash:</dt>    <dd style={{ fontFamily: "monospace", fontSize: 10, wordBreak: "break-all", color: "#302d29" }}>{(budget.firma as { hash: string }).hash}</dd>
+          <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", fontSize: 12, color: "#71685e" }}>
+            <dt>Firmante:</dt><dd style={{ color: "#302d29" }}>{budget.firma.firmante}</dd>
+            <dt>Fecha:</dt>   <dd style={{ color: "#302d29" }}>{formatDateTime(budget.firma.fechaFirma)}</dd>
+            <dt>IP:</dt>      <dd style={{ color: "#302d29" }}>{budget.firma.ip}</dd>
+            <dt>Hash:</dt>    <dd style={{ fontFamily: "monospace", fontSize: 12, wordBreak: "break-all", color: "#302d29" }}>{budget.firma.hash}</dd>
           </dl>
         </section>
       )}
@@ -123,13 +124,13 @@ export function BudgetDetail({ budget, clientName, projectName, onDownloadPDF, o
   );
 }
 
-const thStyle = { padding: "8px 10px", fontSize: 10, fontWeight: 700, color: "#71685e", textTransform: "uppercase" as const, letterSpacing: ".05em", textAlign: "left" as const };
+const thStyle = { padding: "8px 10px", fontSize: 12, fontWeight: 700, color: "#71685e", textTransform: "uppercase" as const, letterSpacing: ".05em", textAlign: "left" as const };
 const tdStyle = { padding: "8px 10px", verticalAlign: "top" as const };
 
 function Meta({ k, v }: { k: string; v: string }) {
   return (
     <div>
-      <dt style={{ fontSize: 10, color: "#71685e", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 2 }}>{k}</dt>
+      <dt style={{ fontSize: 12, color: "#71685e", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 2 }}>{k}</dt>
       <dd style={{ color: "#302d29", fontSize: 12 }}>{v}</dd>
     </div>
   );
