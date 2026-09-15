@@ -1,0 +1,123 @@
+/**
+ * Audit / Solicitudes / Files HTTP controllers.
+ * Grouped to keep the per-file overhead low — each is small.
+ */
+
+import { QueryAuditLogUseCase } from "../../application/use-cases/audit.use-cases.js";
+import { SubmitSolicitudUseCase } from "../../application/use-cases/solicitud.use-cases.js";
+import { UploadFileUseCase, DeleteFileUseCase, ListFilesUseCase, ProjectFile } from "../../application/use-cases/file.use-cases.js";
+import { AuditEntry } from "@reformapro/domain/entities";
+import { toHttpError } from "./errorMiddleware.js";
+import { HttpRequest, HttpResponse } from "./authController.js";
+
+// ─────────────────────────────────────────────────────────────
+// Audit
+// ─────────────────────────────────────────────────────────────
+function toAuditDTO(e: AuditEntry) {
+  return {
+    id: e.id, action: e.action,
+    userId: e.userId, userName: e.userName,
+    details: e.details,
+    timestamp: e.timestamp.toISOString(),
+    ip: e.ip, userAgent: e.userAgent,
+  };
+}
+
+export function auditController(deps: { query: QueryAuditLogUseCase }) {
+  return {
+    // GET /audit?page=0&limit=50&action=...&userId=...&from=...&to=...
+    async query(req: HttpRequest & { actorId: number; query: Record<string, string> }): Promise<HttpResponse> {
+      try {
+        const result = await deps.query.execute({
+          actorId: req.actorId,
+          page:   req.query.page   ? parseInt(req.query.page,   10) : undefined,
+          limit:  req.query.limit  ? parseInt(req.query.limit,  10) : undefined,
+          action: req.query.action ?? null,
+          userId: req.query.userId ? parseInt(req.query.userId, 10) : null,
+          from:   req.query.from   ? new Date(req.query.from)   : null,
+          to:     req.query.to     ? new Date(req.query.to)     : null,
+        });
+        return {
+          status: 200,
+          body: {
+            items: result.items.map(toAuditDTO),
+            total: result.total, page: result.page, limit: result.limit, pages: result.pages,
+          },
+        };
+      } catch (e) { return toHttpError(e); }
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Solicitudes (public, rate-limited)
+// ─────────────────────────────────────────────────────────────
+export function solicitudController(deps: { submit: SubmitSolicitudUseCase }) {
+  const ctxOf = (req: HttpRequest) => ({ ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" });
+
+  return {
+    // POST /solicitudes — public, rate-limited
+    async submit(req: HttpRequest): Promise<HttpResponse> {
+      try {
+        const body = req.body as { nombre: string; email: string; telefono?: string; tipo: string; descripcion: string };
+        const result = await deps.submit.execute({ ...body, ctx: ctxOf(req) });
+        return { status: 201, body: result };
+      } catch (e) { return toHttpError(e); }
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Files
+// ─────────────────────────────────────────────────────────────
+function toFileDTO(f: ProjectFile) {
+  return {
+    id: f.id, projectId: f.projectId, uploadedBy: f.uploadedBy,
+    nombre: f.nombre, tipo: f.tipo, tamaño: f.tamaño,
+    storageKey: f.storageKey, sensitive: f.sensitive,
+    uploadedAt: f.uploadedAt.toISOString(),
+  };
+}
+
+export function fileController(deps: {
+  upload: UploadFileUseCase;
+  delete: DeleteFileUseCase;
+  list:   ListFilesUseCase;
+}) {
+  const ctxOf = (req: HttpRequest) => ({ ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" });
+
+  return {
+    // POST /projects/:projectId/files — metadata only; presigned URL flow goes elsewhere
+    async upload(req: HttpRequest & { actorId: number; params: { projectId: string } }): Promise<HttpResponse> {
+      try {
+        const body = req.body as { nombre: string; tipo: string; tamaño: number; storageKey: string; sensitive: boolean };
+        const file = await deps.upload.execute({
+          actorId: req.actorId,
+          projectId: parseInt(req.params.projectId, 10),
+          ctx: ctxOf(req),
+          ...body,
+        });
+        return { status: 201, body: toFileDTO(file) };
+      } catch (e) { return toHttpError(e); }
+    },
+
+    // DELETE /files/:id
+    async delete(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        await deps.delete.execute({ actorId: req.actorId, fileId: parseInt(req.params.id, 10) });
+        return { status: 204, body: null };
+      } catch (e) { return toHttpError(e); }
+    },
+
+    // GET /projects/:projectId/files
+    async list(req: HttpRequest & { actorId: number; params: { projectId: string } }): Promise<HttpResponse> {
+      try {
+        const files = await deps.list.execute({
+          actorId: req.actorId,
+          projectId: parseInt(req.params.projectId, 10),
+        });
+        return { status: 200, body: files.map(toFileDTO) };
+      } catch (e) { return toHttpError(e); }
+    },
+  };
+}

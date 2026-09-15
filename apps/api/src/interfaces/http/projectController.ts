@@ -1,0 +1,78 @@
+/**
+ * Project HTTP controller.
+ * Permissions (admin-only for create/delete; profesional restricted to progreso/hitos)
+ * are enforced inside the use cases via PermissionPolicy.
+ */
+
+import { CreateProjectUseCase, UpdateProjectUseCase, DeleteProjectUseCase, ListProjectsUseCase } from "../../application/use-cases/project.use-cases.js";
+import { Project } from "@reformapro/domain/entities";
+import { toHttpError } from "./errorMiddleware.js";
+import { HttpRequest, HttpResponse } from "./authController.js";
+
+export function toProjectDTO(p: Project) {
+  return {
+    id: p.id, nombre: p.nombre, descripcion: p.descripcion,
+    clienteId: p.clienteId, direccion: p.direccion, tipo: p.tipo,
+    estado: p.estado,
+    progreso: p.progreso.value, presupuesto: p.presupuesto.amount,
+    fechaInicio:      p.fechaInicio.toISOString(),
+    fechaFinPrevista: p.fechaFinPrevista.toISOString(),
+    profesionalesAsignados: p.profesionalesAsignados,
+    hitos: p.hitos.map(h => ({
+      id: h.id, nombre: h.nombre, completado: h.completado,
+      fecha: h.fecha.toISOString(),
+    })),
+  };
+}
+
+export function projectController(deps: {
+  create: CreateProjectUseCase;
+  update: UpdateProjectUseCase;
+  delete: DeleteProjectUseCase;
+  list:   ListProjectsUseCase;
+}) {
+  const ctxOf = (req: HttpRequest) => ({ ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" });
+
+  return {
+    // POST /projects
+    async create(req: HttpRequest & { actorId: number }): Promise<HttpResponse> {
+      try {
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const project = await deps.create.execute({
+          ...body,
+          actorId: req.actorId, ctx: ctxOf(req),
+        } as never);
+        return { status: 201, body: toProjectDTO(project) };
+      } catch (e) { return toHttpError(e); }
+    },
+
+    // PATCH /projects/:id
+    async update(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        const project = await deps.update.execute({
+          actorId: req.actorId,
+          projectId: parseInt(req.params.id, 10),
+          ctx: ctxOf(req),
+          changes: req.body as never,
+        });
+        return { status: 200, body: toProjectDTO(project) };
+      } catch (e) { return toHttpError(e); }
+    },
+
+    // DELETE /projects/:id
+    async delete(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        await deps.delete.execute({ actorId: req.actorId, projectId: parseInt(req.params.id, 10) });
+        return { status: 204, body: null };
+      } catch (e) { return toHttpError(e); }
+    },
+
+    // GET /projects
+    async list(req: HttpRequest & { actorId: number }): Promise<HttpResponse> {
+      try {
+        const projects = await deps.list.execute({ actorId: req.actorId });
+        return { status: 200, body: projects.map(toProjectDTO) };
+      } catch (e) { return toHttpError(e); }
+    },
+  };
+}

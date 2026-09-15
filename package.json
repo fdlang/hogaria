@@ -1,0 +1,19 @@
+{
+  "name": "reformapro",
+  "version": "2.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api":   "npm run dev --workspace @reformapro/api",
+    "dev:web":   "npm run dev --workspace @reformapro/web",
+    "build":     "npm run build --workspaces --if-present",
+    "test":      "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

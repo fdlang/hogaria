@@ -1,0 +1,55 @@
+/**
+ * Global CSS — kept minimal and additive.
+ * Everything else is inline styles (prop-driven, theme-aware).
+ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #0a0a09;
+  color: #f0ede6;
+}
+
+body {
+  min-height: 100vh;
+}
+
+/* Spinner animation — referenced by <Spinner> in shared/ui */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Focus states — inputs have their own focus ring via border-color */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #c8a96e;
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  border-color: #c8a96e !important;
+}
+
+/* Minimal scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track { background: #0a0a09; }
+::-webkit-scrollbar-thumb { background: #2a2a26; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a36; }
+
+/* Prevent iOS from zooming on input focus */
+@media (max-width: 768px) {
+  input, textarea, select { font-size: 16px !important; }
+}

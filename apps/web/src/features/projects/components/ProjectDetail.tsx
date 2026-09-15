@@ -1,0 +1,239 @@
+/**
+ * ProjectDetail — unified project page (admin / cliente / profesional).
+ *
+ * Uses the specialised optimistic-update helpers in useProjects.ts:
+ *   - useProgressUpdater   — optimistic progreso with rollback on error
+ *   - useMilestoneToggler  — optimistic hito toggle with rollback on error
+ *
+ * The visible action set is gated by usePermissions(), so there's no
+ * duplication across roles.
+ */
+
+import { useState } from "react";
+import { ProjectsApi } from "../api/projects.api";
+import { useProject, useProgressUpdater, useMilestoneToggler } from "../hooks/useProjects";
+import { FilesApi, useProjectFiles } from "@/features/files/api/files.api";
+import { usePermissions } from "@/shared/hooks/usePermissions";
+import { useNotifications } from "@/shared/ui/notifications";
+import { useConfirm } from "@/shared/ui/confirm";
+import { Button, Spinner, Badge, EmptyState } from "@/shared/ui";
+import { PageHeader } from "@/shared/ui/page-header";
+import { ProjectStatusBadge, ProfesionBadge } from "@/shared/ui/badges";
+import { formatMoney, formatDate, formatBytes } from "@/shared/lib/formatters";
+import { Profesion } from "@reformapro/domain";
+
+interface Props {
+  apis: { projects: ProjectsApi; files: FilesApi };
+  projectId: number;
+  onBack: () => void;
+}
+
+export function ProjectDetail({ apis, projectId, onBack }: Props) {
+  const project       = useProject(apis.projects, projectId);
+  const updateProgress = useProgressUpdater(apis.projects, project);
+  const toggleMilestone = useMilestoneToggler(apis.projects, project);
+  const files          = useProjectFiles(apis.files, projectId);
+  const { can }        = usePermissions();
+  const { push }       = useNotifications();
+  const confirm        = useConfirm();
+  const [editingProgress, setEditingProgress] = useState<number | null>(null);
+
+  const handleProgressSave = async () => {
+    if (editingProgress === null) return;
+    try { await updateProgress(editingProgress); setEditingProgress(null); push("Progreso actualizado", "success"); }
+    catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
+  };
+
+  const handleMilestoneToggle = async (id: number) => {
+    try { await toggleMilestone(id); push("Hito actualizado", "success"); }
+    catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
+  };
+
+  const handleFileUpload = async (file: File, sensitive: boolean) => {
+    try { await files.upload(file, sensitive); push(`${file.name} subido`, "success"); }
+    catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
+  };
+
+  const handleFileDelete = async (fileId: number, name: string, sensitive: boolean) => {
+    const ok = await confirm({
+      title: sensitive ? "⚠ Archivo sensible" : "Eliminar archivo",
+      message: sensitive
+        ? <>Vas a eliminar <strong>{name}</strong>, un archivo marcado como sensible. La acción quedará registrada en el audit log.</>
+        : <>¿Eliminar <strong>{name}</strong>?</>,
+      variant: "danger",
+      confirmLabel: "Eliminar",
+    });
+    if (!ok) return;
+    try { await files.remove(fileId); push("Archivo eliminado", "success"); }
+    catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
+  };
+
+  if (project.loading) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>;
+  if (project.error || !project.data) {
+    return <div role="alert" style={{ color: "#f87171", padding: 20 }}>{project.error ?? "Proyecto no encontrado"}</div>;
+  }
+
+  const p = project.data;
+  const canUpdateProgress = can("project.update.progress",   { project: p as never });
+  const canEditMilestones = can("project.update.milestones", { project: p as never });
+  const canManageProject  = can("project.update");
+  const canUploadFiles    = can("project.read", { project: p as never });
+
+  return (
+    <section>
+      <nav style={{ marginBottom: 20 }}>
+        <Button variant="ghost" small onClick={onBack}>← Volver</Button>
+      </nav>
+
+      <PageHeader
+        title={p.nombre}
+        subtitle={`${p.direccion} · ${p.tipo}`}
+        actions={<ProjectStatusBadge estado={p.estado} />}
+      />
+
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24, alignItems: "flex-start" }}>
+        {/* ─── MAIN ──────────────────────────────────── */}
+        <div>
+          {/* Progress */}
+          <section style={{ marginBottom: 30 }}>
+            <h2 style={sectionTitle}>Progreso</h2>
+            <div style={{ padding: 20, background: "#141411", border: "1px solid #2a2a26", borderRadius: 10 }}>
+              {editingProgress === null ? (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <strong style={{ fontSize: 28, color: "#f0ede6" }}>{p.progreso}%</strong>
+                    {canUpdateProgress && <Button small variant="ghost" onClick={() => setEditingProgress(p.progreso)}>Editar</Button>}
+                  </div>
+                  <div style={{ height: 8, background: "#2a2a26", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{ width: `${p.progreso}%`, height: "100%", background: "#c8a96e", transition: "width .3s" }} />
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <input type="range" min="0" max="100" value={editingProgress}
+                    onChange={e => setEditingProgress(parseInt(e.target.value, 10))}
+                    style={{ flex: 1 }} />
+                  <strong style={{ minWidth: 50, textAlign: "right", color: "#c8a96e" }}>{editingProgress}%</strong>
+                  <Button small onClick={handleProgressSave}>Guardar</Button>
+                  <Button small variant="ghost" onClick={() => setEditingProgress(null)}>Cancelar</Button>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Milestones */}
+          <section style={{ marginBottom: 30 }}>
+            <h2 style={sectionTitle}>Hitos ({p.hitos.filter(h => h.completado).length}/{p.hitos.length})</h2>
+            {p.hitos.length === 0
+              ? <p style={{ fontSize: 12, color: "#555" }}>No hay hitos definidos.</p>
+              : <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
+                  {p.hitos.map(h => (
+                    <li key={h.id}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, background: h.completado ? "#34d39908" : "#141411", border: `1px solid ${h.completado ? "#34d399" : "#2a2a26"}`, borderRadius: 8 }}>
+                      <input type="checkbox" checked={h.completado} disabled={!canEditMilestones}
+                        onChange={() => handleMilestoneToggle(h.id)}
+                        style={{ cursor: canEditMilestones ? "pointer" : "not-allowed" }} />
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: 13, color: h.completado ? "#34d399" : "#f0ede6", textDecoration: h.completado ? "line-through" : "none" }}>{h.nombre}</p>
+                        <p style={{ fontSize: 11, color: "#555" }}>{formatDate(h.fecha)}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+            }
+          </section>
+
+          {/* Files */}
+          <section>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <h2 style={sectionTitle}>Documentos ({files.data.length})</h2>
+              {canUploadFiles && <FileUploadButton onUpload={handleFileUpload} canMarkSensitive={canManageProject} />}
+            </div>
+            {files.data.length === 0
+              ? <EmptyState icon="📄" title="Sin documentos" hint="Sube planos, fotos o contratos" />
+              : <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
+                  {files.data.map(f => (
+                    <li key={f.id}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 10, background: "#141411", border: "1px solid #2a2a26", borderRadius: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                        <span style={{ fontSize: 18 }}>{f.tipo.startsWith("image/") ? "🖼" : f.tipo === "application/pdf" ? "📄" : "📎"}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontSize: 13, color: "#f0ede6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.nombre}</p>
+                          <p style={{ fontSize: 10, color: "#555" }}>{formatBytes(f.tamaño)} · {formatDate(f.uploadedAt)}</p>
+                        </div>
+                        {f.sensitive && <Badge color="#f87171">SENSIBLE</Badge>}
+                      </div>
+                      {canManageProject && <Button small variant="danger" onClick={() => handleFileDelete(f.id, f.nombre, f.sensitive)}>✕</Button>}
+                    </li>
+                  ))}
+                </ul>
+            }
+          </section>
+        </div>
+
+        {/* ─── SIDEBAR ───────────────────────────────── */}
+        <aside>
+          <div style={{ padding: 18, background: "#0f0f0d", border: "1px solid #2a2a26", borderRadius: 10, marginBottom: 14 }}>
+            <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Detalles</h3>
+            <dl style={{ display: "grid", gap: 10, fontSize: 12 }}>
+              <Meta k="Presupuesto"       v={formatMoney(p.presupuesto)} />
+              <Meta k="Fecha inicio"      v={formatDate(p.fechaInicio)} />
+              <Meta k="Entrega prevista"  v={formatDate(p.fechaFinPrevista)} />
+              <Meta k="Tipo"               v={p.tipo} />
+            </dl>
+          </div>
+
+          {p.profesionalesAsignados.length > 0 && (
+            <div style={{ padding: 18, background: "#0f0f0d", border: "1px solid #2a2a26", borderRadius: 10 }}>
+              <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Equipo ({p.profesionalesAsignados.length})</h3>
+              <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
+                {p.profesionalesAsignados.map(a => (
+                  <li key={a.userId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#f0ede6" }}>
+                    <ProfesionBadge profesion={a.profesion as Profesion} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+const sectionTitle = { fontSize: 12, fontWeight: 700, color: "#c8a96e", textTransform: "uppercase" as const, letterSpacing: ".05em", marginBottom: 10 };
+
+function Meta({ k, v }: { k: string; v: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 8, borderBottom: "1px solid #1a1a18" }}>
+      <dt style={{ color: "#555" }}>{k}</dt>
+      <dd style={{ color: "#f0ede6", fontWeight: 600 }}>{v}</dd>
+    </div>
+  );
+}
+
+function FileUploadButton({ onUpload, canMarkSensitive }: {
+  onUpload: (file: File, sensitive: boolean) => void;
+  canMarkSensitive: boolean;
+}) {
+  const [sensitive, setSensitive] = useState(false);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      {canMarkSensitive && (
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#666" }}>
+          <input type="checkbox" checked={sensitive} onChange={e => setSensitive(e.target.checked)} />
+          Sensible
+        </label>
+      )}
+      <label style={{ cursor: "pointer", padding: "6px 12px", fontSize: 12, fontWeight: 600, background: "#c8a96e", color: "#0a0a09", borderRadius: 6 }}>
+        + Subir archivo
+        <input type="file" style={{ display: "none" }}
+          onChange={e => {
+            const file = e.target.files?.[0];
+            if (file) onUpload(file, sensitive);
+            e.target.value = "";
+          }} />
+      </label>
+    </div>
+  );
+}

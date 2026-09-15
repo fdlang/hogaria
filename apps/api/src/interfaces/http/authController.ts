@@ -1,0 +1,70 @@
+/**
+ * Auth HTTP controller.
+ *
+ * Framework-agnostic: takes a generic `Router` interface so it can be wired
+ * into Express, Fastify, Koa, Hono, or NestJS without modification.
+ */
+
+import { LoginUseCase } from "../../application/use-cases/auth.use-cases.js";
+import { IUserRepository } from "@reformapro/domain/repositories";
+import { toHttpError } from "./errorMiddleware.js";
+import { UnauthorizedError } from "@reformapro/domain/errors";
+
+export interface HttpRequest {
+  body: unknown;
+  headers: Record<string, string | undefined>;
+  ip: string;
+}
+export interface HttpResponse {
+  status: number;
+  body: unknown;
+  headers?: Record<string, string>;
+}
+
+export function authController(deps: {
+  loginUseCase: LoginUseCase;
+  users: IUserRepository;
+  tokens: import("../../application/use-cases/auth.use-cases.js").ITokenService;
+}) {
+  return {
+    // POST /auth/login
+    async login(req: HttpRequest): Promise<HttpResponse> {
+      try {
+        const { email, password } = req.body as { email: string; password: string };
+        const ctx = { ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" };
+        const { user, token, expiresAt } = await deps.loginUseCase.execute(email, password, ctx);
+        return { status: 200, body: { user, token, expiresAt } };
+      } catch (e) { const { status, body } = toHttpError(e); return { status, body }; }
+    },
+
+    // GET /auth/me
+    async me(req: HttpRequest): Promise<HttpResponse> {
+      try {
+        const bearer = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+        const payload = await deps.tokens.verify(bearer);
+        if (!payload) throw new UnauthorizedError();
+        const user = await deps.users.findById(payload.userId);
+        if (!user) throw new UnauthorizedError();
+        return { status: 200, body: user };
+      } catch (e) { const { status, body } = toHttpError(e); return { status, body }; }
+    },
+
+    // POST /auth/logout — token revocation happens client-side since we use short-lived JWTs.
+    // For long-lived tokens, add a revocation list (Redis) and check it in the auth middleware.
+    async logout(): Promise<HttpResponse> {
+      return { status: 204, body: null };
+    },
+  };
+}
+
+// Generic auth middleware — extracts actorId for controllers downstream
+export function requireAuth(tokens: import("../../application/use-cases/auth.use-cases.js").ITokenService) {
+  return async (req: HttpRequest): Promise<{ actorId: number } | { status: 401; body: unknown }> => {
+    try {
+      const bearer  = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+      const payload = await tokens.verify(bearer);
+      if (!payload) return { status: 401, body: { code: "UNAUTHORIZED", message: "Token inválido o expirado" } };
+      return { actorId: payload.userId };
+    } catch { return { status: 401, body: { code: "UNAUTHORIZED", message: "Token inválido" } }; }
+  };
+}
