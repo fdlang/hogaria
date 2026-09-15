@@ -12,7 +12,7 @@
  */
 
 import http from "node:http";
-import type { IncomingMessage } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { URL } from "node:url";
 import { buildApp } from "./bootstrap.js";
 import { authController, requireAuth, HttpRequest, HttpResponse } from "./interfaces/http/authController.js";
@@ -23,6 +23,8 @@ import { auditController, solicitudController, fileController } from "./interfac
 import { toHttpError } from "./interfaces/http/errorMiddleware.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
+const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map(origin => origin.trim()).filter(Boolean);
 
 // ── Composition root ─────────────────────────────────────────
 const app = await buildApp();
@@ -109,21 +111,36 @@ const ROUTES: Route[] = [
 ];
 
 // ── HTTP server ────────────────────────────────────────────────
-const server = http.createServer(async (req, res) => {
+export async function apiHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
-    // CORS — permissive for demo. Lock to your frontend origin in production.
-    res.setHeader("Access-Control-Allow-Origin",  "*");
+    const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
+    const requestHost = typeof req.headers["x-forwarded-host"] === "string" ? req.headers["x-forwarded-host"] : req.headers.host;
+    const originHost = origin?.replace(/^https?:\/\//, "").split("/")[0];
+    const isSameOrigin = origin ? originHost === requestHost : true;
+    if (origin && !isSameOrigin && !allowedOrigins.includes(origin)) {
+      if (isProduction) {
+        res.writeHead(403, { "Content-Type": "application/json" }).end(JSON.stringify({ code: "FORBIDDEN", message: "Origen no permitido" }));
+        return;
+      }
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    } else if (origin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+    }
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") { res.writeHead(204).end(); return; }
 
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
-    const match = ROUTES.find(r => r.method === req.method && r.pattern.test(url.pathname));
+    // Vercel forwards requests through /api/:path*. Local development may call
+    // the API directly, so normalize both forms before route matching.
+    const pathname = url.pathname.replace(/^\/api(?=\/|$)/, "") || "/";
+    const match = ROUTES.find(r => r.method === req.method && r.pattern.test(pathname));
 
     if (!match) { res.writeHead(404).end(JSON.stringify({ code: "NOT_FOUND", message: "Ruta no encontrada" })); return; }
 
     // Parse path params
-    const m = url.pathname.match(match.pattern)!;
+    const m = pathname.match(match.pattern)!;
     const params: Record<string, string> = {};
     match.keys.forEach((k, i) => { params[k] = m[i + 1]!; });
 
@@ -156,11 +173,15 @@ const server = http.createServer(async (req, res) => {
     const { status, body } = toHttpError(err);
     res.writeHead(status, { "Content-Type": "application/json" }).end(JSON.stringify(body));
   }
-});
+}
 
-server.listen(PORT, () => {
-  console.log(`[api] listening on http://localhost:${PORT}`);
-});
+// A standalone listener is useful locally. Vercel imports apiHandler directly,
+// so no persistent process is started in serverless production.
+if (!process.env.VERCEL) {
+  http.createServer(apiHandler).listen(PORT, () => {
+    console.log(`[api] listening on http://localhost:${PORT}`);
+  });
+}
 
 // ── Helpers ────────────────────────────────────────────────────
 function parseJsonBody(req: IncomingMessage): Promise<unknown> {

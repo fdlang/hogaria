@@ -22,13 +22,15 @@ function bytesToBase64(buf: ArrayBuffer): string {
 
 export class HMACKeyProvider {
   private keyPromise: Promise<CryptoKey> | null = null;
+  constructor(private readonly secret?: string) {}
 
-  // Promise singleton — guaranteed single key across concurrent callers
+  // Development may use an ephemeral key. Deployments must inject HMAC_SECRET
+  // so tokens and signature challenges remain valid across serverless instances.
   getKey(): Promise<CryptoKey> {
     if (!this.keyPromise) {
-      this.keyPromise = crypto.subtle.generateKey(
-        { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]
-      );
+      this.keyPromise = this.secret
+        ? crypto.subtle.importKey("raw", enc.encode(this.secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"])
+        : crypto.subtle.generateKey({ name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
     }
     return this.keyPromise;
   }

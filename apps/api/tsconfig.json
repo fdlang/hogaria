@@ -21,7 +21,7 @@
       "@reformapro/domain/*": ["../../packages/domain/src/*/index.ts"]
     }
   },
-  "include": ["src/**/*", "../../packages/domain/src/**/*"],
+  "include": ["src/**/*", "../../packages/domain/src/**/*", "../../api/**/*"],
   "exclude": [
     "node_modules",
     "dist",

@@ -122,13 +122,18 @@ export interface AppDependencies {
 export async function buildApp(): Promise<AppDependencies> {
   // ── Infrastructure ───────────────────────────────────────────
   const hasher = new BcryptPasswordHasher(bcrypt, 12);
-  const hmacKeys  = new HMACKeyProvider();
+  const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+  const databaseUrl = process.env.DATABASE_URL;
+  const hmacSecret = process.env.HMAC_SECRET;
+  if (isProduction && !databaseUrl) throw new Error("DATABASE_URL es obligatoria en producción");
+  if (isProduction && (!hmacSecret || hmacSecret.length < 32)) throw new Error("HMAC_SECRET debe tener al menos 32 caracteres en producción");
+
+  const hmacKeys  = new HMACKeyProvider(hmacSecret);
   const tokens    = new WebCryptoTokenService(hmacKeys);
   const sigCrypto = new WebCryptoSignatureService(hmacKeys);
   const events    = new InMemoryEventEmitter();
   const cooldown  = new InMemoryCooldownGate();
 
-  const databaseUrl = process.env.DATABASE_URL;
   const pool = databaseUrl ? new pg.Pool({ connectionString: databaseUrl }) : null;
   const users: IUserRepository = pool ? new PostgresUserRepository(pool, hasher) : new InMemoryUserRepository(hasher);
   const projects: IProjectRepository = pool ? new PostgresProjectRepository(pool) : new InMemoryProjectRepository();
@@ -140,13 +145,13 @@ export async function buildApp(): Promise<AppDependencies> {
 
   // Development seed. PostgreSQL deployments use the same credentials only
   // during the first bootstrap; override all values through environment vars.
-  const seedEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@reformapro.local";
-  const seedPassword = process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe_123!";
-  if (!(await users.findByEmail(seedEmail))) {
+  const seedEmail = process.env.SEED_ADMIN_EMAIL ?? (isProduction ? undefined : "admin@reformapro.local");
+  const seedPassword = process.env.SEED_ADMIN_PASSWORD ?? (isProduction ? undefined : "ChangeMe_123!");
+  if (seedEmail && seedPassword && !(await users.findByEmail(seedEmail))) {
     await users.save({
       id: 1,
       email: Email.of(seedEmail),
-      nombre: process.env.SEED_ADMIN_NAME ?? "Administrador ReformaPro",
+      nombre: process.env.SEED_ADMIN_NAME ?? "Administrador Hogaria",
       rol: "admin",
       activo: true,
       createdAt: new Date(),
