@@ -57,10 +57,10 @@ export function DataTable<T>({ data, columns, rowKey, onRowClick, loading, error
   if (data.length === 0) return <EmptyState title={emptyMessage ?? "Sin datos"} />;
 
   return (
-    <div style={{ overflowX: "auto", border: "1px solid #2a2a26", borderRadius: 10 }}>
+    <div style={{ overflowX: "auto", border: "1px solid #d8c4ad", borderRadius: 10 }}>
       <table role="table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
-          <tr style={{ background: "#141411", borderBottom: "1px solid #2a2a26" }}>
+          <tr style={{ background: "#fffaf4", borderBottom: "1px solid #d8c4ad" }}>
             {columns.map(c => (
               <th key={c.key}
                 scope="col"
@@ -68,7 +68,7 @@ export function DataTable<T>({ data, columns, rowKey, onRowClick, loading, error
                 aria-sort={sort?.key === c.key ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}
                 style={{
                   padding: "12px 14px", textAlign: c.align ?? "left",
-                  fontSize: 11, fontWeight: 700, color: "#888",
+                  fontSize: 11, fontWeight: 700, color: "#71685e",
                   textTransform: "uppercase", letterSpacing: ".07em",
                   width: c.width,
                   cursor: c.sortBy ? "pointer" : "default",
@@ -85,11 +85,11 @@ export function DataTable<T>({ data, columns, rowKey, onRowClick, loading, error
           {sorted.map(row => (
             <tr key={rowKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
-              style={{ borderBottom: "1px solid #1a1a18", cursor: onRowClick ? "pointer" : "default" }}
-              onMouseEnter={e => onRowClick && (e.currentTarget.style.background = "#141411")}
+              style={{ borderBottom: "1px solid #decdb8", cursor: onRowClick ? "pointer" : "default" }}
+              onMouseEnter={e => onRowClick && (e.currentTarget.style.background = "#fffaf4")}
               onMouseLeave={e => onRowClick && (e.currentTarget.style.background = "transparent")}>
               {columns.map(c => (
-                <td key={c.key} style={{ padding: "12px 14px", textAlign: c.align ?? "left", color: "#ccc" }}>
+                <td key={c.key} style={{ padding: "12px 14px", textAlign: c.align ?? "left", color: "#423f39" }}>
                   {c.render(row)}
                 </td>
               ))}

@@ -97,15 +97,15 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           {/* Progress */}
           <section style={{ marginBottom: 30 }}>
             <h2 style={sectionTitle}>Progreso</h2>
-            <div style={{ padding: 20, background: "#141411", border: "1px solid #2a2a26", borderRadius: 10 }}>
+            <div style={{ padding: 20, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 10 }}>
               {editingProgress === null ? (
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <strong style={{ fontSize: 28, color: "#f0ede6" }}>{p.progreso}%</strong>
+                    <strong style={{ fontSize: 28, color: "#302d29" }}>{p.progreso}%</strong>
                     {canUpdateProgress && <Button small variant="ghost" onClick={() => setEditingProgress(p.progreso)}>Editar</Button>}
                   </div>
-                  <div style={{ height: 8, background: "#2a2a26", borderRadius: 4, overflow: "hidden" }}>
-                    <div style={{ width: `${p.progreso}%`, height: "100%", background: "#c8a96e", transition: "width .3s" }} />
+                  <div style={{ height: 8, background: "#d8c4ad", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{ width: `${p.progreso}%`, height: "100%", background: "#c17248", transition: "width .3s" }} />
                   </div>
                 </>
               ) : (
@@ -113,7 +113,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                   <input type="range" min="0" max="100" value={editingProgress}
                     onChange={e => setEditingProgress(parseInt(e.target.value, 10))}
                     style={{ flex: 1 }} />
-                  <strong style={{ minWidth: 50, textAlign: "right", color: "#c8a96e" }}>{editingProgress}%</strong>
+                  <strong style={{ minWidth: 50, textAlign: "right", color: "#c17248" }}>{editingProgress}%</strong>
                   <Button small onClick={handleProgressSave}>Guardar</Button>
                   <Button small variant="ghost" onClick={() => setEditingProgress(null)}>Cancelar</Button>
                 </div>
@@ -125,17 +125,17 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           <section style={{ marginBottom: 30 }}>
             <h2 style={sectionTitle}>Hitos ({p.hitos.filter(h => h.completado).length}/{p.hitos.length})</h2>
             {p.hitos.length === 0
-              ? <p style={{ fontSize: 12, color: "#555" }}>No hay hitos definidos.</p>
+              ? <p style={{ fontSize: 12, color: "#71685e" }}>No hay hitos definidos.</p>
               : <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
                   {p.hitos.map(h => (
                     <li key={h.id}
-                      style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, background: h.completado ? "#34d39908" : "#141411", border: `1px solid ${h.completado ? "#34d399" : "#2a2a26"}`, borderRadius: 8 }}>
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, background: h.completado ? "#34d39908" : "#fffaf4", border: `1px solid ${h.completado ? "#34d399" : "#d8c4ad"}`, borderRadius: 8 }}>
                       <input type="checkbox" checked={h.completado} disabled={!canEditMilestones}
                         onChange={() => handleMilestoneToggle(h.id)}
                         style={{ cursor: canEditMilestones ? "pointer" : "not-allowed" }} />
                       <div style={{ flex: 1 }}>
-                        <p style={{ fontSize: 13, color: h.completado ? "#34d399" : "#f0ede6", textDecoration: h.completado ? "line-through" : "none" }}>{h.nombre}</p>
-                        <p style={{ fontSize: 11, color: "#555" }}>{formatDate(h.fecha)}</p>
+                        <p style={{ fontSize: 13, color: h.completado ? "#34d399" : "#302d29", textDecoration: h.completado ? "line-through" : "none" }}>{h.nombre}</p>
+                        <p style={{ fontSize: 11, color: "#71685e" }}>{formatDate(h.fecha)}</p>
                       </div>
                     </li>
                   ))}
@@ -154,12 +154,12 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
               : <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
                   {files.data.map(f => (
                     <li key={f.id}
-                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 10, background: "#141411", border: "1px solid #2a2a26", borderRadius: 8 }}>
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 10, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 8 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                         <span style={{ fontSize: 18 }}>{f.tipo.startsWith("image/") ? "🖼" : f.tipo === "application/pdf" ? "📄" : "📎"}</span>
                         <div style={{ minWidth: 0 }}>
-                          <p style={{ fontSize: 13, color: "#f0ede6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.nombre}</p>
-                          <p style={{ fontSize: 10, color: "#555" }}>{formatBytes(f.tamaño)} · {formatDate(f.uploadedAt)}</p>
+                          <p style={{ fontSize: 13, color: "#302d29", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.nombre}</p>
+                          <p style={{ fontSize: 10, color: "#71685e" }}>{formatBytes(f.tamaño)} · {formatDate(f.uploadedAt)}</p>
                         </div>
                         {f.sensitive && <Badge color="#f87171">SENSIBLE</Badge>}
                       </div>
@@ -173,7 +173,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
 
         {/* ─── SIDEBAR ───────────────────────────────── */}
         <aside>
-          <div style={{ padding: 18, background: "#0f0f0d", border: "1px solid #2a2a26", borderRadius: 10, marginBottom: 14 }}>
+          <div style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, marginBottom: 14 }}>
             <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Detalles</h3>
             <dl style={{ display: "grid", gap: 10, fontSize: 12 }}>
               <Meta k="Presupuesto"       v={formatMoney(p.presupuesto)} />
@@ -184,11 +184,11 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           </div>
 
           {p.profesionalesAsignados.length > 0 && (
-            <div style={{ padding: 18, background: "#0f0f0d", border: "1px solid #2a2a26", borderRadius: 10 }}>
+            <div style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10 }}>
               <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Equipo ({p.profesionalesAsignados.length})</h3>
               <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
                 {p.profesionalesAsignados.map(a => (
-                  <li key={a.userId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#f0ede6" }}>
+                  <li key={a.userId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#302d29" }}>
                     <ProfesionBadge profesion={a.profesion as Profesion} />
                   </li>
                 ))}
@@ -201,13 +201,13 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   );
 }
 
-const sectionTitle = { fontSize: 12, fontWeight: 700, color: "#c8a96e", textTransform: "uppercase" as const, letterSpacing: ".05em", marginBottom: 10 };
+const sectionTitle = { fontSize: 12, fontWeight: 700, color: "#c17248", textTransform: "uppercase" as const, letterSpacing: ".05em", marginBottom: 10 };
 
 function Meta({ k, v }: { k: string; v: string }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 8, borderBottom: "1px solid #1a1a18" }}>
-      <dt style={{ color: "#555" }}>{k}</dt>
-      <dd style={{ color: "#f0ede6", fontWeight: 600 }}>{v}</dd>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 8, borderBottom: "1px solid #decdb8" }}>
+      <dt style={{ color: "#71685e" }}>{k}</dt>
+      <dd style={{ color: "#302d29", fontWeight: 600 }}>{v}</dd>
     </div>
   );
 }
@@ -220,12 +220,12 @@ function FileUploadButton({ onUpload, canMarkSensitive }: {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       {canMarkSensitive && (
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#666" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#71685e" }}>
           <input type="checkbox" checked={sensitive} onChange={e => setSensitive(e.target.checked)} />
           Sensible
         </label>
       )}
-      <label style={{ cursor: "pointer", padding: "6px 12px", fontSize: 12, fontWeight: 600, background: "#c8a96e", color: "#0a0a09", borderRadius: 6 }}>
+      <label style={{ cursor: "pointer", padding: "6px 12px", fontSize: 12, fontWeight: 600, background: "#c17248", color: "#302d29", borderRadius: 6 }}>
         + Subir archivo
         <input type="file" style={{ display: "none" }}
           onChange={e => {

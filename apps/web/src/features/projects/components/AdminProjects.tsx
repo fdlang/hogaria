@@ -61,8 +61,8 @@ export function AdminProjects({ api, onOpenProject, onCreateProject }: Props) {
     { key: "nombre",      header: "Proyecto", sortBy: p => p.nombre,
       render: p => (
         <div>
-          <strong style={{ color: "#f0ede6" }}>{p.nombre}</strong>
-          <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{p.direccion}</div>
+          <strong style={{ color: "#302d29" }}>{p.nombre}</strong>
+          <div style={{ fontSize: 11, color: "#71685e", marginTop: 2 }}>{p.direccion}</div>
         </div>
       )
     },
@@ -70,10 +70,10 @@ export function AdminProjects({ api, onOpenProject, onCreateProject }: Props) {
     { key: "progreso",    header: "Progreso", sortBy: p => p.progreso, align: "right",
       render: p => (
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 120 }}>
-          <div style={{ flex: 1, height: 4, background: "#2a2a26", borderRadius: 2, overflow: "hidden" }}>
-            <div style={{ width: `${p.progreso}%`, height: "100%", background: "#c8a96e" }} />
+          <div style={{ flex: 1, height: 4, background: "#d8c4ad", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{ width: `${p.progreso}%`, height: "100%", background: "#c17248" }} />
           </div>
-          <span style={{ fontSize: 11, color: "#888", minWidth: 30 }}>{p.progreso}%</span>
+          <span style={{ fontSize: 11, color: "#71685e", minWidth: 30 }}>{p.progreso}%</span>
         </div>
       )
     },
@@ -101,7 +101,7 @@ export function AdminProjects({ api, onOpenProject, onCreateProject }: Props) {
           <Input placeholder="Buscar por nombre…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
-          style={{ background: "#0c0c0b", border: "1px solid #252520", borderRadius: 8, padding: "9px 13px", color: "#f0ede6", minWidth: 160 }}>
+          style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", minWidth: 160 }}>
           <option value="all">Todos</option>
           <option value="planificacion">Planificación</option>
           <option value="en_curso">En curso</option>

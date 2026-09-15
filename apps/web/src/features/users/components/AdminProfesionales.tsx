@@ -64,21 +64,21 @@ export function AdminProfesionales({ apis }: Props) {
               const assigned = assignments.get(u.id) ?? 0;
               return (
                 <article key={u.id} role="listitem"
-                  style={{ padding: 16, background: u.activo ? "#141411" : "#0f0f0d", border: "1px solid #2a2a26", borderRadius: 10, opacity: u.activo ? 1 : 0.55 }}>
+                  style={{ padding: 16, background: u.activo ? "#fffaf4" : "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, opacity: u.activo ? 1 : 0.55 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     {prof && <div style={{ width: 42, height: 42, borderRadius: "50%", background: `${prof.color}18`, color: prof.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{prof.icon}</div>}
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                        <h3 style={{ fontSize: 14, fontWeight: 600, color: "#f0ede6" }}>{u.nombre}</h3>
+                        <h3 style={{ fontSize: 14, fontWeight: 600, color: "#302d29" }}>{u.nombre}</h3>
                         {u.profesion && <ProfesionBadge profesion={u.profesion as Profesion} />}
                         <Badge color="#60a5fa">{assigned} proyectos</Badge>
                         {!u.activo && <code style={{ fontSize: 10, color: "#f87171", background: "#f8717118", padding: "1px 5px", borderRadius: 3 }}>INACTIVO</code>}
                       </div>
-                      <p style={{ fontSize: 12, color: "#555" }}>{u.email}{u.telefono && ` · ${u.telefono}`} · desde {formatDate(u.createdAt)}</p>
+                      <p style={{ fontSize: 12, color: "#71685e" }}>{u.email}{u.telefono && ` · ${u.telefono}`} · desde {formatDate(u.createdAt)}</p>
                       {perms && (
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
                           {Object.entries(perms).filter(([, v]) => v).map(([k]) => (
-                            <code key={k} style={{ fontSize: 9, background: "#0c0c0b", color: "#666", padding: "1px 5px", borderRadius: 3 }}>
+                            <code key={k} style={{ fontSize: 9, background: "#fffaf4", color: "#71685e", padding: "1px 5px", borderRadius: 3 }}>
                               {k.replace(/([A-Z])/g, " $1").toLowerCase()}
                             </code>
                           ))}

@@ -67,15 +67,15 @@ export function AdminUsers({ api }: Props) {
     { key: "nombre", header: "Usuario", sortBy: u => u.nombre,
       render: u => (
         <div>
-          <strong style={{ color: u.activo ? "#f0ede6" : "#666" }}>{u.nombre}</strong>
-          <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{u.email}</div>
+          <strong style={{ color: u.activo ? "#302d29" : "#71685e" }}>{u.nombre}</strong>
+          <div style={{ fontSize: 11, color: "#71685e", marginTop: 2 }}>{u.email}</div>
         </div>
       )
     },
     { key: "rol", header: "Rol", sortBy: u => u.rol, render: u => <RoleBadge rol={u.rol} /> },
     { key: "profesion", header: "Profesión",
-      render: u => u.rol === "profesional" && u.profesion ? <ProfesionBadge profesion={u.profesion as Profesion} /> : <span style={{ color: "#444" }}>—</span> },
-    { key: "telefono",  header: "Teléfono",  render: u => u.telefono || <span style={{ color: "#444" }}>—</span> },
+      render: u => u.rol === "profesional" && u.profesion ? <ProfesionBadge profesion={u.profesion as Profesion} /> : <span style={{ color: "#85786b" }}>—</span> },
+    { key: "telefono",  header: "Teléfono",  render: u => u.telefono || <span style={{ color: "#85786b" }}>—</span> },
     { key: "activo",    header: "Estado",    sortBy: u => (u.activo ? 1 : 0),
       render: u => u.activo
         ? <span style={{ fontSize: 11, color: "#34d399" }}>● Activo</span>
@@ -102,7 +102,7 @@ export function AdminUsers({ api }: Props) {
           <Input placeholder="Buscar por nombre o email…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <select value={filterRol} onChange={e => setFilterRol(e.target.value as typeof filterRol)}
-          style={{ background: "#0c0c0b", border: "1px solid #252520", borderRadius: 8, padding: "9px 13px", color: "#f0ede6", minWidth: 160 }}>
+          style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", minWidth: 160 }}>
           <option value="all">Todos los roles</option>
           <option value="admin">Admins</option>
           <option value="cliente">Clientes</option>
@@ -203,7 +203,7 @@ function UserFormView({ api, initialUser, onSaved, onCancel }: {
             value={form.state.newPassword ?? ""} error={form.errors.newPassword}
             onChange={e => form.setField("newPassword", e.target.value)} />
 
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#666", marginBottom: 12 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#71685e", marginBottom: 12 }}>
             <input type="checkbox" checked={form.state.activo}
               onChange={e => form.setField("activo", e.target.checked)} />
             Usuario activo
@@ -211,7 +211,7 @@ function UserFormView({ api, initialUser, onSaved, onCancel }: {
         </>
       )}
 
-      <footer style={{ display: "flex", justifyContent: "space-between", marginTop: 20, paddingTop: 16, borderTop: "1px solid #2a2a26" }}>
+      <footer style={{ display: "flex", justifyContent: "space-between", marginTop: 20, paddingTop: 16, borderTop: "1px solid #d8c4ad" }}>
         <Button variant="ghost" onClick={onCancel} disabled={form.submitting}>Cancelar</Button>
         <Button onClick={submit} loading={form.submitting}>
           {initialUser ? "Guardar cambios" : "Crear usuario"}

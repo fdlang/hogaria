@@ -53,15 +53,15 @@ export function Modal({ open, onClose, title, children, width = 520, unclosable 
 
   return (
     <div role="presentation" onClick={onBackdrop}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.88)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 20 }}>
+      style={{ position: "fixed", inset: 0, background: "rgba(48,45,41,.52)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 20 }}>
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
         onClick={e => e.stopPropagation()}
-        style={{ background: "#161614", border: "1px solid #2a2a26", borderRadius: 16, width: "100%", maxWidth: width, maxHeight: "90vh", overflow: "auto" }}>
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", borderBottom: "1px solid #2a2a26", position: "sticky", top: 0, background: "#161614" }}>
-          <h3 id={titleId} style={{ fontSize: 21, fontWeight: 600, color: "#f0ede6" }}>{title}</h3>
+        style={{ background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 16, width: "100%", maxWidth: width, maxHeight: "90vh", overflow: "auto" }}>
+        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", borderBottom: "1px solid #d8c4ad", position: "sticky", top: 0, background: "#fffaf4" }}>
+          <h3 id={titleId} style={{ fontSize: 21, fontWeight: 600, color: "#302d29" }}>{title}</h3>
           {!unclosable && onClose && (
             <button aria-label="Cerrar modal" onClick={onClose}
-              style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
+              style={{ background: "none", border: "none", color: "#71685e", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
           )}
         </header>
         <div style={{ padding: 24 }}>{children}</div>
@@ -83,9 +83,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export function Button({ variant = "primary", loading, small, children, disabled, style, ...rest }: ButtonProps) {
   const colors: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
-    primary: { bg: "#c8a96e", fg: "#0a0a09", border: "#c8a96e" },
-    ghost:   { bg: "transparent", fg: "#f0ede6", border: "#252520" },
-    danger:  { bg: "#f87171",  fg: "#0a0a09", border: "#f87171" },
+    primary: { bg: "#c17248", fg: "#f7efe5", border: "#c17248" },
+    ghost:   { bg: "transparent", fg: "#545048", border: "#a8947e" },
+    danger:  { bg: "#f87171",  fg: "#302d29", border: "#f87171" },
   };
   const c = colors[variant];
   return (
@@ -118,12 +118,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ l
   const errId       = `${inputId}-err`;
   return (
     <div style={{ marginBottom: 14 }}>
-      {label && <label htmlFor={inputId} style={{ display: "block", fontSize: 11, fontWeight: 600, color: error ? "#f87171" : "#666", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
+      {label && <label htmlFor={inputId} style={{ display: "block", fontSize: 11, fontWeight: 600, color: error ? "#f87171" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
       <input
         {...props} id={inputId} ref={ref}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errId : undefined}
-        style={{ width: "100%", background: "#0c0c0b", border: `1px solid ${error ? "#f87171" : "#252520"}`, borderRadius: 8, padding: "9px 13px", color: "#f0ede6", fontSize: 14, outline: "none", ...props.style }}
+        style={{ width: "100%", background: "#fffaf4", border: `1px solid ${error ? "#f87171" : "#cdb69d"}`, borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", ...props.style }}
       />
       {error && <p id={errId} role="alert" style={{ fontSize: 11, color: "#f87171", marginTop: 3 }}>{error}</p>}
     </div>
@@ -133,15 +133,19 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ l
 // ─────────────────────────────────────────────────────────────
 // Textarea / Select — same pattern
 // ─────────────────────────────────────────────────────────────
-interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> { label?: string }
-export function Textarea({ label, id: explicitId, ...props }: TextareaProps) {
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> { label?: string; error?: string }
+export function Textarea({ label, error, id: explicitId, ...props }: TextareaProps) {
   const generatedId = useId();
   const taId = explicitId ?? generatedId;
+  const errId = `${taId}-err`;
   return (
     <div style={{ marginBottom: 14 }}>
-      {label && <label htmlFor={taId} style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
+      {label && <label htmlFor={taId} style={{ display: "block", fontSize: 11, fontWeight: 600, color: error ? "#b5483f" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
       <textarea {...props} id={taId}
-        style={{ width: "100%", background: "#0c0c0b", border: "1px solid #252520", borderRadius: 8, padding: "9px 13px", color: "#f0ede6", fontSize: 14, outline: "none", resize: "vertical", minHeight: 80, ...props.style }} />
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errId : undefined}
+        style={{ width: "100%", background: "#fffaf4", border: `1px solid ${error ? "#b5483f" : "#cdb69d"}`, borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", resize: "vertical", minHeight: 80, ...props.style }} />
+      {error && <p id={errId} role="alert" style={{ fontSize: 11, color: "#b5483f", marginTop: 3 }}>{error}</p>}
     </div>
   );
 }
@@ -152,9 +156,9 @@ export function Select({ label, children, id: explicitId, ...props }: SelectProp
   const selId = explicitId ?? generatedId;
   return (
     <div style={{ marginBottom: 14 }}>
-      {label && <label htmlFor={selId} style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
+      {label && <label htmlFor={selId} style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
       <select {...props} id={selId}
-        style={{ width: "100%", background: "#0c0c0b", border: "1px solid #252520", borderRadius: 8, padding: "9px 13px", color: "#f0ede6", fontSize: 14, outline: "none", cursor: "pointer", ...props.style }}>{children}</select>
+        style={{ width: "100%", background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", cursor: "pointer", ...props.style }}>{children}</select>
     </div>
   );
 }
@@ -165,11 +169,11 @@ export function Select({ label, children, id: explicitId, ...props }: SelectProp
 export function Spinner({ size = 20 }: { size?: number }) {
   return (
     <span aria-label="Cargando" role="status"
-      style={{ display: "inline-block", width: size, height: size, border: "2px solid #2a2a26", borderTopColor: "#c8a96e", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+      style={{ display: "inline-block", width: size, height: size, border: "2px solid #d8c4ad", borderTopColor: "#c17248", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
   );
 }
 
-export function Badge({ children, color = "#c8a96e" }: { children: ReactNode; color?: string }) {
+export function Badge({ children, color = "#c17248" }: { children: ReactNode; color?: string }) {
   return (
     <span style={{ display: "inline-block", padding: "2px 8px", fontSize: 10, fontWeight: 700, background: `${color}18`, color, borderRadius: 4, letterSpacing: ".05em", textTransform: "uppercase" }}>
       {children}
@@ -180,9 +184,9 @@ export function Badge({ children, color = "#c8a96e" }: { children: ReactNode; co
 export function EmptyState({ icon = "—", title, hint }: { icon?: string; title: string; hint?: string }) {
   return (
     <div style={{ textAlign: "center", padding: "40px 20px" }}>
-      <div style={{ fontSize: 28, color: "#333", marginBottom: 6 }}>{icon}</div>
-      <p style={{ fontSize: 14, color: "#555", marginBottom: 4 }}>{title}</p>
-      {hint && <p style={{ fontSize: 12, color: "#333" }}>{hint}</p>}
+      <div style={{ fontSize: 28, color: "#545048", marginBottom: 6 }}>{icon}</div>
+      <p style={{ fontSize: 14, color: "#71685e", marginBottom: 4 }}>{title}</p>
+      {hint && <p style={{ fontSize: 12, color: "#545048" }}>{hint}</p>}
     </div>
   );
 }

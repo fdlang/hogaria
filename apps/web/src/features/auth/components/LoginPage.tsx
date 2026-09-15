@@ -24,12 +24,12 @@ export function LoginPage({ onSuccess, onBack }: Props) {
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: "80px auto", padding: 40, background: "#141411", border: "1px solid #2a2a26", borderRadius: 12 }}>
+    <div style={{ maxWidth: 400, margin: "80px auto", padding: 40, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 12 }}>
       <header style={{ marginBottom: 24, textAlign: "center" }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#f0ede6" }}>
-          Reforma<span style={{ color: "#c8a96e" }}>Pro</span>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#302d29" }}>
+          Hogaria
         </h1>
-        <p style={{ fontSize: 12, color: "#555", marginTop: 6 }}>Accede a tu cuenta</p>
+        <p style={{ fontSize: 12, color: "#71685e", marginTop: 6 }}>Accede a tu cuenta</p>
       </header>
 
       <form onSubmit={submit} noValidate>
@@ -54,7 +54,7 @@ export function LoginPage({ onSuccess, onBack }: Props) {
         )}
       </form>
 
-      <p style={{ fontSize: 10, color: "#444", textAlign: "center", marginTop: 20 }}>
+      <p style={{ fontSize: 10, color: "#85786b", textAlign: "center", marginTop: 20 }}>
         ¿Problemas para acceder? Contacta con el administrador
       </p>
     </div>

@@ -62,10 +62,10 @@ function NotificationStack({ items, onDismiss }: { items: Notif[]; onDismiss: (i
       style={{ position: "fixed", top: 20, right: 20, display: "flex", flexDirection: "column", gap: 8, zIndex: 3000, maxWidth: 360 }}>
       {items.map(n => (
         <div key={n.id} role="status"
-          style={{ padding: "10px 14px", background: "#161614", border: `1px solid ${colorFor[n.type]}`, borderRadius: 8, color: "#f0ede6", fontSize: 13, display: "flex", justifyContent: "space-between", gap: 12 }}>
+          style={{ padding: "10px 14px", background: "#fffaf4", border: `1px solid ${colorFor[n.type]}`, borderRadius: 8, color: "#302d29", fontSize: 13, display: "flex", justifyContent: "space-between", gap: 12 }}>
           <span>{n.message}</span>
           <button aria-label="Descartar" onClick={() => onDismiss(n.id)}
-            style={{ background: "none", border: "none", color: "#555", cursor: "pointer" }}>✕</button>
+            style={{ background: "none", border: "none", color: "#71685e", cursor: "pointer" }}>✕</button>
         </div>
       ))}
     </div>

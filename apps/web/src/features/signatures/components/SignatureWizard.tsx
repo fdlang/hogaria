@@ -62,13 +62,13 @@ export function SignatureWizard({ open, budgetId, budgetsApi, onClose, onSigned,
       {(flow.state.kind === "idle" || flow.state.kind === "requesting") && (
         <div style={{ textAlign: "center", padding: 40 }}>
           <Spinner size={32} />
-          <p style={{ marginTop: 14, fontSize: 13, color: "#666" }}>Preparando firma segura…</p>
+          <p style={{ marginTop: 14, fontSize: 13, color: "#71685e" }}>Preparando firma segura…</p>
         </div>
       )}
 
       {flow.state.kind === "drawing" && (
         <>
-          <p style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>
+          <p style={{ fontSize: 13, color: "#71685e", marginBottom: 16 }}>
             Dibuja tu firma en el recuadro. Pulsa <strong>Siguiente</strong> cuando esté lista.
           </p>
           <SignatureCanvas ref={canvasRef} onChange={setCanvasData} width={500} height={180} />
@@ -81,11 +81,11 @@ export function SignatureWizard({ open, budgetId, budgetsApi, onClose, onSigned,
 
       {flow.state.kind === "confirming" && (
         <>
-          <div style={{ marginBottom: 16, padding: 12, background: "#0f0f0d", borderRadius: 8, fontSize: 12, color: "#666", fontStyle: "italic" }}>
+          <div style={{ marginBottom: 16, padding: 12, background: "#f8efe4", borderRadius: 8, fontSize: 12, color: "#71685e", fontStyle: "italic" }}>
             {consent}
           </div>
 
-          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 12, color: "#666", cursor: "pointer" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 12, color: "#71685e", cursor: "pointer" }}>
             <input type="checkbox" checked={consentAccepted} onChange={e => setConsentAccepted(e.target.checked)} />
             He leído y acepto el texto del consentimiento.
           </label>
@@ -93,7 +93,7 @@ export function SignatureWizard({ open, budgetId, budgetsApi, onClose, onSigned,
           <Input label="Contraseña" type="password" autoComplete="current-password"
             value={password} onChange={e => setPassword(e.target.value)} />
 
-          <p style={{ fontSize: 11, color: "#555", marginTop: -6, marginBottom: 16 }}>
+          <p style={{ fontSize: 11, color: "#71685e", marginTop: -6, marginBottom: 16 }}>
             Tu contraseña se usa para confirmar tu identidad en el momento de la firma.
             Se hashea con bcrypt; nunca se almacena en claro.
           </p>
@@ -110,16 +110,16 @@ export function SignatureWizard({ open, budgetId, budgetsApi, onClose, onSigned,
       {flow.state.kind === "signing" && (
         <div style={{ textAlign: "center", padding: 40 }}>
           <Spinner size={32} />
-          <p style={{ marginTop: 14, fontSize: 13, color: "#666" }}>Verificando y sellando electrónicamente…</p>
+          <p style={{ marginTop: 14, fontSize: 13, color: "#71685e" }}>Verificando y sellando electrónicamente…</p>
         </div>
       )}
 
       {flow.state.kind === "done" && (
         <div style={{ textAlign: "center", padding: 20 }}>
           <div style={{ fontSize: 48, color: "#34d399", marginBottom: 12 }}>✓</div>
-          <h3 style={{ fontSize: 18, color: "#f0ede6", marginBottom: 8 }}>Firma completada</h3>
-          <p style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>Hash del documento:</p>
-          <code style={{ display: "block", fontFamily: "monospace", fontSize: 10, color: "#c8a96e", wordBreak: "break-all", padding: 8, background: "#0f0f0d", borderRadius: 6 }}>
+          <h3 style={{ fontSize: 18, color: "#302d29", marginBottom: 8 }}>Firma completada</h3>
+          <p style={{ fontSize: 12, color: "#71685e", marginBottom: 10 }}>Hash del documento:</p>
+          <code style={{ display: "block", fontFamily: "monospace", fontSize: 10, color: "#c17248", wordBreak: "break-all", padding: 8, background: "#f8efe4", borderRadius: 6 }}>
             {flow.state.hash}
           </code>
         </div>
@@ -129,7 +129,7 @@ export function SignatureWizard({ open, budgetId, budgetsApi, onClose, onSigned,
         <div style={{ textAlign: "center", padding: 20 }}>
           <div style={{ fontSize: 40, color: "#f87171", marginBottom: 10 }}>✕</div>
           <h3 style={{ fontSize: 15, color: "#f87171", marginBottom: 8 }}>No se pudo completar</h3>
-          <p style={{ fontSize: 12, color: "#666", marginBottom: 20 }}>{flow.state.reason}</p>
+          <p style={{ fontSize: 12, color: "#71685e", marginBottom: 20 }}>{flow.state.reason}</p>
           <Button onClick={handleClose}>Cerrar</Button>
         </div>
       )}

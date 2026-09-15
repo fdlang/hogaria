@@ -87,14 +87,14 @@ export function ProjectForm({ api, initialProject, clients, onSaved, onCancel }:
       )}
 
       {!initialProject && (
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#666", marginBottom: 12, padding: 10, background: "#0f0f0d", borderRadius: 6 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#71685e", marginBottom: 12, padding: 10, background: "#f8efe4", borderRadius: 6 }}>
           <input type="checkbox" checked={form.state.useHitosTemplate}
             onChange={e => form.setField("useHitosTemplate", e.target.checked)} />
           Usar plantilla estándar de hitos (demolición, instalaciones, acabados, entrega)
         </label>
       )}
 
-      <footer style={{ display: "flex", justifyContent: "space-between", marginTop: 20, paddingTop: 16, borderTop: "1px solid #2a2a26" }}>
+      <footer style={{ display: "flex", justifyContent: "space-between", marginTop: 20, paddingTop: 16, borderTop: "1px solid #d8c4ad" }}>
         <Button variant="ghost" onClick={onCancel} disabled={form.submitting}>Cancelar</Button>
         <Button onClick={handleSubmit} loading={form.submitting}>
           {initialProject ? "Guardar cambios" : "Crear proyecto"}

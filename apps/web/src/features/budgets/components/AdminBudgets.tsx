@@ -112,9 +112,9 @@ export function AdminBudgets({ apis }: Props) {
     { key: "nombre", header: "Presupuesto", sortBy: b => b.nombre,
       render: b => (
         <div>
-          <strong style={{ color: "#f0ede6" }}>{b.nombre}</strong>
+          <strong style={{ color: "#302d29" }}>{b.nombre}</strong>
           {b.referencia && (
-            <code style={{ marginLeft: 8, fontSize: 10, background: "#0c0c0b", color: "#555", padding: "2px 6px", borderRadius: 4 }}>{b.referencia}</code>
+            <code style={{ marginLeft: 8, fontSize: 10, background: "#fffaf4", color: "#71685e", padding: "2px 6px", borderRadius: 4 }}>{b.referencia}</code>
           )}
         </div>
       )
@@ -147,9 +147,9 @@ export function AdminBudgets({ apis }: Props) {
           <button key={s} onClick={() => setFilterEstado(s)}
             style={{
               padding: "6px 12px", fontSize: 11, fontWeight: 600, borderRadius: 6,
-              background: filterEstado === s ? "#c8a96e18" : "transparent",
-              color:      filterEstado === s ? "#c8a96e" : "#666",
-              border: `1px solid ${filterEstado === s ? "#c8a96e" : "#2a2a26"}`,
+              background: filterEstado === s ? "#c1724818" : "transparent",
+              color:      filterEstado === s ? "#c17248" : "#71685e",
+              border: `1px solid ${filterEstado === s ? "#c17248" : "#d8c4ad"}`,
               cursor: "pointer", textTransform: "uppercase", letterSpacing: ".05em",
             }}>
             {s === "all" ? "Todos" : s}

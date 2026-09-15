@@ -34,8 +34,8 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div style={{ padding: 40, textAlign: "center", color: "#f87171", fontFamily: "system-ui" }}>
           <h2 style={{ fontSize: 24, marginBottom: 12 }}>Algo ha fallado.</h2>
-          <p style={{ color: "#666", marginBottom: 20 }}>{this.state.error.message}</p>
-          <button onClick={this.reset} style={{ padding: "10px 20px", background: "#c8a96e", border: 0, borderRadius: 6, cursor: "pointer" }}>
+          <p style={{ color: "#71685e", marginBottom: 20 }}>{this.state.error.message}</p>
+          <button onClick={this.reset} style={{ padding: "10px 20px", background: "#c17248", border: 0, borderRadius: 6, cursor: "pointer" }}>
             Reintentar
           </button>
         </div>

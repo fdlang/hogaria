@@ -24,16 +24,16 @@ export function BudgetLineEditor({ partida, globalIva, index, errors, onChange, 
 
   return (
     <article style={{
-      border: "1px solid #2a2a26", borderRadius: 10, padding: 14, marginBottom: 10, background: "#0f0f0d",
+      border: "1px solid #d8c4ad", borderRadius: 10, padding: 14, marginBottom: 10, background: "#f8efe4",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {partida.ref && (
-            <code style={{ fontSize: 10, background: "#141411", color: "#c8a96e", padding: "2px 6px", borderRadius: 4 }}>
+            <code style={{ fontSize: 10, background: "#fffaf4", color: "#c17248", padding: "2px 6px", borderRadius: 4 }}>
               {partida.ref}
             </code>
           )}
-          <span style={{ fontSize: 11, color: "#555" }}>#{index + 1}</span>
+          <span style={{ fontSize: 11, color: "#71685e" }}>#{index + 1}</span>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           {onDuplicate && <Button small variant="ghost" onClick={() => onDuplicate(partida.id)} aria-label="Duplicar">⎘</Button>}
@@ -76,14 +76,14 @@ export function BudgetLineEditor({ partida, globalIva, index, errors, onChange, 
           onChange={e => onChange(partida.id, "descuento", parseFloat(e.target.value) || 0)}
         />
         <div>
-          <label htmlFor={`iva-${partida.id}`} style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#666", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>
+          <label htmlFor={`iva-${partida.id}`} style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>
             IVA (%)
           </label>
           <select
             id={`iva-${partida.id}`}
             value={partida.iva == null ? "default" : partida.iva}
             onChange={e => onChange(partida.id, "iva", e.target.value === "default" ? null : parseFloat(e.target.value))}
-            style={{ width: "100%", background: "#0c0c0b", border: "1px solid #252520", borderRadius: 8, padding: "9px 13px", color: "#f0ede6", fontSize: 14 }}
+            style={{ width: "100%", background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14 }}
           >
             <option value="default">Usar global ({globalIva}%)</option>
             <option value="0">0% — exento</option>
@@ -100,10 +100,10 @@ export function BudgetLineEditor({ partida, globalIva, index, errors, onChange, 
         onChange={e => onChange(partida.id, "nota", e.target.value)}
       />
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 20, fontSize: 12, color: "#666", paddingTop: 8, borderTop: "1px solid #1a1a18" }}>
-        <span>Base: <strong style={{ color: "#f0ede6" }}>{formatMoney(base)}</strong></span>
-        <span>IVA {effectiveIVA}%: <strong style={{ color: "#f0ede6" }}>{formatMoney(ivaAmount)}</strong></span>
-        <span>Total: <strong style={{ color: "#c8a96e" }}>{formatMoney(base + ivaAmount)}</strong></span>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 20, fontSize: 12, color: "#71685e", paddingTop: 8, borderTop: "1px solid #decdb8" }}>
+        <span>Base: <strong style={{ color: "#302d29" }}>{formatMoney(base)}</strong></span>
+        <span>IVA {effectiveIVA}%: <strong style={{ color: "#302d29" }}>{formatMoney(ivaAmount)}</strong></span>
+        <span>Total: <strong style={{ color: "#c17248" }}>{formatMoney(base + ivaAmount)}</strong></span>
       </div>
     </article>
   );

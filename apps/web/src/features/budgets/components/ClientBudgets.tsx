@@ -73,13 +73,13 @@ export function ClientBudgets({ apis }: Props) {
         : <div role="list" style={{ display: "grid", gap: 10 }}>
             {sorted.map(b => (
               <article key={b.id} role="listitem"
-                style={{ padding: 16, background: "#141411", border: `1px solid ${b.estado === "enviado" ? "#fbbf24" : "#2a2a26"}`, borderRadius: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center" }}>
+                style={{ padding: 16, background: "#fffaf4", border: `1px solid ${b.estado === "enviado" ? "#fbbf24" : "#d8c4ad"}`, borderRadius: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                    <h3 style={{ fontSize: 15, fontWeight: 600, color: "#f0ede6" }}>{b.nombre}</h3>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, color: "#302d29" }}>{b.nombre}</h3>
                     <BudgetStatusBadge estado={b.estado} />
                   </div>
-                  <p style={{ fontSize: 12, color: "#555" }}>
+                  <p style={{ fontSize: 12, color: "#71685e" }}>
                     {getProjectName(b.proyectoId)}
                     {b.fechaEnvio && ` · Enviado ${formatDate(b.fechaEnvio)}`}
                     {b.estado === "enviado" && ` · Validez ${b.validezDias} días`}

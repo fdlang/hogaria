@@ -105,14 +105,14 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
     <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 24, alignItems: "flex-start" }}>
       {/* ─── MAIN COLUMN ──────────────────────────────── */}
       <div>
-        <nav role="tablist" style={{ display: "flex", gap: 4, borderBottom: "1px solid #2a2a26", marginBottom: 20 }}>
+        <nav role="tablist" style={{ display: "flex", gap: 4, borderBottom: "1px solid #d8c4ad", marginBottom: 20 }}>
           {(["general", "partidas", "condiciones"] as Tab[]).map(t => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
               style={{
                 padding: "10px 16px", fontSize: 12, fontWeight: 600,
-                color: tab === t ? "#c8a96e" : "#666",
+                color: tab === t ? "#c17248" : "#71685e",
                 background: "none", border: "none",
-                borderBottom: `2px solid ${tab === t ? "#c8a96e" : "transparent"}`,
+                borderBottom: `2px solid ${tab === t ? "#c17248" : "transparent"}`,
                 cursor: "pointer", textTransform: "uppercase", letterSpacing: ".05em",
               }}>
               {t === "general" ? "Datos generales"
@@ -174,7 +174,7 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
             </div>
 
             {showCatalog && (
-              <div style={{ padding: 14, border: "1px dashed #2a2a26", borderRadius: 10, marginBottom: 20 }}>
+              <div style={{ padding: 14, border: "1px dashed #d8c4ad", borderRadius: 10, marginBottom: 20 }}>
                 <CatalogPicker onPickItem={addFromCatalog} onImportCategory={importCategory} />
               </div>
             )}
@@ -184,7 +184,7 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
             )}
 
             {form.state.partidas.length === 0 ? (
-              <p style={{ color: "#555", fontSize: 13, textAlign: "center", padding: 30, border: "1px dashed #2a2a26", borderRadius: 10 }}>
+              <p style={{ color: "#71685e", fontSize: 13, textAlign: "center", padding: 30, border: "1px dashed #d8c4ad", borderRadius: 10 }}>
                 Añade partidas desde el catálogo o manualmente.
               </p>
             ) : form.state.partidas.map((p, i) => (
@@ -211,7 +211,7 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
           </>
         )}
 
-        <footer style={{ display: "flex", justifyContent: "space-between", marginTop: 24, paddingTop: 16, borderTop: "1px solid #2a2a26" }}>
+        <footer style={{ display: "flex", justifyContent: "space-between", marginTop: 24, paddingTop: 16, borderTop: "1px solid #d8c4ad" }}>
           <Button variant="ghost" onClick={onCancel} disabled={submitting}>Cancelar</Button>
           <Button onClick={handleSubmit} loading={submitting}>
             {initialBudget ? "Guardar cambios" : "Crear presupuesto"}
@@ -220,8 +220,8 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
       </div>
 
       {/* ─── SIDEBAR: LIVE TOTALS ──────────────────────── */}
-      <aside style={{ position: "sticky", top: 20, background: "#0f0f0d", border: "1px solid #2a2a26", borderRadius: 10, padding: 18 }}>
-        <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", color: "#555", marginBottom: 12 }}>
+      <aside style={{ position: "sticky", top: 20, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, padding: 18 }}>
+        <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", color: "#71685e", marginBottom: 12 }}>
           Resumen en vivo
         </h4>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13 }}>
@@ -233,11 +233,11 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
           ) : (
             <Row label={`IVA ${form.state.ivaDefault}%`} value={formatMoney(form.totals.iva.amount)} />
           )}
-          <hr style={{ border: 0, borderTop: "1px solid #2a2a26", margin: "6px 0" }} />
+          <hr style={{ border: 0, borderTop: "1px solid #d8c4ad", margin: "6px 0" }} />
           <Row label="TOTAL" value={formatMoney(form.totals.total.amount)} bold />
         </div>
 
-        <p style={{ fontSize: 10, color: "#444", marginTop: 12, textAlign: "center" }}>
+        <p style={{ fontSize: 10, color: "#85786b", marginTop: 12, textAlign: "center" }}>
           {form.state.partidas.length} partidas · {form.state.validezDias} días validez
         </p>
       </aside>
@@ -248,8 +248,8 @@ export function BudgetForm({ api, initialBudget, projects, clients, onSaved, onC
 function Row({ label, value, bold, small }: { label: string; value: string; bold?: boolean; small?: boolean }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", fontSize: small ? 11 : 13 }}>
-      <span style={{ color: small ? "#555" : "#666" }}>{label}</span>
-      <strong style={{ color: bold ? "#c8a96e" : "#f0ede6", fontWeight: bold ? 700 : 600, fontSize: bold ? 16 : undefined }}>{value}</strong>
+      <span style={{ color: small ? "#71685e" : "#71685e" }}>{label}</span>
+      <strong style={{ color: bold ? "#c17248" : "#302d29", fontWeight: bold ? 700 : 600, fontSize: bold ? 16 : undefined }}>{value}</strong>
     </div>
   );
 }

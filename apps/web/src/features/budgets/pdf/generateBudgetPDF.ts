@@ -73,13 +73,13 @@ function loadJsPDF(): Promise<JsPDFCtor> {
 // Default branding (replace per-tenant in multi-tenant deploys)
 // ─────────────────────────────────────────────────────────────
 export const DEFAULT_BRANDING: CompanyBranding = {
-  name:   "ReformaPro",
+  name:   "Hogaria",
   slogan: "GESTIÓN DE REFORMAS Y OBRA",
   address: "C/ Mayor 1, 28001 Madrid",
   cif:    "B12345678",
   phone:  "+34 910 000 000",
-  email:  "info@reformapro.es",
-  web:    "www.reformapro.es",
+  email:  "info@hogaria.es",
+  web:    "www.hogaria.es",
   colors: {
     gold:  [200, 169, 110],
     dark:  [15,  15,  11],

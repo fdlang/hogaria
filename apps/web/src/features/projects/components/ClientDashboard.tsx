@@ -64,8 +64,8 @@ export function ClientDashboard({ apis, onOpenProject, onOpenBudget, onSignBudge
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 30 }}>
         <StatCard label="Proyectos activos"    value={stats.activos}          accent="#34d399" />
-        <StatCard label="Pendientes de firma"  value={stats.pendientesFirma}  accent={stats.pendientesFirma > 0 ? "#fbbf24" : "#2a2a26"} />
-        <StatCard label="Presupuestos firmados" value={stats.firmados}         accent="#c8a96e" />
+        <StatCard label="Pendientes de firma"  value={stats.pendientesFirma}  accent={stats.pendientesFirma > 0 ? "#fbbf24" : "#d8c4ad"} />
+        <StatCard label="Presupuestos firmados" value={stats.firmados}         accent="#c17248" />
         <StatCard label="Inversión total"       value={formatMoney(stats.inversion)} accent="#60a5fa" />
       </div>
 
@@ -77,10 +77,10 @@ export function ClientDashboard({ apis, onOpenProject, onOpenBudget, onSignBudge
           <div style={{ display: "grid", gap: 8 }}>
             {pendingBudgets.map(b => (
               <article key={b.id}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12, background: "#141411", borderRadius: 8 }}>
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12, background: "#fffaf4", borderRadius: 8 }}>
                 <div>
-                  <h3 style={{ fontSize: 13, fontWeight: 600, color: "#f0ede6" }}>{b.nombre}</h3>
-                  <p style={{ fontSize: 11, color: "#555" }}>Recibido {formatDate(b.fechaEnvio)} · Validez {b.validezDias} días</p>
+                  <h3 style={{ fontSize: 13, fontWeight: 600, color: "#302d29" }}>{b.nombre}</h3>
+                  <p style={{ fontSize: 11, color: "#71685e" }}>Recibido {formatDate(b.fechaEnvio)} · Validez {b.validezDias} días</p>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <Button small variant="ghost" onClick={() => onOpenBudget(b.id)}>Revisar</Button>
@@ -92,7 +92,7 @@ export function ClientDashboard({ apis, onOpenProject, onOpenBudget, onSignBudge
         </section>
       )}
 
-      <h2 style={{ fontSize: 15, fontWeight: 700, color: "#c8a96e", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: "#c17248", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>
         Mis proyectos
       </h2>
 
@@ -101,20 +101,20 @@ export function ClientDashboard({ apis, onOpenProject, onOpenBudget, onSignBudge
         : <div role="list" style={{ display: "grid", gap: 10 }}>
             {proj.map(p => (
               <button key={p.id} role="listitem" onClick={() => onOpenProject(p.id)}
-                style={{ textAlign: "left", padding: 16, background: "#141411", border: "1px solid #2a2a26", borderRadius: 10, cursor: "pointer" }}>
+                style={{ textAlign: "left", padding: 16, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 10, cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
                   <div>
-                    <h3 style={{ fontSize: 15, fontWeight: 600, color: "#f0ede6" }}>{p.nombre}</h3>
-                    <p style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{p.direccion}</p>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, color: "#302d29" }}>{p.nombre}</h3>
+                    <p style={{ fontSize: 11, color: "#71685e", marginTop: 2 }}>{p.direccion}</p>
                   </div>
                   <ProjectStatusBadge estado={p.estado} />
                 </div>
 
                 <div style={{ marginTop: 10 }}>
-                  <div style={{ height: 4, background: "#2a2a26", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ width: `${p.progreso}%`, height: "100%", background: "#c8a96e", transition: "width .3s" }} />
+                  <div style={{ height: 4, background: "#d8c4ad", borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ width: `${p.progreso}%`, height: "100%", background: "#c17248", transition: "width .3s" }} />
                   </div>
-                  <p style={{ fontSize: 11, color: "#555", marginTop: 4 }}>
+                  <p style={{ fontSize: 11, color: "#71685e", marginTop: 4 }}>
                     {p.progreso}% completado · entrega prevista {formatDate(p.fechaFinPrevista)}
                   </p>
                 </div>

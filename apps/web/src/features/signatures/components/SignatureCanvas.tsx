@@ -49,7 +49,7 @@ export const SignatureCanvas = forwardRef<SignatureCanvasHandle, Props>(function
     ctx.lineWidth   = 2;
     ctx.lineCap     = "round";
     ctx.lineJoin    = "round";
-    ctx.strokeStyle = "#f0ede6";
+    ctx.strokeStyle = "#302d29";
   }, [width, height]);
 
   const clearCanvas = () => {
@@ -100,8 +100,8 @@ export const SignatureCanvas = forwardRef<SignatureCanvasHandle, Props>(function
         onPointerCancel={onPointerUp}
         style={{
           display: "block",
-          background: "#0c0c0b",
-          border: "1px dashed #2a2a26",
+          background: "#fffaf4",
+          border: "1px dashed #d8c4ad",
           borderRadius: 8,
           cursor: disabled ? "not-allowed" : "crosshair",
           touchAction: "none", // prevent scrolling on touch devices while drawing

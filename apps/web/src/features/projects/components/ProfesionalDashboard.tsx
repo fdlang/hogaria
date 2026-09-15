@@ -56,12 +56,12 @@ export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 30 }}>
         <StatCard label="Proyectos activos"      value={stats.activos}       accent="#34d399" />
         <StatCard label="Hitos pendientes"        value={stats.hitosAbiertos} accent="#fbbf24" />
-        <StatCard label="Proyectos finalizados"   value={stats.finalizados}   accent="#c8a96e" />
+        <StatCard label="Proyectos finalizados"   value={stats.finalizados}   accent="#c17248" />
       </div>
 
       {perms && (
-        <aside style={{ padding: 14, background: "#0f0f0d", border: "1px solid #2a2a26", borderRadius: 10, marginBottom: 24, fontSize: 12, color: "#666" }}>
-          <strong style={{ color: "#c8a96e", display: "block", marginBottom: 6, fontSize: 11, letterSpacing: ".05em", textTransform: "uppercase" }}>Tus permisos</strong>
+        <aside style={{ padding: 14, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, marginBottom: 24, fontSize: 12, color: "#71685e" }}>
+          <strong style={{ color: "#c17248", display: "block", marginBottom: 6, fontSize: 11, letterSpacing: ".05em", textTransform: "uppercase" }}>Tus permisos</strong>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {Object.entries(perms).map(([k, v]) => (
               <code key={k} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: v ? "#34d39918" : "#f8717118", color: v ? "#34d399" : "#f87171" }}>
@@ -72,7 +72,7 @@ export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
         </aside>
       )}
 
-      <h2 style={{ fontSize: 15, fontWeight: 700, color: "#c8a96e", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: "#c17248", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>
         Proyectos asignados
       </h2>
 
@@ -83,15 +83,15 @@ export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
               const pendingMilestones = p.hitos.filter(h => !h.completado).length;
               return (
                 <button key={p.id} role="listitem" onClick={() => onOpenProject(p.id)}
-                  style={{ textAlign: "left", padding: 16, background: "#141411", border: "1px solid #2a2a26", borderRadius: 10, cursor: "pointer" }}>
+                  style={{ textAlign: "left", padding: 16, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 10, cursor: "pointer" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <h3 style={{ fontSize: 15, fontWeight: 600, color: "#f0ede6" }}>{p.nombre}</h3>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, color: "#302d29" }}>{p.nombre}</h3>
                     <div style={{ display: "flex", gap: 6 }}>
                       {user?.profesion && <ProfesionBadge profesion={user.profesion as Profesion} />}
                       <ProjectStatusBadge estado={p.estado} />
                     </div>
                   </div>
-                  <p style={{ fontSize: 12, color: "#555" }}>
+                  <p style={{ fontSize: 12, color: "#71685e" }}>
                     {p.direccion} · {p.progreso}% · entrega {formatDate(p.fechaFinPrevista)}
                     {pendingMilestones > 0 && ` · ${pendingMilestones} hitos pendientes`}
                   </p>

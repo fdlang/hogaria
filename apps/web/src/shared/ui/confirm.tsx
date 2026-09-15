@@ -46,7 +46,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       <Modal open={!!opts} onClose={() => settle(false)} title={opts?.title ?? ""} width={440}>
         {opts && (
           <>
-            <div style={{ fontSize: 14, color: "#aaa", lineHeight: 1.6, marginBottom: 20 }}>{opts.message}</div>
+            <div style={{ fontSize: 14, color: "#71685e", lineHeight: 1.6, marginBottom: 20 }}>{opts.message}</div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <Button small variant="ghost" onClick={() => settle(false)}>{opts.cancelLabel ?? "Cancelar"}</Button>
               <Button small variant={opts.variant === "danger" ? "danger" : "primary"} onClick={() => settle(true)}>

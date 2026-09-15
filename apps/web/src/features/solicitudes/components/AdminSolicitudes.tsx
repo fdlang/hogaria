@@ -66,8 +66,8 @@ export function AdminSolicitudes({ api }: Props) {
     <section>
       <header style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 38, fontWeight: 700, color: "#f0ede6" }}>Solicitudes</h1>
-          <p style={{ fontSize: 13, color: "#555", marginTop: 6 }}>
+          <h1 style={{ fontSize: 38, fontWeight: 700, color: "#302d29" }}>Solicitudes</h1>
+          <p style={{ fontSize: 13, color: "#71685e", marginTop: 6 }}>
             {pending.length} pendientes · {items.length} totales
           </p>
         </div>
@@ -79,14 +79,14 @@ export function AdminSolicitudes({ api }: Props) {
         : <div role="list" style={{ display: "grid", gap: 10 }}>
             {items.map(s => (
               <article key={s.id} role="listitem"
-                style={{ padding: 16, background: "#141411", border: `1px solid ${s.estado === "pendiente" ? "#fbbf24" : "#2a2a26"}`, borderRadius: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center" }}>
+                style={{ padding: 16, background: "#fffaf4", border: `1px solid ${s.estado === "pendiente" ? "#fbbf24" : "#d8c4ad"}`, borderRadius: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                    <h3 style={{ fontSize: 14, fontWeight: 600, color: "#f0ede6" }}>{s.nombre}</h3>
+                    <h3 style={{ fontSize: 14, fontWeight: 600, color: "#302d29" }}>{s.nombre}</h3>
                     <Badge color={s.estado === "pendiente" ? "#fbbf24" : s.estado === "contactado" ? "#34d399" : "#f87171"}>{s.estado}</Badge>
                     <Badge color="#60a5fa">{s.tipo}</Badge>
                   </div>
-                  <p style={{ fontSize: 12, color: "#555" }}>
+                  <p style={{ fontSize: 12, color: "#71685e" }}>
                     {s.email} {s.telefono && `· ${s.telefono}`} · {formatDateTime(s.fecha)}
                   </p>
                 </div>
@@ -115,8 +115,8 @@ export function AdminSolicitudes({ api }: Props) {
               <MetaRow k="IP"          v={detail.ip} />
             </dl>
             <div>
-              <p style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6 }}>Descripción</p>
-              <p style={{ fontSize: 13, color: "#f0ede6", lineHeight: 1.6, padding: 14, background: "#0f0f0d", borderRadius: 8, whiteSpace: "pre-wrap" }}>
+              <p style={{ fontSize: 10, color: "#71685e", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6 }}>Descripción</p>
+              <p style={{ fontSize: 13, color: "#302d29", lineHeight: 1.6, padding: 14, background: "#f8efe4", borderRadius: 8, whiteSpace: "pre-wrap" }}>
                 {detail.descripcion}
               </p>
             </div>
@@ -129,11 +129,11 @@ export function AdminSolicitudes({ api }: Props) {
 
 function MetaRow({ k, v, copyable }: { k: string; v: string; copyable?: boolean }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 6, borderBottom: "1px solid #1a1a18" }}>
-      <dt style={{ color: "#555" }}>{k}</dt>
-      <dd style={{ color: "#f0ede6", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 6, borderBottom: "1px solid #decdb8" }}>
+      <dt style={{ color: "#71685e" }}>{k}</dt>
+      <dd style={{ color: "#302d29", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
         {v}
-        {copyable && <button onClick={() => navigator.clipboard.writeText(v)} style={{ background: "none", border: "none", color: "#c8a96e", cursor: "pointer", fontSize: 11 }}>📋</button>}
+        {copyable && <button onClick={() => navigator.clipboard.writeText(v)} style={{ background: "none", border: "none", color: "#c17248", cursor: "pointer", fontSize: 11 }}>📋</button>}
       </dd>
     </div>
   );

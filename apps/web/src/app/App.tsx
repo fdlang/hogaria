@@ -80,7 +80,7 @@ export function App({ apis }: { apis: AllApis }) {
     : <EmptyState icon="◎" title="Página no encontrada" hint="Usa el menú para navegar" />;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a09", color: "#f0ede6" }}>
+    <div style={{ minHeight: "100vh", background: "var(--marble-light)", color: "var(--ink)" }}>
       {user && <TopBar user={user} onSignOut={signOut} />}
       <main style={user ? { maxWidth: 1200, margin: "0 auto", padding: 32 } : undefined}>
         <Router routes={routes} fallback={fallback} />
@@ -112,25 +112,25 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
     ] : [];
 
   return (
-    <header style={{ display: "flex", justifyContent: "space-between", padding: "14px 32px", borderBottom: "1px solid #1a1a18", alignItems: "center" }}>
-      <a href={user ? `#/${user.rol}` : "#/"} style={{ color: "#f0ede6", fontWeight: 700, fontSize: 18, textDecoration: "none" }}>
-        Reforma<span style={{ color: "#c8a96e" }}>Pro</span>
+    <header style={{ display: "flex", justifyContent: "space-between", padding: "14px 32px", borderBottom: "1px solid var(--line)", background: "rgba(247,239,229,.92)", alignItems: "center", position: "sticky", top: 0, zIndex: 20, backdropFilter: "blur(12px)" }}>
+      <a href={user ? `#/${user.rol}` : "#/"} style={{ color: "var(--graphite)", fontWeight: 700, fontSize: 18, textDecoration: "none" }}>
+        Hogaria
       </a>
 
       {user ? (
         <nav style={{ display: "flex", alignItems: "center", gap: 18 }}>
           {links.map(l => (
             <a key={l.to} href={l.to}
-              style={{ fontSize: 12, color: "#666", textDecoration: "none", textTransform: "uppercase", letterSpacing: ".05em" }}>
+              style={{ fontSize: 12, color: "#71685e", textDecoration: "none", textTransform: "uppercase", letterSpacing: ".05em" }}>
               {l.label}
             </a>
           ))}
-          <span style={{ fontSize: 11, color: "#444" }}>·</span>
-          <span style={{ fontSize: 12, color: "#666" }}>{user.nombre}</span>
+          <span style={{ fontSize: 11, color: "#85786b" }}>·</span>
+          <span style={{ fontSize: 12, color: "#71685e" }}>{user.nombre}</span>
           <Button small variant="ghost" onClick={onSignOut}>Salir</Button>
         </nav>
       ) : (
-        <a href="#/login" style={{ color: "#c8a96e", fontSize: 13, textDecoration: "none" }}>Iniciar sesión →</a>
+        <a href="#/login" style={{ color: "#c17248", fontSize: 13, textDecoration: "none" }}>Iniciar sesión →</a>
       )}
     </header>
   );
@@ -153,7 +153,7 @@ function LoginRoute() {
 function AdminHome() {
   return (
     <section>
-      <h1 style={{ fontSize: 38, fontWeight: 700, color: "#f0ede6", marginBottom: 24 }}>Panel de administración</h1>
+      <h1 style={{ fontSize: 38, fontWeight: 700, color: "#302d29", marginBottom: 24 }}>Panel de administración</h1>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
         <Tile href="#/admin/projects"      title="Proyectos"      subtitle="Gestiona obras activas" />
         <Tile href="#/admin/budgets"       title="Presupuestos"   subtitle="Crea, envía, firma" />
@@ -168,9 +168,9 @@ function AdminHome() {
 
 function Tile({ href, title, subtitle }: { href: string; title: string; subtitle: string }) {
   return (
-    <a href={href} style={{ display: "block", padding: 20, background: "#141411", border: "1px solid #2a2a26", borderRadius: 10, textDecoration: "none" }}>
-      <h3 style={{ color: "#c8a96e", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>{title}</h3>
-      <p style={{ fontSize: 11, color: "#555" }}>{subtitle}</p>
+    <a href={href} style={{ display: "block", padding: 20, background: "rgba(255,250,244,.86)", border: "1px solid var(--line)", borderRadius: 10, textDecoration: "none", boxShadow: "0 8px 24px rgba(72,59,44,.08)" }}>
+      <h3 style={{ color: "#c17248", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>{title}</h3>
+      <p style={{ fontSize: 11, color: "#71685e" }}>{subtitle}</p>
     </a>
   );
 }
