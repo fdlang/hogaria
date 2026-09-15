@@ -81,8 +81,8 @@ export function App({ apis }: { apis: AllApis }) {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a09", color: "#f0ede6" }}>
-      <TopBar user={user} onSignOut={signOut} />
-      <main style={{ maxWidth: 1200, margin: "0 auto", padding: 32 }}>
+      {user && <TopBar user={user} onSignOut={signOut} />}
+      <main style={user ? { maxWidth: 1200, margin: "0 auto", padding: 32 } : undefined}>
         <Router routes={routes} fallback={fallback} />
       </main>
     </div>

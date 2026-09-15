@@ -1,0 +1,11 @@
+import type { Profesion } from "./entities/index.js";
+export const IVA_DEFAULT_PERCENT = 21;
+export const PROJECT_TIPOS = ["Reforma integral", "Baño", "Cocina", "Pintura", "Electricidad", "Fontanería"] as const;
+export const HITOS_TEMPLATE = [{ nombre: "Planificación", offset: 0 }, { nombre: "Inicio de obra", offset: 7 }, { nombre: "Ejecución", offset: 30 }, { nombre: "Finalización", offset: 90 }] as const;
+export const PROFESIONES: Record<Profesion, { value: Profesion; label: string; desc: string; color: string; icon: string }> = { albanil: { value: "albanil", label: "Albañil", desc: "Obra y albañilería", color: "#b45309", icon: "🧱" }, electricista: { value: "electricista", label: "Electricista", desc: "Instalaciones eléctricas", color: "#ca8a04", icon: "⚡" }, fontanero: { value: "fontanero", label: "Fontanero", desc: "Fontanería", color: "#0284c7", icon: "🔧" }, pintor: { value: "pintor", label: "Pintor", desc: "Pintura", color: "#9333ea", icon: "🎨" }, carpintero: { value: "carpintero", label: "Carpintero", desc: "Carpintería", color: "#92400e", icon: "🪚" }, reformista: { value: "reformista", label: "Reformista", desc: "Reformas integrales", color: "#15803d", icon: "🏠" } };
+export const PROFESIONES_LIST = Object.values(PROFESIONES);
+export type BudgetEstadoKey = "borrador" | "enviado" | "firmado" | "rechazado";
+export type ProjectEstadoKey = "planificacion" | "en_curso" | "pausado" | "finalizado";
+export const BUDGET_ESTADOS: Record<BudgetEstadoKey, { label: string; color: string; icon: string }> = { borrador: { label: "Borrador", color: "#64748b", icon: "📝" }, enviado: { label: "Enviado", color: "#2563eb", icon: "✉️" }, firmado: { label: "Firmado", color: "#16a34a", icon: "✓" }, rechazado: { label: "Rechazado", color: "#dc2626", icon: "✕" } };
+export const PROJECT_ESTADOS: Record<ProjectEstadoKey, { label: string; color: string; icon: string }> = { planificacion: { label: "Planificación", color: "#64748b", icon: "📋" }, en_curso: { label: "En curso", color: "#2563eb", icon: "🔨" }, pausado: { label: "Pausado", color: "#d97706", icon: "⏸" }, finalizado: { label: "Finalizado", color: "#16a34a", icon: "✓" } };
+export const USER_ROLES = { admin: { label: "Administrador", color: "#7c3aed", icon: "⚙️" }, cliente: { label: "Cliente", color: "#2563eb", icon: "👤" }, profesional: { label: "Profesional", color: "#15803d", icon: "🛠" } };

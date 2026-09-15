@@ -1,0 +1,17 @@
+{
+  "name": "@reformapro/domain",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./entities": "./src/entities/index.ts",
+    "./value-objects": "./src/value-objects/index.ts",
+    "./errors": "./src/errors/index.ts",
+    "./services": "./src/services/index.ts",
+    "./repositories": "./src/repositories/index.ts",
+    "./events": "./src/events/index.ts"
+  },
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "devDependencies": { "typescript": "^5.4.0" }
+}

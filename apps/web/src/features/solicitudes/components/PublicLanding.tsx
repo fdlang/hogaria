@@ -1,112 +1,40 @@
-/**
- * PublicLanding — landing pública con hero + formulario de contacto.
- * Endpoint sin auth; rate-limited en servidor (3/hora por IP).
- */
-
 import { useState } from "react";
 import { SolicitudesApi, useSubmitSolicitud } from "../api/solicitudes.api";
 import { Input, Textarea, Select, Button } from "@/shared/ui";
 import { useNotifications } from "@/shared/ui/notifications";
 import { PROJECT_TIPOS } from "@reformapro/domain";
 
-interface Props {
-  api: SolicitudesApi;
-  onLogin: () => void;
-}
+interface Props { api: SolicitudesApi; onLogin: () => void; }
+const works = [
+  ["Casa de la Luz", "Reforma integral · Chamberí", "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=85"],
+  ["Cocina Atocha", "Cocina · Madrid centro", "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=85"],
+  ["Baño Olivar", "Baño · Lavapiés", "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=1200&q=85"],
+  ["Ático Retiro", "Interiorismo · Retiro", "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=85"],
+] as const;
+const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
 export function PublicLanding({ api, onLogin }: Props) {
   const { submit, submitting, done, reset } = useSubmitSolicitud(api);
   const { push } = useNotifications();
-
-  const [form, setForm] = useState({
-    nombre: "", email: "", telefono: "", tipo: "", descripcion: "",
-  });
+  const [form, setForm] = useState({ nombre: "", email: "", telefono: "", tipo: "", descripcion: "" });
   const [errors, setErrors] = useState<Partial<typeof form>>({});
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const errs: Partial<typeof form> = {};
-    if (!form.nombre.trim()) errs.nombre = "Obligatorio";
-    if (!form.email.trim())  errs.email  = "Obligatorio";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Email inválido";
-    if (!form.tipo)          errs.tipo = "Selecciona tipo";
-    if (form.descripcion.length < 20) errs.descripcion = "Mínimo 20 caracteres";
-    setErrors(errs);
-    if (Object.keys(errs).length) return;
-
-    try {
-      await submit(form);
-      push("Solicitud enviada. Te contactaremos en menos de 24h.", "success");
-      setForm({ nombre: "", email: "", telefono: "", tipo: "", descripcion: "" });
-    } catch { /* handled by hook */ }
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault(); const next: Partial<typeof form> = {};
+    if (!form.nombre.trim()) next.nombre = "Obligatorio";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = "Introduce un email válido";
+    if (!form.tipo) next.tipo = "Selecciona un proyecto";
+    if (form.descripcion.trim().length < 20) next.descripcion = "Mínimo 20 caracteres";
+    setErrors(next); if (Object.keys(next).length) return;
+    try { await submit(form); push("Solicitud enviada. Te contactaremos en menos de 24h.", "success"); setForm({ nombre: "", email: "", telefono: "", tipo: "", descripcion: "" }); } catch {}
   };
-
-  return (
-    <div style={{ maxWidth: 900, margin: "0 auto" }}>
-      {/* Hero */}
-      <section style={{ padding: "60px 0", textAlign: "center" }}>
-        <h1 style={{ fontSize: 54, fontWeight: 700, color: "#f0ede6", lineHeight: 1.05, marginBottom: 20 }}>
-          Reformas <span style={{ color: "#c8a96e" }}>sin sorpresas</span>
-        </h1>
-        <p style={{ fontSize: 17, color: "#666", maxWidth: 620, margin: "0 auto 30px" }}>
-          Plataforma de gestión integral para reformas en Madrid.
-          Presupuestos transparentes, profesionales verificados y seguimiento en tiempo real.
-        </p>
-        <Button onClick={onLogin}>Acceder a mi cuenta →</Button>
-      </section>
-
-      {/* Done state */}
-      {done ? (
-        <section style={{ padding: 40, background: "#34d39908", border: "1px solid #34d399", borderRadius: 12, textAlign: "center" }}>
-          <div style={{ fontSize: 40, color: "#34d399" }}>✓</div>
-          <h2 style={{ fontSize: 22, color: "#f0ede6", marginTop: 12 }}>Solicitud recibida</h2>
-          <p style={{ color: "#666", marginTop: 8 }}>Revisaremos tu caso y te contactaremos en menos de 24h.</p>
-          <Button small variant="ghost" onClick={reset} style={{ marginTop: 20 }}>Enviar otra solicitud</Button>
-        </section>
-      ) : (
-        <section id="contacto" style={{ padding: 40, background: "#141411", border: "1px solid #2a2a26", borderRadius: 12 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 600, color: "#f0ede6", marginBottom: 8 }}>Cuéntanos tu proyecto</h2>
-          <p style={{ fontSize: 13, color: "#555", marginBottom: 24 }}>
-            Te enviaremos un primer presupuesto orientativo en 24h. Sin compromiso.
-          </p>
-
-          <form onSubmit={onSubmit} noValidate>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Input label="Nombre" required
-                value={form.nombre} error={errors.nombre}
-                onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
-              <Input label="Email" type="email" required
-                value={form.email} error={errors.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Input label="Teléfono"
-                value={form.telefono}
-                onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} />
-              <Select label="Tipo de reforma" required
-                value={form.tipo}
-                onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}>
-                <option value="">— Selecciona —</option>
-                {PROJECT_TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
-              </Select>
-            </div>
-            {errors.tipo && <p role="alert" style={{ fontSize: 11, color: "#f87171", marginTop: -10, marginBottom: 10 }}>{errors.tipo}</p>}
-
-            <Textarea label="Descripción del proyecto" rows={5} required
-              placeholder="Metros cuadrados, ubicación, plazos, estilo deseado…"
-              value={form.descripcion}
-              onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} />
-            {errors.descripcion && <p role="alert" style={{ fontSize: 11, color: "#f87171", marginTop: -10, marginBottom: 10 }}>{errors.descripcion}</p>}
-
-            <Button type="submit" loading={submitting} style={{ width: "100%", marginTop: 10 }}>
-              Enviar solicitud
-            </Button>
-            <p style={{ fontSize: 10, color: "#444", textAlign: "center", marginTop: 8 }}>
-              Al enviar aceptas nuestra política de privacidad (RGPD).
-            </p>
-          </form>
-        </section>
-      )}
-    </div>
-  );
+  return <div className="portfolio">
+    <nav><a className="nav-brand" href="#inicio">Reforma<span>Pro</span></a><a href="#obras">Obras</a><a href="#servicios">Servicios</a><a href="#proceso">Proceso</a><a href="#contacto">Contacto</a><button onClick={onLogin}>Área cliente →</button></nav>
+    <section className="hero" id="inicio"><div><span className="eyebrow">ReformaPro · Madrid</span><h1>Espacios que<br /><em>merece</em> la pena vivir.</h1><p>Reformas e interiorismo con diseño, planificación y ejecución bajo control. Sin sorpresas, con mucho oficio.</p><div className="actions"><Button onClick={() => jump("contacto")}>Cuéntanos tu proyecto →</Button><button onClick={() => jump("obras")}>Ver obras seleccionadas ↓</button></div></div><img src={works[0][2]} alt="Salón luminoso reformado" /><span className="stamp"><b>+120</b>hogares<br />transformados</span></section>
+    <section id="obras" className="section"><header><span className="eyebrow">Obras seleccionadas</span><h2>El detalle no es<br /><em>un extra.</em></h2><p>Cada espacio parte de una conversación y termina con una casa que funciona mejor.</p></header><div className="works">{works.map(([title, type, image]) => <article key={title}><img src={image} alt={title} loading="lazy" /><div><small>{type}</small><h3>{title}</h3><button onClick={() => jump("contacto")}>↗</button></div></article>)}</div></section>
+    <section id="servicios" className="section dark"><header><span className="eyebrow">Lo que hacemos</span><h2>Una reforma,<br /><em>bien pensada.</em></h2></header><div className="services">{[["01","Reforma integral","Diseño, obra y entrega con un único equipo responsable."],["02","Cocinas y baños","Distribución inteligente, materiales duraderos y acabados precisos."],["03","Interiorismo","Espacios que encajan con tu forma de vivir."]].map(([n,t,p]) => <article key={n}><span>{n}</span><div><h3>{t}</h3><p>{p}</p></div><b>↗</b></article>)}</div></section>
+    <section id="proceso" className="case"><img src={works[1][2]} alt="Cocina reformada" loading="lazy" /><div><span className="eyebrow">Caso de estudio · Atocha</span><blockquote>“Queríamos una cocina para estar, no solo para cocinar.”</blockquote><p>Replanteamos la distribución, ganamos luz natural y creamos una isla que conecta toda la vida de la casa.</p><div className="metrics"><span><b>48 m²</b>intervenidos</span><span><b>7 semanas</b>de obra</span><span><b>1 equipo</b>de principio a fin</span></div><Button variant="ghost" onClick={() => jump("contacto")}>Quiero algo así →</Button></div></section>
+    <section className="testimonial"><span className="eyebrow">Opiniones reales</span><blockquote>“Nos acompañaron en cada decisión y cumplieron cada fecha. La reforma fue sorprendentemente tranquila.”</blockquote><b>Clara y Daniel Moreno</b><small>Reforma integral · Retiro</small></section>
+    <section id="contacto" className="contact"><div><span className="eyebrow">Hablemos</span><h2>Tu casa tiene<br /><em>mucho que contar.</em></h2><p>Cuéntanos qué necesitas. Te responderemos con una primera orientación en menos de 24 horas.</p><a href="tel:+34910000000">+34 910 000 000</a><a href="mailto:hola@reformapro.es">hola@reformapro.es</a></div>{done ? <div className="success"><b>✓</b><h3>Solicitud recibida</h3><p>Muy pronto nos pondremos en contacto contigo.</p><Button variant="ghost" onClick={reset}>Enviar otra solicitud</Button></div> : <form onSubmit={send} noValidate><div className="form-row"><Input label="Nombre" required value={form.nombre} error={errors.nombre} onChange={e => setForm(f => ({...f,nombre:e.target.value}))}/><Input label="Email" type="email" required value={form.email} error={errors.email} onChange={e => setForm(f => ({...f,email:e.target.value}))}/></div><Input label="Teléfono" value={form.telefono} onChange={e => setForm(f => ({...f,telefono:e.target.value}))}/><Select label="Tipo de proyecto" required value={form.tipo} onChange={e => setForm(f => ({...f,tipo:e.target.value}))}><option value="">Selecciona una opción</option>{PROJECT_TIPOS.map(t=><option key={t}>{t}</option>)}</Select><Textarea label="Cuéntanos tu idea" rows={4} value={form.descripcion} error={errors.descripcion} onChange={e => setForm(f => ({...f,descripcion:e.target.value}))}/><Button type="submit" loading={submitting} style={{width:"100%"}}>Enviar proyecto →</Button></form>}</section>
+    <footer><a href="#inicio">Reforma<span>Pro</span></a><p>Reformas e interiorismo con oficio.<br />Madrid · 2026</p><div><a href="#obras">Instagram</a><a href="#contacto">Contacto</a><button onClick={onLogin}>Área cliente</button></div></footer>
+  </div>;
 }
