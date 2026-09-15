@@ -11,7 +11,8 @@ import {
   InMemoryUserRepository, InMemoryProjectRepository, InMemoryBudgetRepository,
   InMemoryChallengeRepository, InMemoryAuditRepository,
 } from "./infrastructure/database/inMemoryRepositories.js";
-import { PlainPasswordHasher } from "./infrastructure/database/passwordHasher.js";
+import { BcryptPasswordHasher } from "./infrastructure/database/passwordHasher.js";
+import bcrypt from "bcryptjs";
 import {
   HMACKeyProvider, WebCryptoTokenService, WebCryptoSignatureService,
   generateTempPassword,
@@ -40,6 +41,10 @@ import {
   IFileRepository, ProjectFile,
 } from "./application/use-cases/file.use-cases.js";
 import { NotFoundError } from "@reformapro/domain/errors";
+import { Email } from "@reformapro/domain/value-objects";
+import { IAuditRepository, IBudgetRepository, IChallengeRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
+import { PostgresAuditRepository, PostgresBudgetRepository, PostgresChallengeRepository, PostgresFileRepository, PostgresProjectRepository, PostgresSolicitudRepository, PostgresUserRepository } from "./infrastructure/database/postgresRepositories.js";
+import pg from "pg";
 
 // ─────────────────────────────────────────────────────────────
 // Tiny in-memory implementations for repos that don't have one yet
@@ -79,16 +84,16 @@ class InMemoryFileRepository implements IFileRepository {
 // AppDependencies
 // ─────────────────────────────────────────────────────────────
 export interface AppDependencies {
-  users:        InMemoryUserRepository;
-  projects:     InMemoryProjectRepository;
-  budgets:      InMemoryBudgetRepository;
-  challenges:   InMemoryChallengeRepository;
-  audit:        InMemoryAuditRepository;
+  users:        IUserRepository;
+  projects:     IProjectRepository;
+  budgets:      IBudgetRepository;
+  challenges:   IChallengeRepository;
+  audit:        IAuditRepository;
   events:       InMemoryEventEmitter;
   tokens:       WebCryptoTokenService;
   signatureCrypto: WebCryptoSignatureService;
-  files:        InMemoryFileRepository;
-  solicitudes:  InMemorySolicitudRepository;
+  files:        IFileRepository;
+  solicitudes:  ISolicitudRepository;
 
   useCases: {
     login:                     LoginUseCase;
@@ -114,22 +119,39 @@ export interface AppDependencies {
   };
 }
 
-export function buildApp(): AppDependencies {
+export async function buildApp(): Promise<AppDependencies> {
   // ── Infrastructure ───────────────────────────────────────────
-  const hasher    = new PlainPasswordHasher(); // SWAP FOR BcryptPasswordHasher IN PRODUCTION
+  const hasher = new BcryptPasswordHasher(bcrypt, 12);
   const hmacKeys  = new HMACKeyProvider();
   const tokens    = new WebCryptoTokenService(hmacKeys);
   const sigCrypto = new WebCryptoSignatureService(hmacKeys);
   const events    = new InMemoryEventEmitter();
   const cooldown  = new InMemoryCooldownGate();
 
-  const users       = new InMemoryUserRepository(hasher);
-  const projects    = new InMemoryProjectRepository();
-  const budgets     = new InMemoryBudgetRepository();
-  const challenges  = new InMemoryChallengeRepository();
-  const audit       = new InMemoryAuditRepository();
-  const files       = new InMemoryFileRepository();
-  const solicitudes = new InMemorySolicitudRepository();
+  const databaseUrl = process.env.DATABASE_URL;
+  const pool = databaseUrl ? new pg.Pool({ connectionString: databaseUrl }) : null;
+  const users: IUserRepository = pool ? new PostgresUserRepository(pool, hasher) : new InMemoryUserRepository(hasher);
+  const projects: IProjectRepository = pool ? new PostgresProjectRepository(pool) : new InMemoryProjectRepository();
+  const budgets: IBudgetRepository = pool ? new PostgresBudgetRepository(pool) : new InMemoryBudgetRepository();
+  const challenges: IChallengeRepository = pool ? new PostgresChallengeRepository(pool) : new InMemoryChallengeRepository();
+  const audit: IAuditRepository = pool ? new PostgresAuditRepository(pool) : new InMemoryAuditRepository();
+  const files: IFileRepository = pool ? new PostgresFileRepository(pool) : new InMemoryFileRepository();
+  const solicitudes: ISolicitudRepository = pool ? new PostgresSolicitudRepository(pool) : new InMemorySolicitudRepository();
+
+  // Development seed. PostgreSQL deployments use the same credentials only
+  // during the first bootstrap; override all values through environment vars.
+  const seedEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@reformapro.local";
+  const seedPassword = process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe_123!";
+  if (!(await users.findByEmail(seedEmail))) {
+    await users.save({
+      id: 1,
+      email: Email.of(seedEmail),
+      nombre: process.env.SEED_ADMIN_NAME ?? "Administrador ReformaPro",
+      rol: "admin",
+      activo: true,
+      createdAt: new Date(),
+    }, await hasher.hash(seedPassword));
+  }
 
   // ── Cross-cutting: audit subscriber ───────────────────────────
   const auditor = new AuditSubscriber(events, audit);

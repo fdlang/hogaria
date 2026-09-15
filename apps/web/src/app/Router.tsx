@@ -28,25 +28,41 @@ export function useNavigation() {
 }
 
 export function Router({ routes, fallback }: { routes: Route[]; fallback: ReactNode }) {
-  const [path, setPath] = useState<string>(() => window.location.hash || "#/");
+  const readPath = () => {
+    if (window.location.hash.startsWith("#/")) {
+      const legacyPath = window.location.hash.slice(1);
+      window.history.replaceState(null, "", legacyPath);
+      return legacyPath;
+    }
+    return window.location.pathname || "/";
+  };
+  const [path, setPath] = useState<string>(readPath);
   const { user, status } = useAuth();
 
   useEffect(() => {
-    const handle = () => setPath(window.location.hash || "#/");
+    const handle = () => setPath(readPath());
+    window.addEventListener("popstate", handle);
     window.addEventListener("hashchange", handle);
-    return () => window.removeEventListener("hashchange", handle);
+    return () => {
+      window.removeEventListener("popstate", handle);
+      window.removeEventListener("hashchange", handle);
+    };
   }, []);
 
-  const navigate = useMemo(() => (newPath: string) => { window.location.hash = newPath; }, []);
+  const navigate = useMemo(() => (newPath: string) => {
+    const nextPath = newPath.replace(/^#/, "");
+    window.history.pushState(null, "", nextPath);
+    setPath(nextPath);
+  }, []);
 
   const match = useMemo(() => {
     // Exact match first
-    const exact = routes.find(r => r.path === path);
+    const exact = routes.find(r => r.path.replace(/^#/, "") === path);
     if (exact) return exact;
     // Otherwise, match longest prefix — ensures "#/admin/projects/" beats "#/admin/projects"
     // when the URL is "#/admin/projects/123"
     const candidates = routes
-      .filter(r => path.startsWith(r.path))
+      .filter(r => path.startsWith(r.path.replace(/^#/, "")))
       .sort((a, b) => b.path.length - a.path.length);
     return candidates[0] ?? null;
   }, [routes, path]);

@@ -25,7 +25,7 @@ import { toHttpError } from "./interfaces/http/errorMiddleware.js";
 const PORT = Number(process.env.PORT ?? 3001);
 
 // ── Composition root ─────────────────────────────────────────
-const app = buildApp();
+const app = await buildApp();
 
 const auth     = authController({ loginUseCase: app.useCases.login, users: app.users, tokens: app.tokens });
 const budgets  = budgetController({
