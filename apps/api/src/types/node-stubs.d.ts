@@ -37,6 +37,7 @@ declare module "node:http" {
 declare module "node:url" {
   export class URL {
     constructor(input: string, base?: string);
+    href: string;
     pathname: string;
     searchParams: { forEach(cb: (value: string, key: string) => void): void };
   }
@@ -48,4 +49,5 @@ declare class Buffer {
 
 declare const process: {
   env: Record<string, string | undefined>;
+  cwd(): string;
 };
