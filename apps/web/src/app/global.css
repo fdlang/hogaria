@@ -101,6 +101,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .works small { color: var(--marble); }
 .works h3 { margin: 6px 0 0; font-size: 23px; }
 .works button { position: absolute; right: 20px; bottom: 20px; width: 34px; height: 34px; border: 1px solid var(--marble-light); border-radius: 50%; background: rgba(48,45,41,.45); color: var(--marble-light); }
+.works .works__case-link { width: auto; min-height: 38px; padding: 0 14px; border-radius: 6px; font-weight: 700; }
 
 .dark, .contact { background: rgba(247,239,229,.54); border-block: 1px solid var(--line); }
 .services { border-top: 1px solid var(--line); }
@@ -120,6 +121,24 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .metrics { display: flex; gap: 18px; margin: 28px 0; padding-top: 18px; border-top: 1px solid rgba(247,239,229,.25); }
 .metrics span { color: var(--marble-shadow); font-size: 12px; }.metrics b { display: block; color: var(--marble-light); font-size: 15px; }
 
+.project-showcase { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin: 42px clamp(24px, 4vw, 56px); overflow: hidden; background: rgba(247,239,229,.78); border: 1px solid var(--line); box-shadow: 0 18px 38px rgba(62,48,35,.12); }
+.project-showcase__intro, .project-showcase__story, .project-showcase__materials { padding: clamp(28px, 3.5vw, 48px); }
+.project-showcase__intro, .project-showcase__materials { display: flex; flex-direction: column; justify-content: center; }
+.project-showcase__intro h2 { margin: 16px 0 18px; font-size: clamp(38px, 4.2vw, 58px); color: var(--ink); }
+.project-showcase__intro p, .project-showcase__materials p { max-width: 470px; margin: 0; color: var(--muted); line-height: 1.7; }
+.project-showcase__image { min-height: 420px; margin: 0; overflow: hidden; background: var(--graphite); }
+.project-showcase__image img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.project-showcase__story { display: grid; gap: 22px; background: var(--graphite); color: var(--marble-light); }
+.project-showcase__story .eyebrow { color: #e3a177; }
+.project-showcase__story p { margin: 9px 0 0; color: var(--marble-shadow); line-height: 1.7; }
+.project-showcase__materials { border-top: 1px solid var(--line); }
+.project-showcase__materials h3 { max-width: 520px; margin: 14px 0; color: var(--ink); font-size: clamp(21px, 2vw, 28px); line-height: 1.16; }
+.project-showcase__video { grid-column: 1 / -1; padding: clamp(18px, 3vw, 36px); background: var(--marble); }
+.project-showcase__video video { display: block; width: min(100%, 900px); max-height: min(56vh, 520px); margin: auto; border: 1px solid rgba(84,80,72,.28); background: var(--graphite); object-fit: contain; }
+.project-showcase__video p { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+.project-showcase__cta { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px clamp(24px, 3vw, 42px); border-top: 1px solid var(--line); background: var(--marble-light); }
+.project-showcase__cta p { margin: 0; color: var(--ink); font: 500 clamp(21px, 2vw, 28px)/1.15 "Playfair Display", serif; }
+
 .testimonial { max-width: 850px; margin: 0 auto 105px; color: var(--ink); text-align: center; }
 .testimonial blockquote { font-size: 42px; }.testimonial small { display: block; margin-top: 5px; color: var(--muted); }
 .contact { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(36px, 5vw, 75px); margin: 0 clamp(24px, 4vw, 56px) 75px; padding: 70px clamp(28px, 4vw, 55px); }
@@ -134,6 +153,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .actions { flex-direction: column; align-items: flex-start; }.portfolio nav { min-height: 68px; flex-wrap: wrap; gap: 8px 14px; padding: 11px 24px; overflow: visible; }.portfolio nav .nav-brand { width: 100%; }.portfolio nav a { white-space: nowrap; font-size: 12px; }.portfolio nav .nav-brand .brand-symbol { width: 42px; height: 42px; }.portfolio nav .nav-brand .brand-wordmark { width: 150px; height: 37px; }
   .section { padding: 75px 24px; }.section header { display: block; }.section h2, .contact h2 { font-size: 44px; }.works { grid-template-columns: 1fr; }.works article { height: 300px; }
   .services article { grid-template-columns: 45px 1fr auto; }.case { grid-template-columns: 1fr; margin: 65px 24px; }.case > img { min-height: 260px; }.case > div { padding: 36px 27px; }
+  .project-showcase { grid-template-columns: 1fr; margin: 48px 24px; }.project-showcase__image { min-height: 360px; }.project-showcase__video, .project-showcase__cta { grid-column: auto; }
   .contact { grid-template-columns: 1fr; gap: 30px; margin: 0 24px 55px; padding: 45px 25px; }.form-row { grid-template-columns: 1fr; }.testimonial { margin: 0 24px 70px; }.testimonial blockquote { font-size: 30px; }
   .portfolio footer { flex-wrap: wrap; padding: 30px 24px; }.portfolio footer .footer-brand { min-width: 0; }.portfolio footer div { width: 100%; margin-left: 0; }
 }
@@ -206,6 +226,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .hero > .hero-marble, .hero > .stamp { display: none; }
   .hero::after { background: linear-gradient(126deg, rgba(247,239,229,.96), rgba(232,217,197,.82)); }
   .portfolio nav button { padding: 9px 11px; border: 1px solid rgba(193,113,72,.42); border-radius: 5px; background: rgba(193,113,72,.08); }
+  .project-showcase { margin: 42px 16px; }.project-showcase__intro, .project-showcase__story, .project-showcase__materials { padding: 28px 24px; }.project-showcase__image { min-height: 340px; }.project-showcase__video { padding: 16px; }.project-showcase__cta { align-items: flex-start; flex-direction: column; padding: 22px 24px; }.project-showcase__cta .ui-button { width: 100%; }
 
   .private-main { padding: 16px !important; }
   .private-topbar { min-height: auto !important; padding: 10px 16px !important; }
