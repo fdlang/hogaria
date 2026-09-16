@@ -5,7 +5,7 @@
   "outputDirectory": "apps/web/dist",
   "functions": {
     "api/**/*.ts": {
-      "includeFiles": "api/_app.mjs"
+      "includeFiles": "api/_app.cjs"
     }
   },
   "rewrites": [

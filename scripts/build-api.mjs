@@ -2,14 +2,11 @@ import { build } from "esbuild";
 
 await build({
   entryPoints: ["apps/api/src/main.ts"],
-  outfile: "api/_app.mjs",
+  outfile: "api/_app.cjs",
   bundle: true,
   platform: "node",
-  format: "esm",
+  format: "cjs",
   target: "node24",
-  // pg and bcryptjs are CommonJS packages. Keep them external so Node loads
-  // them natively instead of esbuild emulating `require()` inside ESM.
-  external: ["pg", "bcryptjs"],
   sourcemap: false,
   logLevel: "info",
 });

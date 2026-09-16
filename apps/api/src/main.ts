@@ -27,33 +27,6 @@ const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "").split(",").map(origin => origin.trim()).filter(Boolean);
 
 // ── Composition root ─────────────────────────────────────────
-const app = await buildApp();
-
-const auth     = authController({ loginUseCase: app.useCases.login, users: app.users, tokens: app.tokens });
-const budgets  = budgetController({
-  create:    app.useCases.createBudget,
-  send:      app.useCases.sendBudget,
-  delete:    app.useCases.deleteBudget,
-  list:      app.useCases.listBudgets,
-  challenge: app.useCases.requestSignatureChallenge,
-  sign:      app.useCases.signBudget,
-});
-const users    = userController({
-  create: app.useCases.createUser, update: app.useCases.updateUser,
-  delete: app.useCases.deleteUser, list:   app.useCases.listUsers,
-});
-const projects = projectController({
-  create: app.useCases.createProject, update: app.useCases.updateProject,
-  delete: app.useCases.deleteProject, list:   app.useCases.listProjects,
-});
-const audit       = auditController({ query: app.useCases.queryAuditLog });
-const solicitudes = solicitudController({ submit: app.useCases.submitSolicitud });
-const files       = fileController({
-  upload: app.useCases.uploadFile, delete: app.useCases.deleteFile, list: app.useCases.listFiles,
-});
-
-const authMiddleware = requireAuth(app.tokens);
-
 // ── Router ────────────────────────────────────────────────────
 type Req     = HttpRequest & { actorId?: number; params: Record<string, string>; query: Record<string, string> };
 type Handler = (req: Req) => Promise<HttpResponse>;
@@ -72,7 +45,38 @@ function route(method: string, path: string, handler: Handler, opts: { protected
   return { method, pattern, keys, handler, protected: opts.protected };
 }
 
-const ROUTES: Route[] = [
+interface Runtime {
+  routes: Route[];
+  authMiddleware: ReturnType<typeof requireAuth>;
+}
+
+let runtimePromise: Promise<Runtime> | null = null;
+
+function getRuntime(): Promise<Runtime> {
+  if (runtimePromise) return runtimePromise;
+
+  runtimePromise = buildApp().then(app => {
+    const auth = authController({ loginUseCase: app.useCases.login, users: app.users, tokens: app.tokens });
+    const budgets = budgetController({
+      create: app.useCases.createBudget, send: app.useCases.sendBudget,
+      delete: app.useCases.deleteBudget, list: app.useCases.listBudgets,
+      challenge: app.useCases.requestSignatureChallenge, sign: app.useCases.signBudget,
+    });
+    const users = userController({
+      create: app.useCases.createUser, update: app.useCases.updateUser,
+      delete: app.useCases.deleteUser, list: app.useCases.listUsers,
+    });
+    const projects = projectController({
+      create: app.useCases.createProject, update: app.useCases.updateProject,
+      delete: app.useCases.deleteProject, list: app.useCases.listProjects,
+    });
+    const audit = auditController({ query: app.useCases.queryAuditLog });
+    const solicitudes = solicitudController({ submit: app.useCases.submitSolicitud });
+    const files = fileController({
+      upload: app.useCases.uploadFile, delete: app.useCases.deleteFile, list: app.useCases.listFiles,
+    });
+
+    return { authMiddleware: requireAuth(app.tokens), routes: [
   // Auth (public)
   route("POST", "/auth/login",  async req => auth.login(req)),
   route("GET",  "/auth/me",     async req => auth.me(req)),
@@ -108,7 +112,15 @@ const ROUTES: Route[] = [
   route("GET",    "/projects/:projectId/files", req => files.list(req   as never), { protected: true }),
   route("POST",   "/projects/:projectId/files", req => files.upload(req as never), { protected: true }),
   route("DELETE", "/files/:id",                 req => files.delete(req as never), { protected: true }),
-];
+    ] };
+  }).catch(error => {
+    // A rejected initialisation must not poison future serverless invocations.
+    runtimePromise = null;
+    throw error;
+  });
+
+  return runtimePromise;
+}
 
 // ── HTTP server ────────────────────────────────────────────────
 export async function apiHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -131,11 +143,12 @@ export async function apiHandler(req: IncomingMessage, res: ServerResponse): Pro
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") { res.writeHead(204).end(); return; }
 
+    const { routes, authMiddleware } = await getRuntime();
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
     // Vercel forwards requests through /api/:path*. Local development may call
     // the API directly, so normalize both forms before route matching.
     const pathname = url.pathname.replace(/^\/api(?=\/|$)/, "") || "/";
-    const match = ROUTES.find(r => r.method === req.method && r.pattern.test(pathname));
+    const match = routes.find(r => r.method === req.method && r.pattern.test(pathname));
 
     if (!match) { res.writeHead(404).end(JSON.stringify({ code: "NOT_FOUND", message: "Ruta no encontrada" })); return; }
 

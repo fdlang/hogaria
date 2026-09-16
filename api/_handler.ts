@@ -4,9 +4,10 @@ type ApiModule = {
   apiHandler: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
 };
 
-// Vercel's CJS function bundler rewrites a static `import()` into `require()`.
-// Constructing the import at runtime preserves native ESM loading for the API.
-const importEsm = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<ApiModule>;
+// Vercel's function bundler rewrites a static `import()` into `require()`.
+// Constructing it at runtime preserves Node's native module loader for the
+// self-contained CommonJS application bundle.
+const importApplication = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<ApiModule>;
 
 /**
  * Loads the application lazily so configuration failures are logged and
@@ -15,8 +16,8 @@ const importEsm = new Function("specifier", "return import(specifier)") as (spec
 export async function runApi(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     const root = process.cwd().replace(/\\/g, "/");
-    const specifier = new URL(`file://${root}/api/_app.mjs`).href;
-    const { apiHandler } = await importEsm(specifier);
+    const specifier = new URL(`file://${root}/api/_app.cjs`).href;
+    const { apiHandler } = await importApplication(specifier);
     await apiHandler(req, res);
   } catch (error) {
     console.error("[api bootstrap failed]", error);
