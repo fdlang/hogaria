@@ -98,11 +98,11 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .works article { position: relative; height: 370px; overflow: hidden; background: var(--graphite); }
 .works img { width: 100%; height: 100%; object-fit: cover; filter: saturate(.7); transition: transform .45s ease; }
 .works article:hover img { transform: scale(1.035); }
-.works article > div { position: absolute; inset: auto 0 0; padding: 50px 24px 20px; background: linear-gradient(transparent, rgba(48,45,41,.92)); color: var(--marble-light); }
-.works small { color: var(--marble); }
-.works h3 { margin: 6px 0 0; font-size: 23px; }
+.works article > div { position: absolute; inset: auto 0 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 16px; align-items: end; padding: 50px 24px 20px; background: linear-gradient(transparent, rgba(48,45,41,.92)); color: var(--marble-light); }
+.works small { grid-column: 1 / -1; color: var(--marble); }
+.works h3 { min-width: 0; margin: 0; font-size: 23px; }
 .works button { position: absolute; right: 20px; bottom: 20px; width: 34px; height: 34px; border: 1px solid var(--marble-light); border-radius: 50%; background: rgba(48,45,41,.45); color: var(--marble-light); }
-.works .works__action { width: auto; min-height: 38px; padding: 0 14px; border-radius: 6px; font-weight: 700; }
+.works .works__action { position: static; right: auto; bottom: auto; width: auto; min-height: 38px; padding: 0 14px; border-radius: 6px; font-weight: 700; white-space: nowrap; }
 
 .dark, .contact { background: rgba(247,239,229,.54); border-block: 1px solid var(--line); }
 .services { border-top: 1px solid var(--line); }
@@ -157,6 +157,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .actions { flex-direction: column; align-items: flex-start; }.portfolio nav { min-height: 68px; flex-wrap: wrap; gap: 8px 14px; padding: 11px 24px; overflow: visible; }.portfolio nav .nav-brand { width: 100%; }.portfolio nav a { white-space: nowrap; font-size: 12px; }.portfolio nav .nav-brand .brand-symbol { width: 42px; height: 42px; }.portfolio nav .nav-brand .brand-wordmark { width: 150px; height: 37px; }
   .section { padding: 75px 24px; }.section header { display: block; }.section h2, .contact h2 { font-size: 44px; }.works { grid-template-columns: 1fr; }.works article { height: 300px; }
   .services article { grid-template-columns: 45px minmax(0, 1fr); gap: 8px 16px; }.services article p { grid-column: 2; }.case { grid-template-columns: 1fr; margin: 65px 24px; }.case > img { min-height: 260px; }.case > div { padding: 36px 27px; }
+  .works article > div { grid-template-columns: 1fr; gap: 9px; padding: 56px 20px 18px; }.works .works__action { justify-self: start; min-height: 42px; }
   .services-cta { align-items: flex-start; flex-direction: column; margin-top: 32px; }.services-cta .ui-button { min-height: 44px; }
   .project-showcase { grid-template-columns: 1fr; margin: 48px 24px; }.project-showcase__image { min-height: 360px; }.project-showcase__video, .project-showcase__cta { grid-column: auto; }
   .contact { grid-template-columns: 1fr; gap: 30px; margin: 0 24px 55px; padding: 45px 25px; }.form-row { grid-template-columns: 1fr; }.testimonial { margin: 0 24px 70px; }.testimonial blockquote { font-size: 30px; }
@@ -218,6 +219,9 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .portfolio nav .nav-brand .brand-symbol { width: 38px; height: 38px; }
   .portfolio nav .nav-brand .brand-wordmark { width: 158px; height: 39px; }
   .portfolio nav a:not(.nav-brand) {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
     padding: 8px 4px;
     font-size: 12px;
     letter-spacing: .055em;
@@ -305,7 +309,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .ui-modal-header { padding: 16px 20px !important; }
   .ui-modal-body { padding: 20px !important; }
 
-  .works button { width: 44px; height: 44px; }
+  .works button:not(.works__action) { width: 44px; height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
