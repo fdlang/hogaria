@@ -7,7 +7,8 @@ export const portfolioWorks = [
 ] as const;
 
 export const portfolioServices = [
-  { number: "01", title: "Reforma integral", description: "Diseño, obra y entrega con un único equipo responsable." },
-  { number: "02", title: "Cocinas y baños", description: "Distribución inteligente, materiales duraderos y acabados precisos." },
-  { number: "03", title: "Interiorismo", description: "Espacios que encajan con tu forma de vivir." },
+  { number: "01", title: "Reforma integral de vivienda", description: "Redistribuimos y renovamos salones, dormitorios, cocinas, baños, pasillos, terrazas e instalaciones. Un proyecto coherente desde la distribución hasta el último acabado." },
+  { number: "02", title: "Cocinas y baños", description: "Espacios técnicos que exigen más precisión. Diseñamos funcionalidad, almacenaje, iluminación y materiales preparados para el uso diario." },
+  { number: "03", title: "Interiorismo y acabados", description: "Unificamos materiales, iluminación, mobiliario y detalles para que cada estancia tenga personalidad y toda la vivienda hable el mismo lenguaje." },
+  { number: "04", title: "Espacios a medida", description: "Salones, dormitorios, vestidores, recibidores, zonas de trabajo y terrazas. Adaptamos cada metro a la forma real de vivir de cada familia." },
 ] as const;
