@@ -97,12 +97,27 @@ npm run db:migrate --workspace @reformapro/api
 
 ## Despliegue en Vercel
 
-El repositorio incluye `vercel.json`, fallback para History API y funciones
-serverless en `api/`. Importa el repositorio en Vercel usando la raíz del
-proyecto, configura las variables de producción y aplica la migración contra
-una base PostgreSQL gestionada antes de publicar.
+El repositorio incluye `vercel.json`, reescrituras para las rutas de la SPA y
+funciones serverless en `api/`. Importa el repositorio en Vercel usando la raíz
+del proyecto. El build de Vercel genera primero el bundle CommonJS de la API y
+después la SPA de Vite. Configura las variables de producción y aplica la
+migración contra una base PostgreSQL gestionada antes de publicar.
 
 Consulta [VERCEL_DEPLOY.md](VERCEL_DEPLOY.md) para la guía de despliegue.
+
+## Contenido de la landing
+
+El contenido comercial no está repartido por el proyecto:
+
+- Las tarjetas de obras y servicios se editan en
+  `apps/web/src/features/solicitudes/portfolio.data.ts`.
+- El caso de estudio destacado, textos principales, contacto y formulario se
+  encuentran en `apps/web/src/features/solicitudes/components/PublicLanding.tsx`.
+- Las imágenes públicas se sirven desde `apps/web/public/images/portfolio/` y
+  los recursos de marca desde `apps/web/public/brand/`.
+
+Al añadir una obra con caso de estudio, su tarjeta debe enlazar a una sección o
+ruta concreta; no debe reutilizarse el destino de otra obra.
 
 ## Seguridad y producción
 
@@ -111,7 +126,8 @@ Consulta [VERCEL_DEPLOY.md](VERCEL_DEPLOY.md) para la guía de despliegue.
 - CORS se limita a mismo origen y a `ALLOWED_ORIGINS`.
 - No subas `apps/api/.env`, credenciales ni secretos al repositorio.
 - La carga de binarios requiere un proveedor de objetos, como Vercel Blob o S3,
-  antes de habilitarla en producción.
+  antes de habilitar cargas reales en producción. La aplicación actual sólo
+  persiste los metadatos de los archivos y su clave de almacenamiento.
 
 ## Licencia
 
