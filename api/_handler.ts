@@ -15,7 +15,7 @@ const importEsm = new Function("specifier", "return import(specifier)") as (spec
 export async function runApi(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     const root = process.cwd().replace(/\\/g, "/");
-    const specifier = new URL(`file://${root}/apps/api/src/main.js`).href;
+    const specifier = new URL(`file://${root}/api/_app.mjs`).href;
     const { apiHandler } = await importEsm(specifier);
     await apiHandler(req, res);
   } catch (error) {
