@@ -83,7 +83,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export function Button({ variant = "primary", loading, small, children, disabled, style, className, ...rest }: ButtonProps) {
   const colors: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
-    primary: { bg: "#c17248", fg: "#f7efe5", border: "#c17248" },
+    primary: { bg: "#995637", fg: "#fffaf4", border: "#995637" },
     ghost:   { bg: "transparent", fg: "#545048", border: "#a8947e" },
     danger:  { bg: "#f87171",  fg: "#302d29", border: "#f87171" },
   };

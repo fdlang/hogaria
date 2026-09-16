@@ -70,7 +70,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .portfolio footer a:hover, .portfolio footer a:focus-visible, .portfolio .contact > div > a:hover, .portfolio .contact > div > a:focus-visible { color: var(--copper); }
 .portfolio .works article { transition: box-shadow .22s ease, transform .22s ease; }
 .portfolio .works article:hover { box-shadow: 0 16px 34px rgba(72,59,44,.18); transform: translateY(-3px); }
-.ui-button--primary:not(:disabled):hover { background: var(--copper-dark) !important; border-color: var(--copper-dark) !important; box-shadow: 0 8px 18px rgba(193,113,72,.28); }
+.ui-button--primary:not(:disabled):hover { background: var(--graphite-deep) !important; border-color: var(--graphite-deep) !important; color: var(--marble-light) !important; box-shadow: 0 8px 18px rgba(72,59,44,.24); }
 .ui-button--ghost:not(:disabled):hover { background: rgba(193,113,72,.10) !important; border-color: var(--copper) !important; color: var(--copper-dark) !important; }
 .ui-button--danger:not(:disabled):hover { filter: brightness(.92); box-shadow: 0 8px 18px rgba(181,72,63,.20); }
 .portfolio nav .nav-brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
@@ -85,6 +85,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .hero > .hero-marble { position: absolute; z-index: 0; inset: 0 0 0 auto; width: 68%; height: 100%; object-fit: cover; object-position: center; filter: saturate(.72) contrast(.96) brightness(1.05); }
 .hero::after { content: ""; position: absolute; z-index: 1; inset: 0; pointer-events: none; background: linear-gradient(90deg, var(--marble-light) 0 30%, rgba(247,239,229,.94) 40%, rgba(232,217,197,.48) 56%, rgba(232,217,197,.04) 76%); }
 .actions { display: flex; align-items: center; gap: 25px; margin-top: 30px; }
+.hero .ui-button--primary { min-height: 46px; padding-inline: 22px !important; font-size: 14px !important; letter-spacing: .01em; box-shadow: 0 8px 18px rgba(153,86,55,.2); }
 .stamp { position: absolute; right: 39%; bottom: 75px; display: grid; width: 130px; height: 130px; place-content: center; border: 1px solid var(--copper); border-radius: 50%; background: rgba(247,239,229,.9); color: var(--graphite); font-size: 12px; text-align: center; }
 .stamp b { color: var(--copper-dark); font: 35px "Playfair Display", serif; }
 
@@ -140,7 +141,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .project-showcase__cta p { margin: 0; color: var(--ink); font: 500 clamp(21px, 2vw, 28px)/1.15 "Playfair Display", serif; }
 
 .testimonial { max-width: 850px; margin: 0 auto 105px; color: var(--ink); text-align: center; }
-.testimonial blockquote { font-size: 42px; }.testimonial small { display: block; margin-top: 5px; color: var(--muted); }
+.testimonial blockquote { font-size: 42px; }.testimonial small, .testimonial p { display: block; margin: 5px 0 0; color: var(--muted); }
 .contact { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(36px, 5vw, 75px); margin: 0 clamp(24px, 4vw, 56px) 75px; padding: 70px clamp(28px, 4vw, 55px); }
 .contact p { color: var(--muted); line-height: 1.6; }.contact > div > a { display: block; margin-top: 13px; color: var(--copper-dark); }.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .success { align-self: center; text-align: center; }.success > b { color: var(--copper); font-size: 45px; }.success h3 { font-size: 25px; }
@@ -216,7 +217,6 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .portfolio nav button {
     min-height: 44px;
     flex: 0 0 100%;
-    min-height: 38px;
     margin-top: 1px;
     text-align: left;
   }
@@ -276,4 +276,8 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
+
+@media (max-width: 720px) {
+  body { background-attachment: scroll; }
 }
