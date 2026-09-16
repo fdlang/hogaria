@@ -53,7 +53,10 @@ export class AuthStore {
       this.setState({ status: "authenticated", user, token, error: null });
       return user;
     } catch (e) {
-      const msg = (e as { message?: string }).message ?? "Error de autenticación";
+      const authError = e as { status?: number; message?: string };
+      const msg = authError.status === 401
+        ? "El email o la contraseña no son correctos."
+        : authError.message ?? "No se ha podido iniciar sesión. Inténtalo de nuevo.";
       this.setState({ status: "unauthenticated", user: null, token: null, error: msg });
       return null;
     }

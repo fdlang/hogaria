@@ -37,7 +37,8 @@ export class ApiClient {
     });
 
     if (res.status === 401) {
-      this.onUnauthorized();
+      // A failed login is expected form validation, not an expired session.
+      if (this.token && path !== "/auth/login") this.onUnauthorized();
       throw this.mapError(res, await res.json().catch(() => ({})));
     }
     if (!res.ok) throw this.mapError(res, await res.json().catch(() => ({})));

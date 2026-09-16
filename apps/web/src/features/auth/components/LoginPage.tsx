@@ -37,13 +37,15 @@ export function LoginPage({ onSuccess, onBack }: Props) {
       <form onSubmit={submit} noValidate>
         <Input label="Email" type="email" autoComplete="email" required
           value={email} onChange={e => setEmail(e.target.value)}
+          aria-invalid={error ? true : undefined}
           disabled={status === "authenticating"} />
 
         <Input label="Contraseña" type="password" autoComplete="current-password" required
           value={password} onChange={e => setPassword(e.target.value)}
+          aria-invalid={error ? true : undefined}
           disabled={status === "authenticating"} />
 
-        {error && <p role="alert" style={{ fontSize: 12, color: "#f87171", marginBottom: 14, padding: 8, background: "#f8717108", border: "1px solid #f8717126", borderRadius: 6 }}>{error}</p>}
+        {error && <p role="alert" aria-live="assertive" style={{ fontSize: 14, fontWeight: 600, color: "#9c342c", marginBottom: 14, padding: "11px 12px", background: "#fce9e5", border: "1px solid #d66a5e", borderRadius: 8 }}>{error}</p>}
 
         <Button type="submit" style={{ width: "100%" }} loading={status === "authenticating"}>
           Iniciar sesión
