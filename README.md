@@ -28,7 +28,7 @@ conecta controladores, casos de uso y repositorios en `apps/api/src/bootstrap.ts
 
 ## Requisitos
 
-- Node.js 20.9 o superior.
+- Node.js 24.x.
 - npm 9 o superior.
 - PostgreSQL 16 para persistencia local o una base gestionada para producción.
 
