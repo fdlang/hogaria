@@ -12,7 +12,7 @@ function FeaturedBathroom() {
   return (
     <section id="proceso" className="project-showcase" aria-labelledby="bano-pinto-title">
       <div className="project-showcase__intro">
-        <span className="eyebrow">Baño Pinto · Reforma integral · 5,08 m²</span>
+        <span className="eyebrow">Duplex Pinto · Reforma integral · BaÑo 5,08 m²</span>
         <h2 id="bano-pinto-title">Un baño compacto,<br />diseñado para <em>compartir.</em></h2>
         <p>El baño original tenía bañera, poca iluminación y una distribución que dificultaba su uso diario. El espacio no permitía que dos personas se preparasen cómodamente al mismo tiempo.</p>
       </div>
