@@ -109,7 +109,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                   </div>
                 </>
               ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div className="project-progress-editor" style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <input type="range" min="0" max="100" value={editingProgress}
                     onChange={e => setEditingProgress(parseInt(e.target.value, 10))}
                     style={{ flex: 1 }} />
@@ -153,7 +153,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
               ? <EmptyState icon="📄" title="Sin documentos" hint="Sube planos, fotos o contratos" />
               : <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
                   {files.data.map(f => (
-                    <li key={f.id}
+                    <li className="project-file-item" key={f.id}
                       style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 10, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 8 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                         <span style={{ fontSize: 18 }}>{f.tipo.startsWith("image/") ? "🖼" : f.tipo === "application/pdf" ? "📄" : "📎"}</span>

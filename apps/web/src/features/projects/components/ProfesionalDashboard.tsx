@@ -43,7 +43,7 @@ export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
 
   return (
     <section>
-      <header style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 30 }}>
+      <header className="professional-dashboard-header" style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 30 }}>
         {profInfo && <div style={{ width: 56, height: 56, borderRadius: "50%", background: `${profInfo.color}18`, color: profInfo.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>{profInfo.icon}</div>}
         <div style={{ flex: 1 }}>
           <PageHeader
@@ -82,9 +82,9 @@ export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
             {proj.map(p => {
               const pendingMilestones = p.hitos.filter(h => !h.completado).length;
               return (
-                <button key={p.id} role="listitem" onClick={() => onOpenProject(p.id)}
+                <button className="private-project-card" key={p.id} role="listitem" onClick={() => onOpenProject(p.id)}
                   style={{ textAlign: "left", padding: 16, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 10, cursor: "pointer" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <div className="private-project-card__header" style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 600, color: "#302d29" }}>{p.nombre}</h3>
                     <div style={{ display: "flex", gap: 6 }}>
                       {user?.profesion && <ProfesionBadge profesion={user.profesion as Profesion} />}

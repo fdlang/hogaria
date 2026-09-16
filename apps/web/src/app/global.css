@@ -178,9 +178,6 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .login-brand img:last-child { width: 190px; height: 46px; object-fit: contain; }
 
 @media (max-width: 1023px) {
-  .portfolio nav { flex-wrap: wrap; gap: 8px 18px; padding: 12px 28px; }
-  .portfolio nav .nav-brand { width: 100%; }
-
   .private-main { padding: 24px !important; }
   .private-topbar { display: flex !important; align-items: flex-start !important; flex-wrap: wrap; gap: 10px 18px; padding: 12px 24px !important; }
   .private-nav { order: 3; width: 100%; flex-wrap: wrap; gap: 8px 10px !important; overflow: visible; padding: 3px 0 7px; }
@@ -195,6 +192,13 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .private-action-card { grid-template-columns: 1fr !important; align-items: start !important; }
   .private-action-card > div:last-child { flex-wrap: wrap; }
   .project-documents-header { flex-wrap: wrap; gap: 10px; }
+}
+
+/* Tablet navigation is intentionally distinct from the tighter phone layout.
+   Keeping this range separate prevents it from overriding the 720px rules. */
+@media (min-width: 721px) and (max-width: 1023px) {
+  .portfolio nav { flex-wrap: wrap; gap: 8px 18px; padding: 12px 28px; }
+  .portfolio nav .nav-brand { width: 100%; }
 }
 
 @media (max-width: 639px) {
@@ -239,6 +243,8 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .private-brand-wordmark { width: 136px; height: 33px; }
   .private-nav { margin-inline: 0; width: 100%; padding-inline: 0; }
   .private-nav > span { display: none; }
+  .private-nav { flex-wrap: nowrap !important; overflow-x: auto !important; overscroll-behavior-x: contain; scrollbar-width: thin; }
+  .private-nav > a, .private-nav > button { flex: 0 0 auto; }
   .private-nav-link { font-size: 12px !important; }
   .private-nav > a, .private-nav > button, .ui-button { min-height: 44px; }
   input, select { min-height: 44px; }
@@ -246,6 +252,9 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 
   .private-page-header { align-items: flex-start; flex-wrap: wrap; gap: 12px; }
   .private-page-header > * { flex: 1 1 auto; }
+  .private-page-header h1 { font-size: clamp(28px, 9vw, 36px) !important; line-height: 1.05 !important; }
+  .private-page-header__actions { width: 100%; flex-wrap: wrap; }
+  .private-page-header__actions .ui-button { flex: 1 1 132px; }
   .private-form-grid-two, .private-form-grid-three, .budget-line-main-grid { grid-template-columns: 1fr !important; }
   .budget-line-fields-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .budget-line-totals { flex-wrap: wrap; justify-content: flex-start !important; gap: 8px 16px !important; }
@@ -264,6 +273,26 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .private-action-card > div:last-child .ui-button { flex: 1 1 auto; min-height: 44px; }
   .project-documents-header { align-items: flex-start !important; }
   .file-upload-controls { width: 100%; flex-wrap: wrap; }
+  .private-filter-bar { flex-direction: column; }
+  .private-filter-bar > * { width: 100%; min-width: 0 !important; }
+
+  .private-pending-budget { align-items: stretch !important; flex-direction: column; gap: 12px; }
+  .private-pending-budget__actions { width: 100%; flex-wrap: wrap; }
+  .private-pending-budget__actions .ui-button { flex: 1 1 120px; }
+  .catalog-category-header { align-items: flex-start !important; flex-direction: column; gap: 8px; }
+  .catalog-item { align-items: stretch !important; flex-direction: column; gap: 10px; }
+  .catalog-item__description { align-items: flex-start !important; }
+  .catalog-item__description > span { white-space: normal !important; }
+  .catalog-item__actions { width: 100%; flex-wrap: wrap; justify-content: space-between; gap: 8px !important; }
+  .project-progress-editor { align-items: stretch !important; flex-wrap: wrap; }
+  .project-progress-editor input[type="range"] { flex: 1 0 100% !important; }
+  .project-file-item { align-items: flex-start !important; gap: 8px; }
+  .project-file-item > div:first-child { flex: 1 1 auto; }
+  .professional-dashboard-header { align-items: flex-start !important; flex-wrap: wrap; gap: 12px !important; }
+  .professional-dashboard-header > div:last-child { flex-basis: 100%; }
+  .private-project-card__header { align-items: flex-start !important; gap: 8px; }
+  .private-project-card__header > div:first-child { min-width: 0; }
+  .private-project-card__header > div:last-child { flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
 
   .login-page { min-height: 100svh; padding: 16px; }
   .login-card { margin: 0 !important; padding: 28px 20px !important; }

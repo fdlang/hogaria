@@ -96,7 +96,7 @@ export function AdminProjects({ api, onOpenProject, onCreateProject }: Props) {
         }
       />
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+      <div className="private-filter-bar" style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
           <Input placeholder="Buscar por nombre…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>

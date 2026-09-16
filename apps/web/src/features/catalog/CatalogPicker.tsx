@@ -39,7 +39,7 @@ export function CatalogPicker({ onPickItem, onImportCategory }: Props) {
 
       {filtered.map(cat => (
         <section key={cat.categoria} style={{ marginBottom: 20 }}>
-          <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <header className="catalog-category-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
             <h4 style={{ fontSize: 13, fontWeight: 700, color: "#c17248" }}>{cat.categoria}</h4>
             <Button small variant="ghost" onClick={() => onImportCategory(cat.categoria, cat.items)}>
               + Importar categoría ({cat.items.length})
@@ -48,13 +48,13 @@ export function CatalogPicker({ onPickItem, onImportCategory }: Props) {
 
           <ul style={{ display: "flex", flexDirection: "column", gap: 6, listStyle: "none", padding: 0 }}>
             {cat.items.map(item => (
-              <li key={item.ref}
+              <li className="catalog-item" key={item.ref}
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                <div className="catalog-item__description" style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
                   <code style={{ fontSize: 12, background: "#fffaf4", color: "#c17248", padding: "2px 6px", borderRadius: 4 }}>{item.ref}</code>
                   <span style={{ fontSize: 12, color: "#302d29", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.descripcion}</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div className="catalog-item__actions" style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <Badge color="#60a5fa">{item.iva}% IVA</Badge>
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#302d29" }}>
                     {formatMoney(item.precio)} <span style={{ color: "#71685e", fontSize: 12 }}>/ {item.unidad}</span>

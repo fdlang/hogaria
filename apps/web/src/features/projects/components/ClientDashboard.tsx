@@ -76,13 +76,13 @@ export function ClientDashboard({ apis, onOpenProject, onOpenBudget, onSignBudge
           </h2>
           <div style={{ display: "grid", gap: 8 }}>
             {pendingBudgets.map(b => (
-              <article key={b.id}
+              <article className="private-pending-budget" key={b.id}
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12, background: "#fffaf4", borderRadius: 8 }}>
                 <div>
                   <h3 style={{ fontSize: 13, fontWeight: 600, color: "#302d29" }}>{b.nombre}</h3>
                   <p style={{ fontSize: 12, color: "#71685e" }}>Recibido {formatDate(b.fechaEnvio)} · Validez {b.validezDias} días</p>
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
+                <div className="private-pending-budget__actions" style={{ display: "flex", gap: 6 }}>
                   <Button small variant="ghost" onClick={() => onOpenBudget(b.id)}>Revisar</Button>
                   <Button small onClick={() => onSignBudget(b.id)}>✍ Firmar</Button>
                 </div>
@@ -100,9 +100,9 @@ export function ClientDashboard({ apis, onOpenProject, onOpenBudget, onSignBudge
         ? <EmptyState icon="◎" title="Aún no tienes proyectos" hint="Nuestro equipo contactará contigo para empezar" />
         : <div role="list" style={{ display: "grid", gap: 10 }}>
             {proj.map(p => (
-              <button key={p.id} role="listitem" onClick={() => onOpenProject(p.id)}
+              <button className="private-project-card" key={p.id} role="listitem" onClick={() => onOpenProject(p.id)}
                 style={{ textAlign: "left", padding: 16, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 10, cursor: "pointer" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                <div className="private-project-card__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
                   <div>
                     <h3 style={{ fontSize: 15, fontWeight: 600, color: "#302d29" }}>{p.nombre}</h3>
                     <p style={{ fontSize: 12, color: "#71685e", marginTop: 2 }}>{p.direccion}</p>
