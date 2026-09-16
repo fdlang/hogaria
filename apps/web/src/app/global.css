@@ -136,7 +136,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .project-showcase__image img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .project-showcase__story { display: grid; gap: 22px; background: var(--graphite); color: var(--marble-light); }
 .project-showcase__story .eyebrow { color: #e3a177; }
-.project-showcase__story p { margin: 9px 0 0; color: var(--marble-shadow); line-height: 1.7; }
+.project-showcase__story p { margin: 9px 0 0; color: var(--marble-light); line-height: 1.7; }
 .project-showcase__materials { border-top: 1px solid var(--line); }
 .project-showcase__materials h3 { max-width: 520px; margin: 14px 0; color: var(--ink); font-size: clamp(21px, 2vw, 28px); line-height: 1.16; }
 .project-showcase__video { grid-column: 1 / -1; padding: clamp(18px, 3vw, 36px); background: var(--marble); }
@@ -200,8 +200,25 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 /* Tablet navigation is intentionally distinct from the tighter phone layout.
    Keeping this range separate prevents it from overriding the 720px rules. */
 @media (min-width: 721px) and (max-width: 1023px) {
-  .portfolio nav { flex-wrap: wrap; gap: 8px 18px; padding: 12px 28px; }
-  .portfolio nav .nav-brand { width: 100%; }
+  .portfolio nav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 18px;
+    min-height: 0;
+    padding: 12px 28px 10px;
+  }
+  .portfolio nav .nav-brand { grid-column: 1; width: auto; margin: 0; }
+  .portfolio nav .nav-client {
+    grid-column: 2;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid rgba(193,113,72,.42);
+    border-radius: 5px;
+    background: rgba(193,113,72,.08);
+    color: var(--copper-dark);
+    font-weight: 700;
+  }
+  .portfolio nav .nav-links { grid-column: 1 / -1; display: flex; gap: 12px; }
 }
 
 @media (max-width: 639px) {
@@ -320,6 +337,13 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 
 @media (max-width: 720px) {
   body { background-attachment: scroll; }
+  .portfolio {
+    background-color: var(--marble-light);
+    background-image:
+      radial-gradient(ellipse at 8% 4%, rgba(255,255,255,.82), transparent 32%),
+      radial-gradient(ellipse at 94% 28%, rgba(255,250,242,.54), transparent 30%),
+      linear-gradient(125deg, transparent 0 52%, rgba(84,80,72,.035) 52.2%, transparent 52.6%);
+  }
 
   /* Mobile public navigation: brand and private access remain visible while
      section links use a compact horizontal rail instead of adding tall rows. */
