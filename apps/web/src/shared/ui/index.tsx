@@ -52,19 +52,19 @@ export function Modal({ open, onClose, title, children, width = 520, unclosable 
   const onBackdrop = () => { if (!unclosable && onClose) onClose(); };
 
   return (
-    <div role="presentation" onClick={onBackdrop}
+    <div className="ui-modal-backdrop" role="presentation" onClick={onBackdrop}
       style={{ position: "fixed", inset: 0, background: "rgba(48,45,41,.52)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 20 }}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
+      <div className="ui-modal" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
         onClick={e => e.stopPropagation()}
         style={{ background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 16, width: "100%", maxWidth: width, maxHeight: "90vh", overflow: "auto" }}>
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", borderBottom: "1px solid #d8c4ad", position: "sticky", top: 0, background: "#fffaf4" }}>
+        <header className="ui-modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", borderBottom: "1px solid #d8c4ad", position: "sticky", top: 0, background: "#fffaf4" }}>
           <h3 id={titleId} style={{ fontSize: 21, fontWeight: 600, color: "#302d29" }}>{title}</h3>
           {!unclosable && onClose && (
             <button aria-label="Cerrar modal" onClick={onClose}
               style={{ background: "none", border: "none", color: "#71685e", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
           )}
         </header>
-        <div style={{ padding: 24 }}>{children}</div>
+        <div className="ui-modal-body" style={{ padding: 24 }}>{children}</div>
       </div>
     </div>
   );
