@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { apiHandler } from "../apps/api/src/main.js";
+import { runApi } from "./_handler.js";
 
 /**
  * Vercel serverless entrypoint.
@@ -8,5 +8,5 @@ import { apiHandler } from "../apps/api/src/main.js";
  * adapter. It deliberately does not create a listener.
  */
 export default function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  return apiHandler(req, res);
+  return runApi(req, res);
 }

@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { apiHandler } from "../apps/api/src/main.js";
+import { runApi } from "./_handler.js";
 
 /**
  * Vercel splat Function for every /api/* route.
@@ -17,5 +17,5 @@ export default function handler(req: IncomingMessage, res: ServerResponse): Prom
     req.url = `${url.pathname}${url.search}`;
   }
 
-  return apiHandler(req, res);
+  return runApi(req, res);
 }

@@ -20,6 +20,7 @@ declare module "node:http" {
     destroy(): void;
   }
   export interface ServerResponse {
+    headersSent: boolean;
     setHeader(name: string, value: string): void;
     writeHead(statusCode: number, headers?: Record<string, string>): this;
     end(data?: string): void;
