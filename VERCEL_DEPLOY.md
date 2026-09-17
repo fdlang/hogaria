@@ -19,6 +19,10 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
    - `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`: opcionales,
      sólo para crear el primer administrador.
    - `VITE_API_URL`: opcional. Déjalo vacío para usar `/api` en el mismo dominio.
+   - `VITE_EMAILJS_SERVICE_ID`, `VITE_EMAILJS_AUTOREPLY_TEMPLATE_ID` y
+     `VITE_EMAILJS_PUBLIC_KEY`: opcionales. Habilitan el email de confirmación
+     de EmailJS tras registrar una solicitud. La clave pública puede estar en
+     el frontend; no añadas contraseñas de correo ni claves privadas.
 
 ## Garantías incluidas
 

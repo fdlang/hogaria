@@ -147,6 +147,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .testimonial blockquote { font-size: 42px; }.testimonial small, .testimonial p { display: block; margin: 5px 0 0; color: var(--muted); }
 .contact { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(36px, 5vw, 75px); margin: 0 clamp(24px, 4vw, 56px) 75px; padding: 70px clamp(28px, 4vw, 55px); }
 .contact p { color: var(--muted); line-height: 1.6; }.contact > div > a { display: block; margin-top: 13px; color: var(--copper-dark); }.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.contact-title__project { white-space: nowrap; }
 .success { align-self: center; text-align: center; }.success > b { color: var(--copper); font-size: 45px; }.success h3 { font-size: 25px; }
 
 .portfolio footer { display: flex; gap: clamp(28px, 4vw, 55px); padding: 35px clamp(24px, 4vw, 56px) 48px; border-top: 1px solid var(--line); }
@@ -161,6 +162,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .services-cta { align-items: flex-start; flex-direction: column; margin-top: 32px; }.services-cta .ui-button { min-height: 44px; }
   .project-showcase { grid-template-columns: 1fr; margin: 48px 24px; }.project-showcase__image { min-height: 360px; }.project-showcase__video, .project-showcase__cta { grid-column: auto; }
   .contact { grid-template-columns: 1fr; gap: 30px; margin: 0 24px 55px; padding: 45px 25px; }.form-row { grid-template-columns: 1fr; }.testimonial { margin: 0 24px 70px; }.testimonial blockquote { font-size: 30px; }
+  .contact h2 { font-size: clamp(36px, 10.75vw, 42px); }
   .portfolio footer { flex-wrap: wrap; padding: 30px 24px; }.portfolio footer .footer-brand { min-width: 0; }.portfolio footer div { width: 100%; margin-left: 0; }
 }
 

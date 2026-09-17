@@ -1,3 +1,4 @@
 node_modules/
 apps/api/.env
+apps/web/.env
 api/_app.*

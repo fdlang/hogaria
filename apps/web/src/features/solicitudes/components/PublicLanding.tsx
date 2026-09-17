@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { send as sendEmail } from "@emailjs/browser";
 import { SolicitudesApi, useSubmitSolicitud } from "../api/solicitudes.api";
 import { Input, Textarea, Select, Button } from "@/shared/ui";
 import { useNotifications } from "@/shared/ui/notifications";
@@ -7,6 +8,29 @@ import { portfolioServices, portfolioWorks } from "../portfolio.data";
 
 interface Props { api: SolicitudesApi; onLogin: () => void; }
 const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+
+const emailJsConfig = {
+  serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
+  templateId: import.meta.env.VITE_EMAILJS_AUTOREPLY_TEMPLATE_ID,
+  publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
+};
+
+/**
+ * The API is the source of truth for a contact request. EmailJS is best-effort:
+ * an email provider failure must never prevent the request from being saved.
+ */
+function sendAutomaticReply(form: { nombre: string; email: string; telefono: string; tipo: string; descripcion: string }) {
+  const { serviceId, templateId, publicKey } = emailJsConfig;
+  if (!serviceId || !templateId || !publicKey) return Promise.resolve();
+
+  return sendEmail(serviceId, templateId, {
+    nombre: form.nombre,
+    email: form.email,
+    telefono: form.telefono,
+    tipo: form.tipo,
+    descripcion: form.descripcion,
+  }, { publicKey });
+}
 
 function FeaturedBathroom() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -93,7 +117,15 @@ export function PublicLanding({ api, onLogin }: Props) {
     if (!form.tipo) next.tipo = "Selecciona un proyecto";
     if (form.descripcion.trim().length < 20) next.descripcion = "Mínimo 20 caracteres";
     setErrors(next); if (Object.keys(next).length) return;
-    try { await submit(form); push("Solicitud enviada. Te contactaremos en menos de 24h.", "success"); setForm({ nombre: "", email: "", telefono: "", tipo: "", descripcion: "" }); } catch {}
+    try {
+      await submit(form);
+      void sendAutomaticReply(form).catch(() => undefined);
+      push("Solicitud enviada correctamente. Te contactaremos en menos de 24 h.", "success");
+      setForm({ nombre: "", email: "", telefono: "", tipo: "", descripcion: "" });
+      setErrors({});
+    } catch {
+      push("No hemos podido enviar tu solicitud. Comprueba tu conexión e inténtalo de nuevo.", "error");
+    }
   };
   return <div className="portfolio">
     <nav aria-label="Navegación principal"><a className="nav-brand" href="#inicio"><img className="brand-symbol" src="/brand/hogaria-isotipo.png" alt="" /><img className="brand-wordmark" src="/brand/hogaria-wordmark.png" alt="Hogaria Reformas Integrales" /></a><div className="nav-links"><a href="#obras">Obras</a><a href="#servicios">Servicios</a><a href="#proceso">Proyecto</a><a href="#contacto">Contacto</a></div></nav>
@@ -115,7 +147,7 @@ export function PublicLanding({ api, onLogin }: Props) {
     <section id="contacto" className="contact">
       <div>
         <span className="eyebrow">Hablemos</span>
-        <h2>Empecemos por<br /><em>tu proyecto.</em></h2>
+        <h2>Empecemos<br /><span className="contact-title__project">por <em>tu proyecto.</em></span></h2>
         <p>Cuéntanos qué quieres transformar. Revisaremos tu idea y te indicaremos los siguientes pasos.</p>
         <a href="tel:+34614786341">+34 614 786 341</a>
         <a href="mailto:info@hogaria.design">info@hogaria.design</a>
