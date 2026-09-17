@@ -68,6 +68,16 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
   };
 
+  const handleFileDownload = async (fileId: number, name: string) => {
+    try {
+      const blob = await apis.files.download(fileId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url; link.download = name; link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { push((e as { message?: string }).message ?? "No se pudo descargar el archivo", "error"); }
+  };
+
   if (project.loading) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>;
   if (project.error || !project.data) {
     return <div role="alert" style={{ color: "#f87171", padding: 20 }}>{project.error ?? "Proyecto no encontrado"}</div>;
@@ -157,10 +167,10 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                       style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 10, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 8 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                         <span style={{ fontSize: 18 }}>{f.tipo.startsWith("image/") ? "🖼" : f.tipo === "application/pdf" ? "📄" : "📎"}</span>
-                        <div style={{ minWidth: 0 }}>
+                        <button type="button" onClick={() => handleFileDownload(f.id, f.nombre)} title={`Descargar ${f.nombre}`} style={{ minWidth: 0, textAlign: "left", border: 0, padding: 0, background: "transparent", cursor: "pointer" }}>
                           <p style={{ fontSize: 13, color: "#302d29", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.nombre}</p>
                           <p style={{ fontSize: 12, color: "#71685e" }}>{formatBytes(f.tamaño)} · {formatDate(f.uploadedAt)}</p>
-                        </div>
+                        </button>
                         {f.sensitive && <Badge color="#f87171">SENSIBLE</Badge>}
                       </div>
                       {canManageProject && <Button small variant="danger" onClick={() => handleFileDelete(f.id, f.nombre, f.sensitive)}>✕</Button>}

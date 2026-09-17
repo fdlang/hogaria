@@ -33,7 +33,14 @@ export interface IFileRepository {
   delete(id: number): Promise<void>;
 }
 
-const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB
+export interface IFileStorage {
+  put(input: { projectId: number; filename: string; contentType: string; bytes: Uint8Array }): Promise<{ key: string }>;
+  delete(key: string): Promise<void>;
+  get(key: string): Promise<Uint8Array>;
+}
+
+// Server uploads on Vercel stay below the platform request-body limit.
+const MAX_FILE_BYTES = 3 * 1024 * 1024;
 const ALLOWED_MIMES = new Set([
   "image/jpeg", "image/png", "image/webp", "image/gif",
   "application/pdf",
@@ -48,13 +55,14 @@ export class UploadFileUseCase {
     private readonly users: IUserRepository,
     private readonly projects: IProjectRepository,
     private readonly files: IFileRepository,
+    private readonly storage: IFileStorage,
     private readonly events: IEventEmitter,
   ) {}
 
   async execute(cmd: {
     actorId: number; projectId: number;
-    nombre: string; tipo: string; tamaño: number; storageKey: string;
-    sensitive: boolean; ctx: ClientContext;
+    nombre: string; tipo: string; tamaño: number;
+    sensitive: boolean; contenidoBase64: string; ctx: ClientContext;
   }): Promise<ProjectFile> {
     const actor   = await this.users.findById(cmd.actorId);
     if (!actor) throw new ForbiddenError();
@@ -76,21 +84,33 @@ export class UploadFileUseCase {
       if (cmd.sensitive) throw new ForbiddenError("Los profesionales no pueden subir archivos sensibles");
     }
 
+    // Metadata alone is never accepted: persist exactly the bytes selected in the browser.
+    const bytes = decodeBase64(cmd.contenidoBase64);
+    if (bytes.byteLength === 0) throw new ValidationError("El archivo está vacío");
+    if (bytes.byteLength > MAX_FILE_BYTES) throw new ValidationError(`Archivo supera ${MAX_FILE_BYTES / 1024 / 1024} MB`);
+
     // Content validation
     if (cmd.tamaño > MAX_FILE_BYTES)    throw new ValidationError(`Archivo supera ${MAX_FILE_BYTES / 1024 / 1024} MB`);
     if (!ALLOWED_MIMES.has(cmd.tipo))   throw new ValidationError(`Tipo de archivo no permitido: ${cmd.tipo}`);
     if (!cmd.nombre?.trim())            throw new ValidationError("Nombre de archivo obligatorio");
 
-    const saved = await this.files.save({
+    const stored = await this.storage.put({ projectId: cmd.projectId, filename: cmd.nombre.trim(), contentType: cmd.tipo, bytes });
+    let saved: ProjectFile;
+    try {
+      saved = await this.files.save({
       projectId: cmd.projectId,
       uploadedBy: actor.id,
       nombre: cmd.nombre.trim(),
       tipo: cmd.tipo,
-      tamaño: cmd.tamaño,
-      storageKey: cmd.storageKey,
+      tamaño: bytes.byteLength,
+      storageKey: stored.key,
       sensitive: cmd.sensitive,
       uploadedAt: new Date(),
-    });
+      });
+    } catch (error) {
+      await this.storage.delete(stored.key).catch(() => undefined);
+      throw error;
+    }
 
     await this.events.emit({
       type: "FileUploaded", eventId: crypto.randomUUID(), occurredAt: new Date(),
@@ -107,6 +127,7 @@ export class DeleteFileUseCase {
     private readonly users: IUserRepository,
     private readonly projects: IProjectRepository,
     private readonly files: IFileRepository,
+    private readonly storage: IFileStorage,
   ) {}
 
   async execute(cmd: { actorId: number; fileId: number }): Promise<void> {
@@ -119,6 +140,7 @@ export class DeleteFileUseCase {
     if (file.sensitive && actor.rol !== "admin") throw new ForbiddenError();
     if (!file.sensitive && actor.rol !== "admin" && file.uploadedBy !== actor.id) throw new ForbiddenError();
 
+    await this.storage.delete(file.storageKey);
     await this.files.delete(file.id);
   }
 }
@@ -150,4 +172,36 @@ export class ListFilesUseCase {
 
     return all;
   }
+}
+
+export class DownloadFileUseCase {
+  constructor(
+    private readonly users: IUserRepository,
+    private readonly projects: IProjectRepository,
+    private readonly files: IFileRepository,
+    private readonly storage: IFileStorage,
+  ) {}
+  async execute(cmd: { actorId: number; fileId: number }): Promise<{ file: ProjectFile; bytes: Uint8Array }> {
+    const actor = await this.users.findById(cmd.actorId);
+    if (!actor) throw new ForbiddenError();
+    const file = await this.files.findById(cmd.fileId);
+    if (!file) throw new NotFoundError("Archivo");
+    const project = await this.projects.findById(file.projectId);
+    if (!project) throw new NotFoundError("Proyecto");
+    PermissionPolicy.authorize(actor, "project.read", { project });
+    if (actor.rol === "profesional" && file.sensitive) {
+      const assignment = project.profesionalesAsignados.find(a => a.userId === actor.id);
+      const perms = assignment ? PermissionPolicy.PROFESSIONAL_ACCESS[assignment.profesion as Profesion] : null;
+      if (!perms?.verContrato && !perms?.verFactura) throw new ForbiddenError();
+    }
+    return { file, bytes: await this.storage.get(file.storageKey) };
+  }
+}
+
+function decodeBase64(value: string): Uint8Array {
+  if (typeof value !== "string" || !/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 !== 0) {
+    throw new ValidationError("Contenido de archivo inválido", "contenidoBase64");
+  }
+  const binary = atob(value);
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
 }

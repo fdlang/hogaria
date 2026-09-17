@@ -23,7 +23,7 @@ declare module "node:http" {
     headersSent: boolean;
     setHeader(name: string, value: string): void;
     writeHead(statusCode: number, headers?: Record<string, string>): this;
-    end(data?: string): void;
+    end(data?: unknown): void;
   }
   export type RequestListener = (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
   export interface Server {

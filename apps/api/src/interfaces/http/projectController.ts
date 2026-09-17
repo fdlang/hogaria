@@ -4,7 +4,7 @@
  * are enforced inside the use cases via PermissionPolicy.
  */
 
-import { CreateProjectUseCase, UpdateProjectUseCase, DeleteProjectUseCase, ListProjectsUseCase } from "../../application/use-cases/project.use-cases.js";
+import { AssignProjectProfessionalUseCase, CreateProjectUseCase, DeleteProjectUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "../../application/use-cases/project.use-cases.js";
 import { Project } from "@reformapro/domain/entities";
 import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
@@ -30,6 +30,9 @@ export function projectController(deps: {
   update: UpdateProjectUseCase;
   delete: DeleteProjectUseCase;
   list:   ListProjectsUseCase;
+  get: GetProjectUseCase;
+  assign: AssignProjectProfessionalUseCase;
+  unassign: UnassignProjectProfessionalUseCase;
 }) {
   const ctxOf = (req: HttpRequest) => ({ ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" });
 
@@ -64,6 +67,31 @@ export function projectController(deps: {
       try {
         await deps.delete.execute({ actorId: req.actorId, projectId: parseInt(req.params.id, 10) });
         return { status: 204, body: null };
+      } catch (e) { return toHttpError(e); }
+    },
+
+    // GET /projects/:id
+    async get(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        const project = await deps.get.execute({ actorId: req.actorId, projectId: parseInt(req.params.id, 10) });
+        return { status: 200, body: toProjectDTO(project) };
+      } catch (e) { return toHttpError(e); }
+    },
+
+    // POST /projects/:id/professionals
+    async assign(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        const body = req.body as { userId: number; profesion?: string };
+        const project = await deps.assign.execute({ actorId: req.actorId, projectId: parseInt(req.params.id, 10), ...body } as never);
+        return { status: 200, body: toProjectDTO(project) };
+      } catch (e) { return toHttpError(e); }
+    },
+
+    // DELETE /projects/:id/professionals/:userId
+    async unassign(req: HttpRequest & { actorId: number; params: { id: string; userId: string } }): Promise<HttpResponse> {
+      try {
+        const project = await deps.unassign.execute({ actorId: req.actorId, projectId: parseInt(req.params.id, 10), userId: parseInt(req.params.userId, 10) });
+        return { status: 200, body: toProjectDTO(project) };
       } catch (e) { return toHttpError(e); }
     },
 

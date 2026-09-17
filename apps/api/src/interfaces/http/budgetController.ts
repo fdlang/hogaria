@@ -7,7 +7,7 @@
 
 import {
   CreateBudgetUseCase, SendBudgetUseCase, DeleteBudgetUseCase,
-  ListBudgetsUseCase, RequestSignatureChallengeUseCase,
+  GetBudgetUseCase, ListBudgetsUseCase, RequestSignatureChallengeUseCase, UpdateBudgetUseCase,
 } from "../../application/use-cases/budget.use-cases.js";
 import { SignBudgetUseCase } from "../../application/use-cases/sign-budget.use-case.js";
 import { Budget } from "@reformapro/domain/entities";
@@ -47,6 +47,8 @@ export function budgetController(deps: {
   send:      SendBudgetUseCase;
   delete:    DeleteBudgetUseCase;
   list:      ListBudgetsUseCase;
+  get:       GetBudgetUseCase;
+  update:    UpdateBudgetUseCase;
   challenge: RequestSignatureChallengeUseCase;
   sign:      SignBudgetUseCase;
 }) {
@@ -62,6 +64,23 @@ export function budgetController(deps: {
           actorId: req.actorId, ctx: ctxOf(req),
         } as never);
         return { status: 201, body: toBudgetDTO(budget) };
+      } catch (e) { return toHttpError(e); }
+    },
+
+    // GET /budgets/:id
+    async get(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        const budget = await deps.get.execute({ actorId: req.actorId, budgetId: parseInt(req.params.id, 10) });
+        return { status: 200, body: toBudgetDTO(budget) };
+      } catch (e) { return toHttpError(e); }
+    },
+
+    // PATCH /budgets/:id
+    async update(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const budget = await deps.update.execute({ ...body, actorId: req.actorId, budgetId: parseInt(req.params.id, 10), ctx: ctxOf(req) } as never);
+        return { status: 200, body: toBudgetDTO(budget) };
       } catch (e) { return toHttpError(e); }
     },
 

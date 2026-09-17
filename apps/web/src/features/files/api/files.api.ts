@@ -1,7 +1,4 @@
-/**
- * Files feature — project documents and images.
- * Upload goes through pre-signed URL when wired to S3; here simplified.
- */
+/** Project documents persisted in private object storage through the API. */
 
 import { useCallback, useEffect, useState } from "react";
 import { ApiClient } from "@/shared/lib/api-client";
@@ -13,7 +10,8 @@ export interface FileDTO {
   uploadedAt: string;
 }
 
-const MAX_FILE_BYTES = 25 * 1024 * 1024;
+// Base64 is sent to a Vercel Function, whose request body is limited to 4.5 MB.
+const MAX_FILE_BYTES = 3 * 1024 * 1024;
 const ALLOWED_MIMES = [
   "image/jpeg", "image/png", "image/webp", "image/gif",
   "application/pdf",
@@ -23,33 +21,45 @@ const ALLOWED_MIMES = [
 
 export class FilesApi {
   constructor(private readonly http: ApiClient) {}
-
-  list(projectId: number): Promise<FileDTO[]>      { return this.http.get(`/projects/${projectId}/files`); }
+  list(projectId: number): Promise<FileDTO[]> { return this.http.get(`/projects/${projectId}/files`); }
 
   async upload(projectId: number, file: File, sensitive: boolean): Promise<FileDTO> {
-    // Client-side validation — server re-validates with magic bytes
-    if (file.size > MAX_FILE_BYTES) throw new Error(`Archivo supera ${MAX_FILE_BYTES / 1024 / 1024} MB`);
+    if (file.size > MAX_FILE_BYTES) throw new Error("El archivo supera el límite de 3 MB");
     if (!ALLOWED_MIMES.includes(file.type)) throw new Error(`Tipo no permitido: ${file.type}`);
-
-    // In production: POST /files/presign → PUT to S3 → POST /files (metadata only)
-    const body = { nombre: file.name, tipo: file.type, tamaño: file.size, sensitive, storageKey: `stub-${crypto.randomUUID()}` };
-    return this.http.post(`/projects/${projectId}/files`, body);
+    const contenidoBase64 = await toBase64(file);
+    return this.http.post(`/projects/${projectId}/files`, {
+      nombre: file.name, tipo: file.type, tamaño: file.size, sensitive, contenidoBase64,
+    });
   }
 
   delete(fileId: number): Promise<void> { return this.http.delete(`/files/${fileId}`); }
+  download(fileId: number): Promise<Blob> { return this.http.download(`/files/${fileId}/download`); }
+}
+
+function toBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") { reject(new Error("No se pudo leer el archivo")); return; }
+      resolve(result.split(",", 2)[1] ?? "");
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 export function useProjectFiles(api: FilesApi, projectId: number | null) {
-  const [data, setData]       = useState<FileDTO[]>([]);
+  const [data, setData] = useState<FileDTO[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (projectId == null) return;
     setLoading(true); setError(null);
     try { setData(await api.list(projectId)); }
     catch (e) { setError((e as { message?: string }).message ?? "Error"); }
-    finally   { setLoading(false); }
+    finally { setLoading(false); }
   }, [api, projectId]);
 
   useEffect(() => { if (projectId != null) refresh(); }, [projectId, refresh]);

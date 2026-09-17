@@ -52,9 +52,12 @@ CREATE TABLE IF NOT EXISTS solicitudes (
   tipo TEXT NOT NULL,
   descripcion TEXT NOT NULL,
   estado TEXT NOT NULL DEFAULT 'pendiente',
+  motivo TEXT,
   ip INET,
   fecha TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS motivo TEXT;
 
 CREATE TABLE IF NOT EXISTS project_files (
   id BIGSERIAL PRIMARY KEY,

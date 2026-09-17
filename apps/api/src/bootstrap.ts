@@ -23,23 +23,25 @@ import { AuditSubscriber }       from "./infrastructure/audit/audit.subscriber.j
 import { LoginUseCase } from "./application/use-cases/auth.use-cases.js";
 import {
   CreateBudgetUseCase, SendBudgetUseCase, DeleteBudgetUseCase,
-  ListBudgetsUseCase, RequestSignatureChallengeUseCase,
+  GetBudgetUseCase, ListBudgetsUseCase, RequestSignatureChallengeUseCase, UpdateBudgetUseCase,
 } from "./application/use-cases/budget.use-cases.js";
 import { SignBudgetUseCase } from "./application/use-cases/sign-budget.use-case.js";
 import {
   CreateUserUseCase, UpdateUserUseCase, DeleteUserUseCase, ListUsersUseCase,
 } from "./application/use-cases/user.use-cases.js";
 import {
-  CreateProjectUseCase, UpdateProjectUseCase, DeleteProjectUseCase, ListProjectsUseCase,
+  AssignProjectProfessionalUseCase, CreateProjectUseCase, DeleteProjectUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase,
 } from "./application/use-cases/project.use-cases.js";
 import { QueryAuditLogUseCase } from "./application/use-cases/audit.use-cases.js";
 import {
-  SubmitSolicitudUseCase, InMemoryCooldownGate, ISolicitudRepository,
+  ListSolicitudesUseCase, SubmitSolicitudUseCase, UpdateSolicitudStatusUseCase,
+  InMemoryCooldownGate, ISolicitudRepository, Solicitud,
 } from "./application/use-cases/solicitud.use-cases.js";
 import {
-  UploadFileUseCase, DeleteFileUseCase, ListFilesUseCase,
-  IFileRepository, ProjectFile,
+  DownloadFileUseCase, UploadFileUseCase, DeleteFileUseCase, ListFilesUseCase,
+  IFileRepository, IFileStorage, ProjectFile,
 } from "./application/use-cases/file.use-cases.js";
+import { VercelBlobFileStorage } from "./infrastructure/storage/vercelBlobFileStorage.js";
 import { NotFoundError } from "@reformapro/domain/errors";
 import { Email } from "@reformapro/domain/value-objects";
 import { IAuditRepository, IBudgetRepository, IChallengeRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
@@ -50,12 +52,21 @@ import pg from "pg";
 // Tiny in-memory implementations for repos that don't have one yet
 // ─────────────────────────────────────────────────────────────
 class InMemorySolicitudRepository implements ISolicitudRepository {
-  private readonly items: Array<{ id: number; nombre: string; email: string; telefono: string; tipo: string; descripcion: string; fecha: Date; estado: "pendiente"; ip: string }> = [];
+  private readonly items: Solicitud[] = [];
   private nextId = 1;
-  async save(s: Omit<typeof this.items[number], "id">): Promise<{ id: number }> {
+  async save(s: Omit<Solicitud, "id" | "motivo">): Promise<{ id: number }> {
     const id = this.nextId++;
-    this.items.push({ ...s, id });
+    this.items.push({ ...s, id, motivo: null });
     return { id };
+  }
+  async findAll(): Promise<Solicitud[]> { return [...this.items].sort((a, b) => b.fecha.getTime() - a.fecha.getTime()); }
+  async findById(id: number): Promise<Solicitud | null> { return this.items.find(item => item.id === id) ?? null; }
+  async update(id: number, changes: Pick<Solicitud, "estado" | "motivo">): Promise<Solicitud> {
+    const index = this.items.findIndex(item => item.id === id);
+    if (index === -1) throw new NotFoundError("Solicitud");
+    const next = { ...this.items[index]!, ...changes };
+    this.items[index] = next;
+    return next;
   }
 }
 
@@ -101,6 +112,8 @@ export interface AppDependencies {
     sendBudget:                SendBudgetUseCase;
     deleteBudget:              DeleteBudgetUseCase;
     listBudgets:               ListBudgetsUseCase;
+    getBudget:                 GetBudgetUseCase;
+    updateBudget:              UpdateBudgetUseCase;
     requestSignatureChallenge: RequestSignatureChallengeUseCase;
     signBudget:                SignBudgetUseCase;
     createUser:                CreateUserUseCase;
@@ -111,11 +124,17 @@ export interface AppDependencies {
     updateProject:             UpdateProjectUseCase;
     deleteProject:             DeleteProjectUseCase;
     listProjects:              ListProjectsUseCase;
+    getProject:                GetProjectUseCase;
+    assignProjectProfessional: AssignProjectProfessionalUseCase;
+    unassignProjectProfessional: UnassignProjectProfessionalUseCase;
     queryAuditLog:             QueryAuditLogUseCase;
     submitSolicitud:           SubmitSolicitudUseCase;
+    listSolicitudes:           ListSolicitudesUseCase;
+    updateSolicitudStatus:     UpdateSolicitudStatusUseCase;
     uploadFile:                UploadFileUseCase;
     deleteFile:                DeleteFileUseCase;
     listFiles:                 ListFilesUseCase;
+    downloadFile:              DownloadFileUseCase;
   };
 }
 
@@ -141,6 +160,7 @@ export async function buildApp(): Promise<AppDependencies> {
   const challenges: IChallengeRepository = pool ? new PostgresChallengeRepository(pool) : new InMemoryChallengeRepository();
   const audit: IAuditRepository = pool ? new PostgresAuditRepository(pool) : new InMemoryAuditRepository();
   const files: IFileRepository = pool ? new PostgresFileRepository(pool) : new InMemoryFileRepository();
+  const fileStorage: IFileStorage = new VercelBlobFileStorage();
   const solicitudes: ISolicitudRepository = pool ? new PostgresSolicitudRepository(pool) : new InMemorySolicitudRepository();
 
   // Development seed. PostgreSQL deployments use the same credentials only
@@ -169,6 +189,8 @@ export async function buildApp(): Promise<AppDependencies> {
     sendBudget:                 new SendBudgetUseCase(users, budgets, events),
     deleteBudget:               new DeleteBudgetUseCase(users, budgets),
     listBudgets:                new ListBudgetsUseCase(users, budgets),
+    getBudget:                  new GetBudgetUseCase(users, budgets),
+    updateBudget:               new UpdateBudgetUseCase(users, budgets),
     requestSignatureChallenge:  new RequestSignatureChallengeUseCase(users, budgets, challenges, sigCrypto, events),
     signBudget:                 new SignBudgetUseCase(users, budgets, challenges, sigCrypto, events),
     createUser:                 new CreateUserUseCase(users, hasher, generateTempPassword, events),
@@ -179,11 +201,17 @@ export async function buildApp(): Promise<AppDependencies> {
     updateProject:              new UpdateProjectUseCase(users, projects, events),
     deleteProject:              new DeleteProjectUseCase(users, projects),
     listProjects:               new ListProjectsUseCase(users, projects),
+    getProject:                 new GetProjectUseCase(users, projects),
+    assignProjectProfessional:  new AssignProjectProfessionalUseCase(users, projects),
+    unassignProjectProfessional:new UnassignProjectProfessionalUseCase(users, projects),
     queryAuditLog:              new QueryAuditLogUseCase(users, audit),
     submitSolicitud:            new SubmitSolicitudUseCase(solicitudes, cooldown),
-    uploadFile:                 new UploadFileUseCase(users, projects, files, events),
-    deleteFile:                 new DeleteFileUseCase(users, projects, files),
+    listSolicitudes:            new ListSolicitudesUseCase(users, solicitudes),
+    updateSolicitudStatus:      new UpdateSolicitudStatusUseCase(users, solicitudes),
+    uploadFile:                 new UploadFileUseCase(users, projects, files, fileStorage, events),
+    deleteFile:                 new DeleteFileUseCase(users, projects, files, fileStorage),
     listFiles:                  new ListFilesUseCase(users, projects, files),
+    downloadFile:               new DownloadFileUseCase(users, projects, files, fileStorage),
   };
 
   return { users, projects, budgets, challenges, audit, events, tokens, signatureCrypto: sigCrypto, files, solicitudes, useCases };

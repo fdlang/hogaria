@@ -9,11 +9,20 @@
  */
 
 import { Email } from "@reformapro/domain/value-objects";
-import { ValidationError, RateLimitError } from "@reformapro/domain/errors";
+import { ForbiddenError, NotFoundError, ValidationError, RateLimitError } from "@reformapro/domain/errors";
+import type { IUserRepository } from "@reformapro/domain/repositories";
 import { ClientContext } from "./auth.use-cases.js";
 
+export type SolicitudStatus = "pendiente" | "contactado" | "rechazado";
+export interface Solicitud {
+  id: number; nombre: string; email: string; telefono: string; tipo: string;
+  descripcion: string; fecha: Date; estado: SolicitudStatus; ip: string; motivo: string | null;
+}
 export interface ISolicitudRepository {
-  save(s: { nombre: string; email: string; telefono: string; tipo: string; descripcion: string; fecha: Date; estado: "pendiente"; ip: string }): Promise<{ id: number }>;
+  save(s: Omit<Solicitud, "id" | "motivo">): Promise<{ id: number }>;
+  findAll(): Promise<Solicitud[]>;
+  findById(id: number): Promise<Solicitud | null>;
+  update(id: number, changes: Pick<Solicitud, "estado" | "motivo">): Promise<Solicitud>;
 }
 
 // Rate-limit port — production impl would use Redis INCR + EXPIRE
@@ -56,6 +65,29 @@ export class SubmitSolicitudUseCase {
       estado:      "pendiente",
       ip:          cmd.ctx.ip,
     });
+  }
+}
+
+export class ListSolicitudesUseCase {
+  constructor(private readonly users: IUserRepository, private readonly solicitudes: ISolicitudRepository) {}
+  async execute(actorId: number): Promise<Solicitud[]> {
+    const actor = await this.users.findById(actorId);
+    if (!actor || actor.rol !== "admin") throw new ForbiddenError();
+    return this.solicitudes.findAll();
+  }
+}
+
+export class UpdateSolicitudStatusUseCase {
+  constructor(private readonly users: IUserRepository, private readonly solicitudes: ISolicitudRepository) {}
+  async execute(cmd: { actorId: number; solicitudId: number; estado: Exclude<SolicitudStatus, "pendiente">; motivo?: string }): Promise<Solicitud> {
+    const actor = await this.users.findById(cmd.actorId);
+    if (!actor || actor.rol !== "admin") throw new ForbiddenError();
+    const solicitud = await this.solicitudes.findById(cmd.solicitudId);
+    if (!solicitud) throw new NotFoundError("Solicitud");
+    if (solicitud.estado !== "pendiente") throw new ValidationError("La solicitud ya ha sido gestionada");
+    const motivo = cmd.estado === "rechazado" ? (cmd.motivo?.trim().slice(0, 500) || null) : null;
+    if (cmd.estado === "rechazado" && !motivo) throw new ValidationError("Indica un motivo de rechazo", "reason");
+    return this.solicitudes.update(solicitud.id, { estado: cmd.estado, motivo });
   }
 }
 

@@ -54,6 +54,15 @@ export class ApiClient {
   patch<T>(path: string, body?: unknown, signal?: AbortSignal):  Promise<T> { return this.request<T>(path, { method: "PATCH", body, signal }); }
   delete<T>(path: string, signal?: AbortSignal):                 Promise<T> { return this.request<T>(path, { method: "DELETE", signal }); }
 
+  async download(path: string): Promise<Blob> {
+    const headers: Record<string, string> = {};
+    if (this.token) headers.Authorization = `Bearer ${this.token}`;
+    const res = await fetch(`${this.baseUrl}${path}`, { headers });
+    if (res.status === 401 && this.token) this.onUnauthorized();
+    if (!res.ok) throw this.mapError(res, await res.json().catch(() => ({})));
+    return res.blob();
+  }
+
   private mapError(res: Response, body: { code?: string; message?: string; field?: string }): ApiError {
     return {
       status: res.status,

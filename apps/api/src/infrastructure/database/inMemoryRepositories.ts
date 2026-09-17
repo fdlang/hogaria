@@ -135,6 +135,7 @@ export class InMemoryBudgetRepository implements IBudgetRepository {
   async findByClient(clienteId: number): Promise<Budget[]> {
     return this.budgets.filter(b => b.clienteId === clienteId);
   }
+  async findAll(): Promise<Budget[]> { return [...this.budgets]; }
   async save(budget: Budget): Promise<Budget> {
     const id = budget.id || this.nextId++;
     if (budget.id && id >= this.nextId) this.nextId = id + 1;

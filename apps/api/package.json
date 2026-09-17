@@ -12,6 +12,7 @@
   "dependencies": {
     "@reformapro/domain": "*",
     "@types/pg": "^8.23.1",
+    "@vercel/blob": "^2.4.0",
     "bcryptjs": "^2.4.3",
     "pg": "^8.23.0"
   },

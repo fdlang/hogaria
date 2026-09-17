@@ -5,7 +5,7 @@
 
 import { IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
 import { IEventEmitter } from "@reformapro/domain/events";
-import { Project } from "@reformapro/domain/entities";
+import { Project, ProjectMilestone, ProjectProfessional } from "@reformapro/domain/entities";
 import { Money, Percentage } from "@reformapro/domain/value-objects";
 import { ValidationError, ForbiddenError, NotFoundError } from "@reformapro/domain/errors";
 import { PermissionPolicy } from "@reformapro/domain/services";
@@ -21,6 +21,7 @@ export interface CreateProjectCommand {
   presupuesto: number;
   fechaInicio: string;       // ISO
   fechaFinPrevista: string;  // ISO
+  hitos?: Array<{ id: string; nombre: string; completado: boolean; fecha: string }>;
   ctx: ClientContext;
 }
 
@@ -52,7 +53,7 @@ export class CreateProjectUseCase {
       fechaInicio: new Date(cmd.fechaInicio),
       fechaFinPrevista: new Date(cmd.fechaFinPrevista),
       profesionalesAsignados: [],
-      hitos: [],
+      hitos: (cmd.hitos ?? []).map(h => ({ ...h, fecha: new Date(h.fecha) })),
       createdAt: new Date(),
     };
 
@@ -141,6 +142,51 @@ export class DeleteProjectUseCase {
     if (!project) throw new NotFoundError("Proyecto");
     // In production: cascade check — reject if there are signed budgets
     await this.projects.delete(cmd.projectId);
+  }
+}
+
+export class GetProjectUseCase {
+  constructor(private readonly users: IUserRepository, private readonly projects: IProjectRepository) {}
+  async execute(cmd: { actorId: number; projectId: number }): Promise<Project> {
+    const actor = await this.users.findById(cmd.actorId);
+    if (!actor) throw new ForbiddenError();
+    const project = await this.projects.findById(cmd.projectId);
+    if (!project) throw new NotFoundError("Proyecto");
+    PermissionPolicy.authorize(actor, "project.read", { project });
+    return project;
+  }
+}
+
+export class AssignProjectProfessionalUseCase {
+  constructor(private readonly users: IUserRepository, private readonly projects: IProjectRepository) {}
+  async execute(cmd: { actorId: number; projectId: number; userId: number; profesion?: ProjectProfessional["profesion"] }): Promise<Project> {
+    const actor = await this.users.findById(cmd.actorId);
+    if (!actor || actor.rol !== "admin") throw new ForbiddenError();
+    const project = await this.projects.findById(cmd.projectId);
+    if (!project) throw new NotFoundError("Proyecto");
+    const professional = await this.users.findById(cmd.userId);
+    if (!professional || professional.rol !== "profesional" || !professional.activo) {
+      throw new ValidationError("Profesional inválido", "userId");
+    }
+    if (project.profesionalesAsignados.some(p => p.userId === professional.id)) {
+      throw new ValidationError("El profesional ya está asignado", "userId");
+    }
+    const profesion = cmd.profesion ?? professional.profesion;
+    const assignment: ProjectProfessional = profesion ? { userId: professional.id, profesion } : { userId: professional.id };
+    return this.projects.update(project.id, { profesionalesAsignados: [...project.profesionalesAsignados, assignment] });
+  }
+}
+
+export class UnassignProjectProfessionalUseCase {
+  constructor(private readonly users: IUserRepository, private readonly projects: IProjectRepository) {}
+  async execute(cmd: { actorId: number; projectId: number; userId: number }): Promise<Project> {
+    const actor = await this.users.findById(cmd.actorId);
+    if (!actor || actor.rol !== "admin") throw new ForbiddenError();
+    const project = await this.projects.findById(cmd.projectId);
+    if (!project) throw new NotFoundError("Proyecto");
+    const remaining = project.profesionalesAsignados.filter(p => p.userId !== cmd.userId);
+    if (remaining.length === project.profesionalesAsignados.length) throw new NotFoundError("Asignación");
+    return this.projects.update(project.id, { profesionalesAsignados: remaining });
   }
 }
 

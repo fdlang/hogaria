@@ -11,6 +11,14 @@ import { ValidationError, ForbiddenError, NotFoundError, ConflictError } from "@
 import { PermissionPolicy } from "@reformapro/domain/services";
 import { ClientContext } from "./auth.use-cases.js";
 
+function linesFromCommand(partidas: CreateBudgetCommand["partidas"]): BudgetLine[] {
+  return partidas.map(p => new BudgetLine(
+    p.id ?? crypto.randomUUID(), p.categoria, p.descripcion, p.cantidad, p.unidad,
+    Money.of(p.precioUnit), Percentage.of(p.descuento),
+    p.iva != null ? IVARate.of(p.iva) : null, p.ref, p.nota,
+  ));
+}
+
 export interface CreateBudgetCommand {
   actorId: number;
   proyectoId: number;
@@ -23,6 +31,7 @@ export interface CreateBudgetCommand {
   garantia: string;
   notas: string;
   partidas: Array<{
+    id?: string;
     categoria: string; descripcion: string; cantidad: number; unidad: string;
     precioUnit: number; descuento: number; iva: number | null;
     ref?: string; nota?: string;
@@ -59,14 +68,7 @@ export class CreateBudgetUseCase {
     }
 
     // 4) Map DTO → domain objects (fails fast on invalid input)
-    const lines = cmd.partidas.map((p, i) => new BudgetLine(
-      crypto.randomUUID(),
-      p.categoria, p.descripcion, p.cantidad, p.unidad,
-      Money.of(p.precioUnit),
-      Percentage.of(p.descuento),
-      p.iva != null ? IVARate.of(p.iva) : null,
-      p.ref, p.nota,
-    ));
+    const lines = linesFromCommand(cmd.partidas);
 
     const budget = new Budget(
       /* id             */ 0, // assigned by repository
@@ -150,12 +152,50 @@ export class ListBudgetsUseCase {
     if (actor.rol === "admin") {
       if (cmd.proyectoId != null) return this.budgets.findByProject(cmd.proyectoId);
       // no findAll on the interface — leave that to admin dashboards via project filter
-      return [];
+      return this.budgets.findAll();
     }
     // Cliente: only their own
     if (actor.rol === "cliente") return this.budgets.findByClient(actor.id);
     // Profesionales do not see budgets by default
     return [];
+  }
+}
+
+export class GetBudgetUseCase {
+  constructor(private readonly users: IUserRepository, private readonly budgets: IBudgetRepository) {}
+
+  async execute(cmd: { actorId: number; budgetId: number }): Promise<Budget> {
+    const actor = await this.users.findById(cmd.actorId);
+    if (!actor) throw new ForbiddenError();
+    const budget = await this.budgets.findById(cmd.budgetId);
+    if (!budget) throw new NotFoundError("Presupuesto");
+    if (actor.rol !== "admin" && budget.clienteId !== actor.id) throw new ForbiddenError();
+    return budget;
+  }
+}
+
+export class UpdateBudgetUseCase {
+  constructor(private readonly users: IUserRepository, private readonly budgets: IBudgetRepository) {}
+
+  async execute(cmd: CreateBudgetCommand & { budgetId: number }): Promise<Budget> {
+    const actor = await this.users.findById(cmd.actorId);
+    if (!actor || actor.rol !== "admin") throw new ForbiddenError();
+    const current = await this.budgets.findById(cmd.budgetId);
+    if (!current) throw new NotFoundError("Presupuesto");
+    if (current.estado !== "borrador") throw new ConflictError("Solo se puede editar un borrador");
+    if (!cmd.nombre?.trim()) throw new ValidationError("Nombre obligatorio", "nombre");
+    if (!cmd.partidas?.length) throw new ValidationError("Al menos una partida", "partidas");
+    if (cmd.validezDias < 1 || cmd.validezDias > 365) throw new ValidationError("Validez debe estar entre 1 y 365 días", "validezDias");
+    if (cmd.proyectoId !== current.proyectoId || cmd.clienteId !== current.clienteId) {
+      throw new ValidationError("No se puede cambiar el proyecto o cliente de un presupuesto existente");
+    }
+    const next = new Budget(
+      current.id, current.proyectoId, current.clienteId, cmd.nombre.trim(), cmd.referencia,
+      current.estado, IVARate.of(cmd.ivaDefault), cmd.validezDias, current.fechaCreacion,
+      current.fechaEnvio, cmd.condicionesPago, cmd.garantia, cmd.notas,
+      linesFromCommand(cmd.partidas), current.firma,
+    );
+    return this.budgets.update(current.id, next);
   }
 }
 

@@ -21,6 +21,7 @@ import { userController }    from "./interfaces/http/userController.js";
 import { projectController } from "./interfaces/http/projectController.js";
 import { auditController, solicitudController, fileController } from "./interfaces/http/otherControllers.js";
 import { toHttpError } from "./interfaces/http/errorMiddleware.js";
+import { ValidationError } from "@reformapro/domain/errors";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
@@ -60,6 +61,7 @@ function getRuntime(): Promise<Runtime> {
     const budgets = budgetController({
       create: app.useCases.createBudget, send: app.useCases.sendBudget,
       delete: app.useCases.deleteBudget, list: app.useCases.listBudgets,
+      get: app.useCases.getBudget, update: app.useCases.updateBudget,
       challenge: app.useCases.requestSignatureChallenge, sign: app.useCases.signBudget,
     });
     const users = userController({
@@ -69,11 +71,15 @@ function getRuntime(): Promise<Runtime> {
     const projects = projectController({
       create: app.useCases.createProject, update: app.useCases.updateProject,
       delete: app.useCases.deleteProject, list: app.useCases.listProjects,
+      get: app.useCases.getProject,
+      assign: app.useCases.assignProjectProfessional,
+      unassign: app.useCases.unassignProjectProfessional,
     });
     const audit = auditController({ query: app.useCases.queryAuditLog });
-    const solicitudes = solicitudController({ submit: app.useCases.submitSolicitud });
+    const solicitudes = solicitudController({ submit: app.useCases.submitSolicitud, list: app.useCases.listSolicitudes, updateStatus: app.useCases.updateSolicitudStatus });
     const files = fileController({
       upload: app.useCases.uploadFile, delete: app.useCases.deleteFile, list: app.useCases.listFiles,
+      download: app.useCases.downloadFile,
     });
 
     return { authMiddleware: requireAuth(app.tokens), routes: [
@@ -85,6 +91,8 @@ function getRuntime(): Promise<Runtime> {
   // Budgets
   route("GET",    "/budgets",                          req => budgets.list(req as never),                 { protected: true }),
   route("POST",   "/budgets",                          req => budgets.create(req as never),               { protected: true }),
+  route("GET",    "/budgets/:id",                      req => budgets.get(req as never),                  { protected: true }),
+  route("PATCH",  "/budgets/:id",                      req => budgets.update(req as never),               { protected: true }),
   route("POST",   "/budgets/:id/send",                 req => budgets.send(req   as never),               { protected: true }),
   route("DELETE", "/budgets/:id",                      req => budgets.delete(req as never),               { protected: true }),
   route("POST",   "/budgets/:id/signature/challenge",  req => budgets.requestChallenge(req as never),     { protected: true }),
@@ -99,19 +107,26 @@ function getRuntime(): Promise<Runtime> {
   // Projects
   route("GET",    "/projects",          req => projects.list(req   as never), { protected: true }),
   route("POST",   "/projects",          req => projects.create(req as never), { protected: true }),
+  route("GET",    "/projects/:id",      req => projects.get(req    as never), { protected: true }),
   route("PATCH",  "/projects/:id",      req => projects.update(req as never), { protected: true }),
   route("DELETE", "/projects/:id",      req => projects.delete(req as never), { protected: true }),
+  route("POST",   "/projects/:id/professionals", req => projects.assign(req as never), { protected: true }),
+  route("DELETE", "/projects/:id/professionals/:userId", req => projects.unassign(req as never), { protected: true }),
 
   // Audit
   route("GET", "/audit", req => audit.query(req as never), { protected: true }),
 
   // Solicitudes (POST is public)
   route("POST", "/solicitudes", req => solicitudes.submit(req as never)),
+  route("GET", "/solicitudes", req => solicitudes.list(req as never), { protected: true }),
+  route("POST", "/solicitudes/:id/contact", req => solicitudes.contact(req as never), { protected: true }),
+  route("POST", "/solicitudes/:id/reject", req => solicitudes.reject(req as never), { protected: true }),
 
   // Files
   route("GET",    "/projects/:projectId/files", req => files.list(req   as never), { protected: true }),
   route("POST",   "/projects/:projectId/files", req => files.upload(req as never), { protected: true }),
   route("DELETE", "/files/:id",                 req => files.delete(req as never), { protected: true }),
+  route("GET",    "/files/:id/download",        req => files.download(req as never), { protected: true }),
     ] };
   }).catch(error => {
     // A rejected initialisation must not poison future serverless invocations.
@@ -179,7 +194,12 @@ export async function apiHandler(req: IncomingMessage, res: ServerResponse): Pro
     }
 
     const result = await match.handler(httpReq);
-    res.writeHead(result.status, { "Content-Type": "application/json" }).end(
+    const headers = result.headers ?? {};
+    if (result.body instanceof Uint8Array) {
+      res.writeHead(result.status, headers).end(result.body as unknown as string);
+      return;
+    }
+    res.writeHead(result.status, { "Content-Type": "application/json", ...headers }).end(
       result.body === null ? "" : JSON.stringify(result.body)
     );
   } catch (err) {
@@ -201,8 +221,16 @@ function parseJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     if (req.method === "GET" || req.method === "DELETE") { resolve({}); return; }
     let raw = "";
-    req.on("data", (chunk: Buffer) => { raw += chunk.toString(); if (raw.length > 1_000_000) req.destroy(); });
-    req.on("end",   () => { try { resolve(raw ? JSON.parse(raw) : {}); } catch { reject(new Error("Invalid JSON")); } });
+    let tooLarge = false;
+    req.on("data", (chunk: Buffer) => {
+      raw += chunk.toString();
+      // A 3 MiB file is ~4.2 MB after base64 encoding; keep below Vercel's 4.5 MB ceiling.
+      if (raw.length > 4_400_000) tooLarge = true;
+    });
+    req.on("end", () => {
+      if (tooLarge) { reject(new ValidationError("La solicitud supera el límite permitido")); return; }
+      try { resolve(raw ? JSON.parse(raw) : {}); } catch { reject(new ValidationError("JSON inválido")); }
+    });
     req.on("error", reject);
   });
 }
