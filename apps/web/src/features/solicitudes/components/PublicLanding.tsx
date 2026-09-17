@@ -32,6 +32,25 @@ function sendAutomaticReply(form: { nombre: string; email: string; telefono: str
   }, { publicKey });
 }
 
+function SubmissionSuccessIllustration() {
+  return (
+    <svg className="success-illustration" viewBox="0 0 160 120" aria-hidden="true" focusable="false">
+      <path className="success-illustration__ground" d="M24 103h112" />
+      <g className="success-illustration__person">
+        <circle cx="62" cy="34" r="12" />
+        <path d="M51 51c-7 9-9 23-7 40M72 51c10 9 13 23 11 40M44 68l16 10 18-8" />
+        <path d="M52 91l-7 12M80 91l8 12" />
+      </g>
+      <g className="success-illustration__clipboard">
+        <rect x="91" y="43" width="35" height="48" rx="3" />
+        <path d="M102 43v-5h13v5M100 57h17M100 66h17M100 75h11" />
+      </g>
+      <path className="success-illustration__pencil" d="M74 67l22-14 4 6-22 14-7 1z" />
+      <path className="success-illustration__check" d="m105 103 5 5 10-12" />
+    </svg>
+  );
+}
+
 function FeaturedBathroom() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [muted, setMuted] = useState(true);
@@ -152,7 +171,7 @@ export function PublicLanding({ api, onLogin }: Props) {
         <a href="tel:+34614786341">+34 614 786 341</a>
         <a href="mailto:info@hogaria.design">info@hogaria.design</a>
       </div>
-      {done ? <div className="success"><b>✓</b><h3>Solicitud recibida</h3><p>Muy pronto nos pondremos en contacto contigo.</p><Button variant="ghost" onClick={reset}>Enviar otra solicitud</Button></div> : <form onSubmit={send} noValidate><div className="form-row"><Input label="Nombre" required value={form.nombre} error={errors.nombre} onChange={e => setForm(f => ({...f,nombre:e.target.value}))}/><Input label="Email" type="email" required value={form.email} error={errors.email} onChange={e => setForm(f => ({...f,email:e.target.value}))}/></div><Input label="Teléfono" value={form.telefono} onChange={e => setForm(f => ({...f,telefono:e.target.value}))}/><Select label="Tipo de proyecto" required value={form.tipo} onChange={e => setForm(f => ({...f,tipo:e.target.value}))}><option value="">Selecciona una opción</option>{PROJECT_TIPOS.map(t=><option key={t}>{t}</option>)}</Select><Textarea label="Cuéntanos tu idea" rows={4} value={form.descripcion} error={errors.descripcion} onChange={e => setForm(f => ({...f,descripcion:e.target.value}))}/><Button type="submit" loading={submitting} style={{width:"100%"}}>Enviar proyecto</Button></form>}
+      {done ? <div className="success"><SubmissionSuccessIllustration /><b>✓</b><h3>Solicitud recibida</h3><p>Estamos revisando tu proyecto y te contactaremos muy pronto.</p><Button variant="ghost" onClick={reset}>Enviar otra solicitud</Button></div> : <form onSubmit={send} noValidate><div className="form-row"><Input label="Nombre" required value={form.nombre} error={errors.nombre} onChange={e => setForm(f => ({...f,nombre:e.target.value}))}/><Input label="Email" type="email" required value={form.email} error={errors.email} onChange={e => setForm(f => ({...f,email:e.target.value}))}/></div><Input label="Teléfono" value={form.telefono} onChange={e => setForm(f => ({...f,telefono:e.target.value}))}/><Select label="Tipo de proyecto" required value={form.tipo} onChange={e => setForm(f => ({...f,tipo:e.target.value}))}><option value="">Selecciona una opción</option>{PROJECT_TIPOS.map(t=><option key={t}>{t}</option>)}</Select><Textarea label="Cuéntanos tu idea" rows={4} value={form.descripcion} error={errors.descripcion} onChange={e => setForm(f => ({...f,descripcion:e.target.value}))}/><Button type="submit" loading={submitting} style={{width:"100%"}}>Enviar proyecto</Button></form>}
     </section>
     <footer><a className="footer-brand" href="#inicio" aria-label="Hogaria, volver al inicio"><img src="/brand/hogaria-isotipo.png" alt="" /><img src="/brand/hogaria-wordmark.png" alt="Hogaria Reformas Integrales" /></a><p>Reformas integrales e interiorismo.<br />Madrid · 2026</p><div><a className="footer-instagram" href="https://www.instagram.com/" target="_blank" rel="noreferrer" aria-label="Instagram de Hogaria"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg></a><a href="#contacto">Contacto</a><button onClick={onLogin}>Área cliente</button></div></footer>
   </div>;
