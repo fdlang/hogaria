@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SolicitudesApi, useSubmitSolicitud } from "../api/solicitudes.api";
 import { Input, Textarea, Select, Button } from "@/shared/ui";
 import { useNotifications } from "@/shared/ui/notifications";
@@ -9,6 +9,25 @@ interface Props { api: SolicitudesApi; onLogin: () => void; }
 const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
 function FeaturedBathroom() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [muted, setMuted] = useState(true);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting && entry.intersectionRatio >= 0.6) {
+        void video.play().catch(() => undefined);
+      } else {
+        video.pause();
+      }
+    }, { threshold: [0, 0.6] });
+
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <section id="proceso" className="project-showcase" aria-labelledby="bano-pinto-title">
       <div className="project-showcase__intro">
@@ -39,10 +58,18 @@ function FeaturedBathroom() {
       </div>
 
       <div className="project-showcase__video">
-        <video controls preload="metadata" playsInline poster="/images/portfolio/bano-pinto-detalle.jpg" aria-label="Recorrido por el Baño Pinto reformado">
-          <source src="/images/portfolio/bano-pinto.mp4" type="video/mp4" />
-          Tu navegador no puede reproducir este vídeo.
-        </video>
+        <div className="project-showcase__video-frame">
+          <video ref={videoRef} controls muted={muted} loop preload="metadata" playsInline poster="/images/portfolio/bano-pinto-detalle.jpg" aria-label="Recorrido por el Baño Pinto reformado">
+            <source src="/images/portfolio/bano-pinto.mp4" type="video/mp4" />
+            Tu navegador no puede reproducir este vídeo.
+          </video>
+          <button className="project-showcase__sound" type="button" aria-pressed={!muted} onClick={() => {
+            setMuted(value => !value);
+            void videoRef.current?.play().catch(() => undefined);
+          }}>
+            {muted ? "🔇 Activar sonido" : "🔊 Silenciar"}
+          </button>
+        </div>
         <p>Recorrido por el resultado final.</p>
       </div>
 
