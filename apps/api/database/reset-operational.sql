@@ -33,7 +33,7 @@ CREATE TABLE estimates (
   cliente_id BIGINT NOT NULL REFERENCES users(id),
   numero TEXT NOT NULL UNIQUE,
   titulo TEXT NOT NULL,
-  estado TEXT NOT NULL CHECK (estado IN ('borrador','en_revision','enviado','aceptado','rechazado','caducado','sustituido')) DEFAULT 'borrador',
+  estado TEXT NOT NULL CHECK (estado IN ('borrador','en_revision','enviado','firmado','aceptado','rechazado','caducado','sustituido')) DEFAULT 'borrador',
   version_actual INTEGER NOT NULL DEFAULT 1,
   borrador JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

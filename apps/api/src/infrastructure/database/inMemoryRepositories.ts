@@ -176,6 +176,7 @@ export class InMemoryEstimateRepository implements IEstimateRepository {
   async update(id: number, changes: Partial<Pick<Estimate, "titulo" | "estado" | "versionActual" | "borrador">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Presupuesto"); const next = { ...old, ...changes, updatedAt: new Date() }; this.items[this.items.indexOf(old)] = next; return next; }
   async saveVersion(item: Omit<EstimateVersion, "id" | "createdAt">) { const saved: EstimateVersion = { ...item, id: this.nextVersionId++, createdAt: new Date() }; this.versions.push(saved); return saved; }
   async findVersions(estimateId: number) { return this.versions.filter(item => item.estimateId === estimateId).sort((a, b) => b.version - a.version); }
+  async signVersion(estimateId: number, version: number, firma: Record<string, unknown>, firmadoAt: Date) { const old = this.versions.find(item => item.estimateId === estimateId && item.version === version && !item.firmadoAt); if (!old) throw new NotFoundError("Versión firmable"); const next = { ...old, firma, firmadoAt }; this.versions[this.versions.indexOf(old)] = next; return next; }
 }
 
 export class InMemoryChangeOrderRepository implements IChangeOrderRepository {

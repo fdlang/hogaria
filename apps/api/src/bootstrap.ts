@@ -223,7 +223,7 @@ export async function buildApp(): Promise<AppDependencies> {
     listFiles:                  new ListFilesUseCase(users, projects, files),
     downloadFile:               new DownloadFileUseCase(users, projects, files, fileStorage),
     opportunities:              new OpportunityUseCases(users, opportunities, events),
-    estimates:                  new EstimateUseCases(users, opportunities, estimates, projects, events),
+    estimates:                  new EstimateUseCases(users, opportunities, estimates, projects, events, sigCrypto),
     changes:                    new ChangeOrderUseCases(users, projects, changes),
   };
 

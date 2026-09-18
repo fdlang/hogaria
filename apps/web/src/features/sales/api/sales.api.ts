@@ -12,4 +12,6 @@ export class SalesApi {
   estimates() { return this.http.get<EstimateDTO[]>("/estimates"); }
   createEstimate(oportunidadId: number, borrador: EstimateDraftDTO) { return this.http.post<EstimateDTO>("/estimates", { oportunidadId, borrador }); }
   sendEstimate(id: number) { return this.http.post<EstimateDTO>(`/estimates/${id}/send`); }
+  signEstimate(id: number, input: { password: string; canvasSignature: string; consentimiento: string }) { return this.http.post<{ estimate: EstimateDTO; hash: string; fechaFirma: string }>(`/estimates/${id}/sign`, input); }
+  convertToProject(id: number) { return this.http.post<{ id: number; estimateId: number }>(`/estimates/${id}/accept`); }
 }

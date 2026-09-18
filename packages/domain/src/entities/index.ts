@@ -8,7 +8,7 @@ export interface ProjectMilestone { id: string; nombre: string; completado: bool
 export interface Project { id: number; estimateId: number; nombre: string; descripcion: string; clienteId: number; direccion: string; tipo: string; estado: ProjectStatus; progreso: Percentage; presupuesto: Money; fechaInicio: Date; fechaFinPrevista: Date; profesionalesAsignados: ProjectProfessional[]; hitos: ProjectMilestone[]; createdAt: Date; }
 export type OpportunityStatus = "nueva" | "contactada" | "visita_agendada" | "en_estudio" | "ganada" | "descartada";
 export interface Opportunity { id: number; clienteId: number | null; nombre: string; email: string | null; telefono: string | null; direccion: string; tipo: string; descripcion: string; estado: OpportunityStatus; fechaVisita: Date | null; notasInternas: string; createdAt: Date; updatedAt: Date; }
-export type EstimateStatus = "borrador" | "en_revision" | "enviado" | "aceptado" | "rechazado" | "caducado" | "sustituido";
+export type EstimateStatus = "borrador" | "en_revision" | "enviado" | "firmado" | "aceptado" | "rechazado" | "caducado" | "sustituido";
 export type ChangeOrderStatus = "borrador" | "enviado" | "aprobado" | "rechazado";
 export interface EstimateLine { id: string; categoria: string; descripcion: string; cantidad: number; unidad: string; precioVentaUnitario: number; costeUnitario: number | null; descuento: number; iva: number; notaCliente?: string; notaInterna?: string; }
 export interface EstimateDraft { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; notasInternas: string; partidas: EstimateLine[]; }

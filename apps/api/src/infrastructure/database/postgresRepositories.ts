@@ -59,6 +59,7 @@ export class PostgresEstimateRepository implements IEstimateRepository {
   async update(id: number, changes: Partial<Pick<Estimate, "titulo" | "estado" | "versionActual" | "borrador">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Presupuesto"); const next = { ...old, ...changes }; const r = await this.pool.query("UPDATE estimates SET titulo=$2,estado=$3,version_actual=$4,borrador=$5,updated_at=NOW() WHERE id=$1 RETURNING *", [id,next.titulo,next.estado,next.versionActual,next.borrador]); return this.map(r.rows[0]); }
   async saveVersion(v: Omit<EstimateVersion, "id" | "createdAt">) { const r = await this.pool.query("INSERT INTO budget_versions(estimate_id,version,snapshot,enviado_at,firmado_at,firma) VALUES($1,$2,$3,$4,$5,$6) RETURNING *", [v.estimateId,v.version,v.snapshot,v.enviadoAt,v.firmadoAt,v.firma]); return this.mapVersion(r.rows[0]); }
   async findVersions(estimateId: number) { return (await this.pool.query("SELECT * FROM budget_versions WHERE estimate_id=$1 ORDER BY version DESC", [estimateId])).rows.map(row => this.mapVersion(row)); }
+  async signVersion(estimateId: number, version: number, firma: Record<string, unknown>, firmadoAt: Date) { const r = await this.pool.query("UPDATE budget_versions SET firma=$3,firmado_at=$4 WHERE estimate_id=$1 AND version=$2 AND firmado_at IS NULL RETURNING *", [estimateId,version,firma,firmadoAt]); if (!r.rows[0]) throw new NotFoundError("Versión firmable"); return this.mapVersion(r.rows[0]); }
 }
 
 export class PostgresChangeOrderRepository implements IChangeOrderRepository {
