@@ -7,7 +7,7 @@ import type { UsersApi } from "@/features/users/api/users.api";
 import { SalesApi, type EstimateDraftDTO, type EstimateDTO, type OpportunityDTO } from "../api/sales.api";
 
 const newLine = () => ({ id: crypto.randomUUID(), categoria: "General", descripcion: "", cantidad: 1, unidad: "ud", precioVentaUnitario: 0, costeUnitario: null, descuento: 0, iva: 21 });
-const blankDraft = (): EstimateDraftDTO => ({ titulo: "", validezDias: 30, condicionesPago: "", garantia: "", notasCliente: "", notasInternas: "", partidas: [] });
+const blankDraft = (): EstimateDraftDTO => ({ titulo: "", validezDias: 30, condicionesPago: "50 % a la aceptación del presupuesto, destinado a la planificación e inicio de los trabajos, y 50 % a la finalización de la obra, una vez comprobada la correcta ejecución.", garantia: "", notasCliente: "", notasInternas: "", partidas: [] });
 const steps = ["Oportunidad", "Alcance", "Partidas", "Revisión"];
 
 export function SalesPipeline({ api, users }: { api: SalesApi; users: UsersApi }) {
