@@ -7,7 +7,7 @@ import { IProjectRepository, IUserRepository } from "@reformapro/domain/reposito
 import { IEventEmitter } from "@reformapro/domain/events";
 import { Project, ProjectMilestone, ProjectProfessional } from "@reformapro/domain/entities";
 import { Money, Percentage } from "@reformapro/domain/value-objects";
-import { ValidationError, ForbiddenError, NotFoundError } from "@reformapro/domain/errors";
+import { ValidationError, ForbiddenError, NotFoundError, ConflictError } from "@reformapro/domain/errors";
 import { PermissionPolicy } from "@reformapro/domain/services";
 import { ClientContext } from "./auth.use-cases.js";
 
@@ -36,12 +36,15 @@ export class CreateProjectUseCase {
     const actor = await this.users.findById(cmd.actorId);
     if (!actor || actor.rol !== "admin") throw new ForbiddenError();
 
+    throw new ConflictError("Los proyectos se crean al aceptar un presupuesto. Usa la conversión desde la propuesta.");
+
     const client = await this.users.findById(cmd.clienteId);
-    if (!client || client.rol !== "cliente") throw new ValidationError("Cliente inválido", "clienteId");
+    if (!client || client?.rol !== "cliente") throw new ValidationError("Cliente inválido", "clienteId");
     if (!cmd.nombre?.trim()) throw new ValidationError("Nombre obligatorio", "nombre");
 
     const project: Project = {
       id: 0,
+      estimateId: 0,
       nombre: cmd.nombre.trim(),
       descripcion: cmd.descripcion,
       clienteId: cmd.clienteId,
@@ -60,7 +63,7 @@ export class CreateProjectUseCase {
     const saved = await this.projects.save(project);
     await this.events.emit({
       type: "ProjectCreated", eventId: crypto.randomUUID(), occurredAt: new Date(),
-      actorId: actor.id, actorName: actor.nombre,
+      actorId: actor!.id, actorName: actor!.nombre,
       ip: cmd.ctx.ip, userAgent: cmd.ctx.userAgent,
       projectId: saved.id,
     });

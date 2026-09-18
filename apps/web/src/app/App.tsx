@@ -22,6 +22,9 @@ import { ProjectDetail }       from "@/features/projects/components/ProjectDetai
 import { ProjectForm }         from "@/features/projects/components/ProjectForm";
 
 import { AdminBudgets }  from "@/features/budgets/components/AdminBudgets";
+import { SalesApi } from "@/features/sales/api/sales.api";
+import { SalesPipeline } from "@/features/sales/components/SalesPipeline";
+import { ClientEstimates } from "@/features/sales/components/ClientEstimates";
 import { ClientBudgets } from "@/features/budgets/components/ClientBudgets";
 import { SignatureWizard } from "@/features/signatures/components/SignatureWizard";
 
@@ -45,6 +48,7 @@ interface AllApis {
   audit:            AuditApi;
   solicitudes:      SolicitudesApi;
   adminSolicitudes: AdminSolicitudesApi;
+  sales:            SalesApi;
 }
 
 export function App({ apis }: { apis: AllApis }) {
@@ -59,7 +63,7 @@ export function App({ apis }: { apis: AllApis }) {
     { path: "#/admin",                 roles: ["admin"],        element: <AdminHome /> },
     { path: "#/admin/projects",        roles: ["admin"],        element: <AdminProjectsRoute apis={apis} /> },
     { path: "#/admin/projects/",       roles: ["admin"],        element: <AdminProjectDetailRoute apis={apis} /> },
-    { path: "#/admin/budgets",         roles: ["admin"],        element: <AdminBudgets apis={apis} /> },
+    { path: "#/admin/budgets",         roles: ["admin"],        element: <SalesPipeline api={apis.sales} users={apis.users} /> },
     { path: "#/admin/users",           roles: ["admin"],        element: <AdminUsers api={apis.users} /> },
     { path: "#/admin/profesionales",   roles: ["admin"],        element: <AdminProfesionales apis={apis} /> },
     { path: "#/admin/solicitudes",     roles: ["admin"],        element: <AdminSolicitudes api={apis.adminSolicitudes} /> },
@@ -68,7 +72,7 @@ export function App({ apis }: { apis: AllApis }) {
     // Cliente
     { path: "#/cliente",               roles: ["cliente"],      element: <ClientDashboardRoute apis={apis} /> },
     { path: "#/cliente/projects/",     roles: ["cliente"],      element: <ClientProjectDetailRoute apis={apis} /> },
-    { path: "#/cliente/budgets",       roles: ["cliente"],      element: <ClientBudgets apis={apis} /> },
+    { path: "#/cliente/budgets",       roles: ["cliente"],      element: <ClientEstimates api={apis.sales} /> },
 
     // Profesional
     { path: "#/profesional",           roles: ["profesional"],  element: <ProfesionalDashboardRoute apis={apis} /> },
@@ -207,26 +211,7 @@ function AdminProjectDetailRoute({ apis }: { apis: AllApis }) {
 }
 
 function ClientDashboardRoute({ apis }: { apis: AllApis }) {
-  const { navigate } = useNavigation();
-  const [signingBudgetId, setSigningBudgetId] = useState<number | null>(null);
-
-  return (
-    <>
-      <ClientDashboard
-        apis={apis}
-        onOpenProject={id => navigate(`#/cliente/projects/${id}`)}
-        onOpenBudget={() => navigate("#/cliente/budgets")}
-        onSignBudget={id => setSigningBudgetId(id)}
-      />
-      <SignatureWizard
-        open={signingBudgetId !== null}
-        budgetId={signingBudgetId}
-        budgetsApi={apis.budgets}
-        onClose={() => setSigningBudgetId(null)}
-        onSigned={() => setSigningBudgetId(null)}
-      />
-    </>
-  );
+  return <ClientEstimates api={apis.sales} />;
 }
 
 function ClientProjectDetailRoute({ apis }: { apis: AllApis }) {

@@ -28,6 +28,10 @@ const ACTION_CODES: Record<DomainEvent["type"], string> = {
   SignatureChallengeRequested: "FIRMA_CHALLENGE_SOLICITADO",
   SignatureRejected:           "FIRMA_INTENTO_INVALIDO",
   FileUploaded:                "ARCHIVO_SUBIDO",
+  OpportunityCreated:          "OPORTUNIDAD_CREADA",
+  EstimateCreated:             "PRESUPUESTO_CREADO",
+  EstimateSent:                "PRESUPUESTO_ENVIADO",
+  EstimateAccepted:            "PRESUPUESTO_ACEPTADO",
 };
 
 export class AuditSubscriber {

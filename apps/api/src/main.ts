@@ -20,6 +20,7 @@ import { budgetController } from "./interfaces/http/budgetController.js";
 import { userController }    from "./interfaces/http/userController.js";
 import { projectController } from "./interfaces/http/projectController.js";
 import { auditController, solicitudController, fileController } from "./interfaces/http/otherControllers.js";
+import { salesController } from "./interfaces/http/salesController.js";
 import { toHttpError } from "./interfaces/http/errorMiddleware.js";
 import { ValidationError } from "@reformapro/domain/errors";
 
@@ -81,6 +82,7 @@ function getRuntime(): Promise<Runtime> {
       upload: app.useCases.uploadFile, delete: app.useCases.deleteFile, list: app.useCases.listFiles,
       download: app.useCases.downloadFile,
     });
+    const sales = salesController({ opportunities: app.useCases.opportunities, estimates: app.useCases.estimates, changes: app.useCases.changes });
 
     return { authMiddleware: requireAuth(app.tokens), routes: [
   // Auth (public)
@@ -97,6 +99,21 @@ function getRuntime(): Promise<Runtime> {
   route("DELETE", "/budgets/:id",                      req => budgets.delete(req as never),               { protected: true }),
   route("POST",   "/budgets/:id/signature/challenge",  req => budgets.requestChallenge(req as never),     { protected: true }),
   route("POST",   "/budgets/:id/signature",            req => budgets.sign(req   as never),               { protected: true }),
+
+  // Commercial pipeline: opportunity -> versioned estimate -> project.
+  route("GET",   "/opportunities",       req => sales.listOpportunities(req as never), { protected: true }),
+  route("POST",  "/opportunities",       req => sales.createOpportunity(req as never), { protected: true }),
+  route("PATCH", "/opportunities/:id",   req => sales.updateOpportunity(req as never), { protected: true }),
+  route("GET",   "/estimates",           req => sales.listEstimates(req as never),     { protected: true }),
+  route("POST",  "/estimates",           req => sales.createEstimate(req as never),    { protected: true }),
+  route("GET",   "/estimates/:id",       req => sales.getEstimate(req as never),       { protected: true }),
+  route("PATCH", "/estimates/:id",       req => sales.updateEstimate(req as never),    { protected: true }),
+  route("POST",  "/estimates/:id/send",  req => sales.sendEstimate(req as never),      { protected: true }),
+  route("POST",  "/estimates/:id/revise",req => sales.reviseEstimate(req as never),    { protected: true }),
+  route("POST",  "/estimates/:id/accept",req => sales.acceptEstimate(req as never),    { protected: true }),
+  route("GET",   "/estimates/:id/versions", req => sales.versions(req as never),       { protected: true }),
+  route("GET",   "/projects/:projectId/change-orders", req => sales.listChanges(req as never), { protected: true }),
+  route("POST",  "/projects/:projectId/change-orders", req => sales.createChange(req as never), { protected: true }),
 
   // Users
   route("GET",    "/users",        req => users.list(req   as never), { protected: true }),

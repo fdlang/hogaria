@@ -7,9 +7,9 @@
 
 import {
   IUserRepository, IProjectRepository, IBudgetRepository,
-  IChallengeRepository, IAuditRepository, Challenge,
+  IChallengeRepository, IAuditRepository, IChangeOrderRepository, IEstimateRepository, IOpportunityRepository, Challenge,
 } from "@reformapro/domain/repositories";
-import { User, Project, Budget, AuditEntry, UserRole } from "@reformapro/domain/entities";
+import { ChangeOrder, Estimate, EstimateVersion, Opportunity, OpportunityStatus, User, Project, Budget, AuditEntry, UserRole } from "@reformapro/domain/entities";
 import { NotFoundError } from "@reformapro/domain/errors";
 
 // Hashes are stored ONLY hashed, never plaintext.
@@ -157,6 +157,32 @@ export class InMemoryBudgetRepository implements IBudgetRepository {
     if (idx === -1) throw new NotFoundError("Presupuesto");
     this.budgets.splice(idx, 1);
   }
+}
+
+export class InMemoryOpportunityRepository implements IOpportunityRepository {
+  private readonly items: Opportunity[] = []; private nextId = 1;
+  async findById(id: number) { return this.items.find(item => item.id === id) ?? null; }
+  async findAll(status?: OpportunityStatus) { return this.items.filter(item => !status || item.estado === status).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); }
+  async save(item: Omit<Opportunity, "id" | "createdAt" | "updatedAt">) { const now = new Date(); const saved: Opportunity = { ...item, id: this.nextId++, createdAt: now, updatedAt: now }; this.items.push(saved); return saved; }
+  async update(id: number, changes: Partial<Omit<Opportunity, "id" | "createdAt" | "updatedAt">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Oportunidad"); const next = { ...old, ...changes, updatedAt: new Date() }; this.items[this.items.indexOf(old)] = next; return next; }
+}
+
+export class InMemoryEstimateRepository implements IEstimateRepository {
+  private readonly items: Estimate[] = []; private readonly versions: EstimateVersion[] = []; private nextId = 1; private nextVersionId = 1;
+  async findById(id: number) { return this.items.find(item => item.id === id) ?? null; }
+  async findAll() { return [...this.items].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); }
+  async findByOpportunity(opportunityId: number) { return this.items.filter(item => item.oportunidadId === opportunityId); }
+  async save(item: Omit<Estimate, "id" | "createdAt" | "updatedAt">) { const now = new Date(); const saved: Estimate = { ...item, id: this.nextId++, createdAt: now, updatedAt: now }; this.items.push(saved); return saved; }
+  async update(id: number, changes: Partial<Pick<Estimate, "titulo" | "estado" | "versionActual" | "borrador">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Presupuesto"); const next = { ...old, ...changes, updatedAt: new Date() }; this.items[this.items.indexOf(old)] = next; return next; }
+  async saveVersion(item: Omit<EstimateVersion, "id" | "createdAt">) { const saved: EstimateVersion = { ...item, id: this.nextVersionId++, createdAt: new Date() }; this.versions.push(saved); return saved; }
+  async findVersions(estimateId: number) { return this.versions.filter(item => item.estimateId === estimateId).sort((a, b) => b.version - a.version); }
+}
+
+export class InMemoryChangeOrderRepository implements IChangeOrderRepository {
+  private readonly items: ChangeOrder[] = []; private nextId = 1;
+  async findByProject(projectId: number) { return this.items.filter(item => item.projectId === projectId); }
+  async save(item: Omit<ChangeOrder, "id" | "createdAt">) { const saved: ChangeOrder = { ...item, id: this.nextId++, createdAt: new Date() }; this.items.push(saved); return saved; }
+  async update(id: number, changes: Partial<Pick<ChangeOrder, "estado" | "payload" | "aprobadoAt">>) { const old = this.items.find(item => item.id === id); if (!old) throw new NotFoundError("Orden de cambio"); const next = { ...old, ...changes }; this.items[this.items.indexOf(old)] = next; return next; }
 }
 
 // In production: Redis with TTL — challenges auto-expire without a cleanup job.

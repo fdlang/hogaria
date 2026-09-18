@@ -1,0 +1,15 @@
+import { ApiClient } from "@/shared/lib/api-client";
+
+export type OpportunityDTO = { id: number; clienteId: number | null; nombre: string; email: string | null; telefono: string | null; direccion: string; tipo: string; descripcion: string; estado: string; fechaVisita: string | null; notasInternas: string; createdAt: string; updatedAt: string };
+export type EstimateLineDTO = { id: string; categoria: string; descripcion: string; cantidad: number; unidad: string; precioVentaUnitario: number; costeUnitario: number | null; descuento: number; iva: number; notaCliente?: string; notaInterna?: string };
+export type EstimateDraftDTO = { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; notasInternas: string; partidas: EstimateLineDTO[] };
+export type EstimateDTO = { id: number; oportunidadId: number; clienteId: number; numero: string; titulo: string; estado: string; versionActual: number; borrador: EstimateDraftDTO; createdAt: string; updatedAt: string };
+
+export class SalesApi {
+  constructor(private readonly http: ApiClient) {}
+  opportunities() { return this.http.get<OpportunityDTO[]>("/opportunities"); }
+  createOpportunity(input: Omit<OpportunityDTO, "id" | "createdAt" | "updatedAt">) { return this.http.post<OpportunityDTO>("/opportunities", input); }
+  estimates() { return this.http.get<EstimateDTO[]>("/estimates"); }
+  createEstimate(oportunidadId: number, borrador: EstimateDraftDTO) { return this.http.post<EstimateDTO>("/estimates", { oportunidadId, borrador }); }
+  sendEstimate(id: number) { return this.http.post<EstimateDTO>(`/estimates/${id}/send`); }
+}

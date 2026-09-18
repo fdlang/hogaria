@@ -8,7 +8,7 @@
  */
 
 import {
-  InMemoryUserRepository, InMemoryProjectRepository, InMemoryBudgetRepository,
+  InMemoryUserRepository, InMemoryProjectRepository, InMemoryBudgetRepository, InMemoryOpportunityRepository, InMemoryEstimateRepository, InMemoryChangeOrderRepository,
   InMemoryChallengeRepository, InMemoryAuditRepository,
 } from "./infrastructure/database/inMemoryRepositories.js";
 import { BcryptPasswordHasher } from "./infrastructure/database/passwordHasher.js";
@@ -42,10 +42,11 @@ import {
   IFileRepository, IFileStorage, ProjectFile,
 } from "./application/use-cases/file.use-cases.js";
 import { VercelBlobFileStorage } from "./infrastructure/storage/vercelBlobFileStorage.js";
+import { ChangeOrderUseCases, EstimateUseCases, OpportunityUseCases } from "./application/use-cases/sales.use-cases.js";
 import { NotFoundError } from "@reformapro/domain/errors";
 import { Email } from "@reformapro/domain/value-objects";
-import { IAuditRepository, IBudgetRepository, IChallengeRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
-import { PostgresAuditRepository, PostgresBudgetRepository, PostgresChallengeRepository, PostgresFileRepository, PostgresProjectRepository, PostgresSolicitudRepository, PostgresUserRepository } from "./infrastructure/database/postgresRepositories.js";
+import { IAuditRepository, IBudgetRepository, IChangeOrderRepository, IChallengeRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
+import { PostgresAuditRepository, PostgresBudgetRepository, PostgresChangeOrderRepository, PostgresChallengeRepository, PostgresEstimateRepository, PostgresFileRepository, PostgresOpportunityRepository, PostgresProjectRepository, PostgresSolicitudRepository, PostgresUserRepository } from "./infrastructure/database/postgresRepositories.js";
 import pg from "pg";
 
 // ─────────────────────────────────────────────────────────────
@@ -105,6 +106,9 @@ export interface AppDependencies {
   signatureCrypto: WebCryptoSignatureService;
   files:        IFileRepository;
   solicitudes:  ISolicitudRepository;
+  opportunities: IOpportunityRepository;
+  estimates: IEstimateRepository;
+  changes: IChangeOrderRepository;
 
   useCases: {
     login:                     LoginUseCase;
@@ -135,6 +139,9 @@ export interface AppDependencies {
     deleteFile:                DeleteFileUseCase;
     listFiles:                 ListFilesUseCase;
     downloadFile:              DownloadFileUseCase;
+    opportunities:             OpportunityUseCases;
+    estimates:                 EstimateUseCases;
+    changes:                   ChangeOrderUseCases;
   };
 }
 
@@ -162,6 +169,9 @@ export async function buildApp(): Promise<AppDependencies> {
   const files: IFileRepository = pool ? new PostgresFileRepository(pool) : new InMemoryFileRepository();
   const fileStorage: IFileStorage = new VercelBlobFileStorage();
   const solicitudes: ISolicitudRepository = pool ? new PostgresSolicitudRepository(pool) : new InMemorySolicitudRepository();
+  const opportunities: IOpportunityRepository = pool ? new PostgresOpportunityRepository(pool) : new InMemoryOpportunityRepository();
+  const estimates: IEstimateRepository = pool ? new PostgresEstimateRepository(pool) : new InMemoryEstimateRepository();
+  const changes: IChangeOrderRepository = pool ? new PostgresChangeOrderRepository(pool) : new InMemoryChangeOrderRepository();
 
   // Development seed. PostgreSQL deployments use the same credentials only
   // during the first bootstrap; override all values through environment vars.
@@ -212,7 +222,10 @@ export async function buildApp(): Promise<AppDependencies> {
     deleteFile:                 new DeleteFileUseCase(users, projects, files, fileStorage),
     listFiles:                  new ListFilesUseCase(users, projects, files),
     downloadFile:               new DownloadFileUseCase(users, projects, files, fileStorage),
+    opportunities:              new OpportunityUseCases(users, opportunities, events),
+    estimates:                  new EstimateUseCases(users, opportunities, estimates, projects, events),
+    changes:                    new ChangeOrderUseCases(users, projects, changes),
   };
 
-  return { users, projects, budgets, challenges, audit, events, tokens, signatureCrypto: sigCrypto, files, solicitudes, useCases };
+  return { users, projects, budgets, challenges, audit, events, tokens, signatureCrypto: sigCrypto, files, solicitudes, opportunities, estimates, changes, useCases };
 }

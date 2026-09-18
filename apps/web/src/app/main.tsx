@@ -17,6 +17,7 @@ import { FilesApi }       from "@/features/files/api/files.api";
 import { AuditApi }       from "@/features/audit/api/audit.api";
 import { SolicitudesApi } from "@/features/solicitudes/api/solicitudes.api";
 import { AdminSolicitudesApi } from "@/features/solicitudes/components/AdminSolicitudes";
+import { SalesApi } from "@/features/sales/api/sales.api";
 import { App } from "./App";
 import { NotificationsProvider } from "@/shared/ui/notifications";
 import { ConfirmProvider } from "@/shared/ui/confirm";
@@ -42,6 +43,7 @@ const apis = {
   audit:            new AuditApi(api),
   solicitudes:      new SolicitudesApi(api),
   adminSolicitudes: new AdminSolicitudesApi(api),
+  sales:            new SalesApi(api),
 };
 
 // 4) Restore session on boot (best-effort; failures silently sign out)

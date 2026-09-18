@@ -11,7 +11,7 @@ import { HttpRequest, HttpResponse } from "./authController.js";
 
 export function toProjectDTO(p: Project) {
   return {
-    id: p.id, nombre: p.nombre, descripcion: p.descripcion,
+    id: p.id, estimateId: p.estimateId, nombre: p.nombre, descripcion: p.descripcion,
     clienteId: p.clienteId, direccion: p.direccion, tipo: p.tipo,
     estado: p.estado,
     progreso: p.progreso.value, presupuesto: p.presupuesto.amount,

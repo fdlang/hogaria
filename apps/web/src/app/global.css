@@ -13,6 +13,12 @@
   --line: rgba(84, 80, 72, .13);
 }
 
+.sales-card { max-width: 760px; padding: 24px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,250,244,.86); box-shadow: 0 8px 24px rgba(72,59,44,.06); }
+.sales-card label { display: grid; gap: 6px; margin: 14px 0; color: #51493f; font-size: 13px; font-weight: 700; }
+.sales-card input, .sales-card select, .sales-card textarea { width: 100%; min-height: 42px; padding: 9px 10px; color: var(--ink); font: inherit; border: 1px solid var(--line); border-radius: 6px; background: #fffdf9; }
+.sales-card textarea { min-height: 92px; resize: vertical; }
+@media (max-width: 620px) { .sales-card { padding: 16px; } }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 
 * { box-sizing: border-box; }
