@@ -6,7 +6,7 @@
  * a11y-compliant. Call `ask({ ... })` and await a boolean.
  */
 
-import React, { createContext, useCallback, useContext, useRef, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useRef, useState, ReactNode } from "react";
 import { Modal, Button } from "../ui";
 
 export interface ConfirmOptions {

@@ -10,7 +10,7 @@
  * Use these via the barrel: `import { Button, Input, Modal } from "@/shared/ui"`
  */
 
-import React, { useEffect, useRef, useId, forwardRef, ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes } from "react";
+import { useEffect, useRef, useId, forwardRef, ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes } from "react";
 
 // ─────────────────────────────────────────────────────────────
 // Modal — with Escape key, focus trap, proper ARIA

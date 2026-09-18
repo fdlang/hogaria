@@ -4,7 +4,6 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { SolicitudesApi } from "../api/solicitudes.api";
 import { ApiClient } from "@/shared/lib/api-client";
 import { Button, Spinner, EmptyState, Modal, Badge } from "@/shared/ui";
 import { useNotifications } from "@/shared/ui/notifications";

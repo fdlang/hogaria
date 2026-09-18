@@ -5,7 +5,7 @@
  * This version tracks timers in a ref and clears them all on unmount.
  */
 
-import React, { createContext, useContext, useRef, useState, useCallback, useEffect, ReactNode } from "react";
+import { createContext, useContext, useRef, useState, useCallback, useEffect, ReactNode } from "react";
 
 export type NotifType = "info" | "success" | "warn" | "error";
 export interface Notif { id: string; message: string; type: NotifType }

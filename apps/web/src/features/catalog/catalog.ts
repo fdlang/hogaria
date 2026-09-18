@@ -105,13 +105,6 @@ export const CATALOG: CatalogCategory[] = [
 
 let runtimeCatalog: CatalogCategory[] = CATALOG;
 
-/** Replaces the bundled fallback once the authenticated API returns Neon data. */
+/** Replaces the bundled fallback once the authenticated API returns the managed catalogue. */
 export function setRuntimeCatalog(catalog: CatalogCategory[]) { runtimeCatalog = catalog; }
 export function getRuntimeCatalog(): CatalogCategory[] { return runtimeCatalog; }
-
-const byRef = new Map<string, CatalogItem>();
-const categoryByRef = new Map<string, string>();
-CATALOG.forEach(category => category.items.forEach(item => { byRef.set(item.ref, item); categoryByRef.set(item.ref, category.categoria); }));
-
-export function findCatalogItem(ref: string): CatalogItem | undefined { return byRef.get(ref); }
-export function findCatalogCategory(ref: string): string | undefined { return categoryByRef.get(ref); }

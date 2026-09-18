@@ -3,7 +3,7 @@
  * Wrap the tree at the top AND around high-risk subtrees (PDF viewer, signature canvas).
  */
 
-import React, { Component, ReactNode } from "react";
+import { Component, ReactNode } from "react";
 
 interface ErrorInfo { componentStack: string }
 

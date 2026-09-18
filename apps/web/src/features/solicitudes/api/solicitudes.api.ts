@@ -18,11 +18,10 @@ export class SolicitudesApi {
 
 export function useSubmitSolicitud(api: SolicitudesApi) {
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError]           = useState<string | null>(null);
   const [done, setDone]             = useState(false);
 
   const submit = useCallback(async (payload: SolicitudPayload) => {
-    setSubmitting(true); setError(null);
+    setSubmitting(true);
     try {
       // Basic client-side validation mirroring server rules
       if (!payload.nombre?.trim())         throw new Error("Nombre obligatorio");
@@ -34,12 +33,11 @@ export function useSubmitSolicitud(api: SolicitudesApi) {
       await api.submit(payload);
       setDone(true);
     } catch (e) {
-      setError((e as { message?: string }).message ?? "Error");
       throw e;
     } finally { setSubmitting(false); }
   }, [api]);
 
-  const reset = useCallback(() => { setDone(false); setError(null); }, []);
+  const reset = useCallback(() => { setDone(false); }, []);
 
-  return { submit, submitting, error, done, reset };
+  return { submit, submitting, done, reset };
 }
