@@ -7,8 +7,7 @@
 
 import {
   DomainError, NotFoundError, UnauthorizedError, ForbiddenError,
-  ValidationError, ConflictError, RateLimitError, BudgetExpiredError,
-  SignatureInvalidError, ChallengeActiveError,
+  ValidationError, ConflictError, RateLimitError,
 } from "@reformapro/domain/errors";
 
 export interface HttpErrorResponse {
@@ -21,15 +20,12 @@ export function toHttpError(err: unknown): HttpErrorResponse {
   if (err instanceof ForbiddenError)          return { status: 403, body: { code: err.code, message: err.message } };
   if (err instanceof NotFoundError)           return { status: 404, body: { code: err.code, message: err.message } };
   if (err instanceof ConflictError)           return { status: 409, body: { code: err.code, message: err.message } };
-  if (err instanceof ChallengeActiveError)    return { status: 409, body: { code: err.code, message: err.message } };
-  if (err instanceof BudgetExpiredError)      return { status: 410, body: { code: err.code, message: err.message } };
   if (err instanceof RateLimitError)          return { status: 429, body: { code: err.code, message: err.message } };
   if (err instanceof ValidationError) {
     const body: HttpErrorResponse["body"] = { code: err.code, message: err.message };
     if (err.field !== undefined) body.field = err.field;
     return { status: 422, body };
   }
-  if (err instanceof SignatureInvalidError)   return { status: 400, body: { code: err.code, message: err.message } };
   if (err instanceof DomainError)             return { status: 400, body: { code: err.code, message: err.message } };
 
   // Unknown error — never leak internals in production

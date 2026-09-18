@@ -1,13 +1,17 @@
-import { Email, IVARate, Money, Percentage, DocumentHash } from "../value-objects/index.js";
+import { Email, Money, Percentage } from "../value-objects/index.js";
+
 export type UserRole = "admin" | "cliente" | "profesional";
 export type Profesion = "albanil" | "electricista" | "fontanero" | "pintor" | "carpintero" | "reformista";
 export interface User { id: number; email: Email; nombre: string; rol: UserRole; profesion?: Profesion; telefono?: string; activo: boolean; createdAt: Date; }
+
 export type ProjectStatus = "planificacion" | "en_curso" | "pausado" | "finalizado";
 export interface ProjectProfessional { userId: number; profesion?: Profesion; }
 export interface ProjectMilestone { id: string; nombre: string; completado: boolean; fecha: Date; }
 export interface Project { id: number; estimateId: number; nombre: string; descripcion: string; clienteId: number; direccion: string; tipo: string; estado: ProjectStatus; progreso: Percentage; presupuesto: Money; fechaInicio: Date; fechaFinPrevista: Date; profesionalesAsignados: ProjectProfessional[]; hitos: ProjectMilestone[]; createdAt: Date; }
+
 export type OpportunityStatus = "nueva" | "contactada" | "visita_agendada" | "en_estudio" | "ganada" | "descartada";
 export interface Opportunity { id: number; clienteId: number | null; nombre: string; email: string | null; telefono: string | null; direccion: string; tipo: string; descripcion: string; estado: OpportunityStatus; fechaVisita: Date | null; notasInternas: string; createdAt: Date; updatedAt: Date; }
+
 export type EstimateStatus = "borrador" | "en_revision" | "enviado" | "firmado" | "aceptado" | "rechazado" | "caducado" | "sustituido";
 export type ChangeOrderStatus = "borrador" | "enviado" | "aprobado" | "rechazado";
 export interface EstimateLine { id: string; categoria: string; descripcion: string; cantidad: number; unidad: string; precioVentaUnitario: number; costeUnitario: number | null; descuento: number; iva: number; notaCliente?: string; notaInterna?: string; }
@@ -15,8 +19,5 @@ export interface EstimateDraft { titulo: string; referencia?: string; validezDia
 export interface Estimate { id: number; oportunidadId: number; clienteId: number; numero: string; titulo: string; estado: EstimateStatus; versionActual: number; borrador: EstimateDraft; motivoRechazo: string | null; createdAt: Date; updatedAt: Date; }
 export interface EstimateVersion { id: number; estimateId: number; version: number; snapshot: EstimateDraft; enviadoAt: Date | null; firmadoAt: Date | null; firma: Record<string, unknown> | null; createdAt: Date; }
 export interface ChangeOrder { id: number; projectId: number; numero: string; estado: ChangeOrderStatus; payload: EstimateDraft; aprobadoAt: Date | null; createdAt: Date; }
-export class BudgetLine { constructor(public readonly id: string, public readonly categoria: string, public readonly descripcion: string, public readonly cantidad: number, public readonly unidad: string, public readonly precioUnit: Money, public readonly descuento: Percentage, public readonly iva: IVARate | null, public readonly ref?: string, public readonly nota?: string) {} effectiveIVA(defaultIVA: IVARate) { return this.iva ?? defaultIVA; } get base() { return this.precioUnit.times(this.cantidad).times(1 - this.descuento.value / 100); } get subtotal() { return this.base; } }
+export interface CatalogItem { id: number; reference: string; category: string; description: string; unit: string; salePrice: number; vatRate: number; active: boolean; createdAt: Date; updatedAt: Date; }
 export interface AuditEntry { id: string; action: string; userId: number; userName: string; details: Record<string, unknown>; timestamp: Date; ip: string; userAgent: string; }
-export class Signature { constructor(public readonly firmado: boolean, public readonly firmante: string, public readonly firmanteEmail: Email, public readonly fechaFirma: Date, public readonly ip: string, public readonly hash: DocumentHash, public readonly token: string, public readonly consentimiento: string, public readonly auditTrail: AuditEntry[]) {} isValid() { return this.firmado && !!this.hash.value; } }
-export type BudgetStatus = "borrador" | "enviado" | "firmado" | "rechazado";
-export class Budget { constructor(public readonly id: number, public readonly proyectoId: number, public readonly clienteId: number, public readonly nombre: string, public readonly referencia: string, public readonly estado: BudgetStatus, public readonly ivaDefault: IVARate, public readonly validezDias: number, public readonly fechaCreacion: Date, public readonly fechaEnvio: Date | null, public readonly condicionesPago: string, public readonly garantia: string, public readonly notas: string, public readonly partidas: BudgetLine[], public readonly firma: Signature | null) {} get fechaExpiracion() { return this.fechaEnvio ? new Date(this.fechaEnvio.getTime() + this.validezDias * 86400000) : null; } hasExpired() { const exp = this.fechaExpiracion; return exp !== null && exp.getTime() < Date.now(); } isSignable() { return this.estado === "enviado" && !this.hasExpired() && !this.firma; } }

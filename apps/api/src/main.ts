@@ -20,6 +20,7 @@ import { userController }    from "./interfaces/http/userController.js";
 import { projectController } from "./interfaces/http/projectController.js";
 import { auditController, solicitudController, fileController } from "./interfaces/http/otherControllers.js";
 import { salesController } from "./interfaces/http/salesController.js";
+import { catalogController } from "./interfaces/http/catalogController.js";
 import { toHttpError } from "./interfaces/http/errorMiddleware.js";
 import { ValidationError } from "@reformapro/domain/errors";
 
@@ -77,6 +78,7 @@ function getRuntime(): Promise<Runtime> {
       download: app.useCases.downloadFile,
     });
     const sales = salesController({ opportunities: app.useCases.opportunities, estimates: app.useCases.estimates, changes: app.useCases.changes });
+    const catalog = catalogController({ catalog: app.useCases.catalog });
 
     return { authMiddleware: requireAuth(app.tokens, app.users), routes: [
   // Auth (public)
@@ -86,6 +88,10 @@ function getRuntime(): Promise<Runtime> {
   route("POST", "/auth/activate", async req => users.activate(req)),
 
   // Commercial pipeline: opportunity -> versioned estimate -> project.
+  route("GET",   "/catalog",             req => catalog.list(req as never), { protected: true }),
+  route("POST",  "/catalog",             req => catalog.create(req as never), { protected: true }),
+  route("PATCH", "/catalog/:id",         req => catalog.update(req as never), { protected: true }),
+  route("DELETE","/catalog/:id",         req => catalog.archive(req as never), { protected: true }),
   route("GET",   "/opportunities",       req => sales.listOpportunities(req as never), { protected: true }),
   route("POST",  "/opportunities",       req => sales.createOpportunity(req as never), { protected: true }),
   route("PATCH", "/opportunities/:id",   req => sales.updateOpportunity(req as never), { protected: true }),

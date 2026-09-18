@@ -4,7 +4,7 @@ import type { IEventEmitter } from "@reformapro/domain/events";
 import { Money, Percentage } from "@reformapro/domain/value-objects";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@reformapro/domain/errors";
 import type { ClientContext } from "./auth.use-cases.js";
-import type { ISignatureCrypto } from "./sign-budget.use-case.js";
+import type { ISignatureCrypto } from "../../infrastructure/crypto/crypto.service.js";
 
 type OpportunityInput = Pick<Opportunity, "clienteId" | "nombre" | "email" | "telefono" | "direccion" | "tipo" | "descripcion" | "estado" | "fechaVisita" | "notasInternas">;
 type PublicEstimateLine = Pick<EstimateDraft["partidas"][number], "id" | "categoria" | "descripcion" | "cantidad" | "unidad" | "precioVentaUnitario" | "descuento" | "iva" | "notaCliente">;

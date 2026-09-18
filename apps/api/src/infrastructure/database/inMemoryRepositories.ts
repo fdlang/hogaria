@@ -6,10 +6,9 @@
  */
 
 import {
-  IUserRepository, IProjectRepository, IBudgetRepository,
-  IChallengeRepository, IAuditRepository, IChangeOrderRepository, IEstimateRepository, IOpportunityRepository, Challenge,
+  IUserRepository, IProjectRepository, IAuditRepository, ICatalogRepository, IChangeOrderRepository, IEstimateRepository, IOpportunityRepository,
 } from "@reformapro/domain/repositories";
-import { ChangeOrder, Estimate, EstimateVersion, Opportunity, OpportunityStatus, User, Project, Budget, AuditEntry, UserRole } from "@reformapro/domain/entities";
+import { CatalogItem, ChangeOrder, Estimate, EstimateVersion, Opportunity, OpportunityStatus, User, Project, AuditEntry, UserRole } from "@reformapro/domain/entities";
 import { NotFoundError } from "@reformapro/domain/errors";
 
 // Hashes are stored ONLY hashed, never plaintext.
@@ -122,49 +121,21 @@ export class InMemoryProjectRepository implements IProjectRepository {
   }
 }
 
-export class InMemoryBudgetRepository implements IBudgetRepository {
-  private readonly budgets: Budget[] = [];
-  private nextId = 1;
-
-  async findById(id: number): Promise<Budget | null> {
-    return this.budgets.find(b => b.id === id) ?? null;
-  }
-  async findByProject(proyectoId: number): Promise<Budget[]> {
-    return this.budgets.filter(b => b.proyectoId === proyectoId);
-  }
-  async findByClient(clienteId: number): Promise<Budget[]> {
-    return this.budgets.filter(b => b.clienteId === clienteId);
-  }
-  async findAll(): Promise<Budget[]> { return [...this.budgets]; }
-  async save(budget: Budget): Promise<Budget> {
-    const id = budget.id || this.nextId++;
-    if (budget.id && id >= this.nextId) this.nextId = id + 1;
-    // Preserve the prototype chain (Budget has methods like isSignable())
-    const stored = Object.assign(Object.create(Object.getPrototypeOf(budget)), budget, { id }) as Budget;
-    this.budgets.push(stored);
-    return stored;
-  }
-  async update(id: number, changes: Partial<Budget>): Promise<Budget> {
-    const idx = this.budgets.findIndex(b => b.id === id);
-    const current = this.budgets[idx];
-    if (!current) throw new NotFoundError("Presupuesto");
-    const merged = Object.assign(Object.create(Object.getPrototypeOf(current)), current, changes) as Budget;
-    this.budgets[idx] = merged;
-    return merged;
-  }
-  async delete(id: number): Promise<void> {
-    const idx = this.budgets.findIndex(b => b.id === id);
-    if (idx === -1) throw new NotFoundError("Presupuesto");
-    this.budgets.splice(idx, 1);
-  }
-}
-
 export class InMemoryOpportunityRepository implements IOpportunityRepository {
   private readonly items: Opportunity[] = []; private nextId = 1;
   async findById(id: number) { return this.items.find(item => item.id === id) ?? null; }
   async findAll(status?: OpportunityStatus) { return this.items.filter(item => !status || item.estado === status).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); }
   async save(item: Omit<Opportunity, "id" | "createdAt" | "updatedAt">) { const now = new Date(); const saved: Opportunity = { ...item, id: this.nextId++, createdAt: now, updatedAt: now }; this.items.push(saved); return saved; }
   async update(id: number, changes: Partial<Omit<Opportunity, "id" | "createdAt" | "updatedAt">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Oportunidad"); const next = { ...old, ...changes, updatedAt: new Date() }; this.items[this.items.indexOf(old)] = next; return next; }
+}
+
+export class InMemoryCatalogRepository implements ICatalogRepository {
+  private readonly items: CatalogItem[] = []; private nextId = 1;
+  async findAll(includeInactive = false) { return this.items.filter(item => includeInactive || item.active); }
+  async findById(id: number) { return this.items.find(item => item.id === id) ?? null; }
+  async findByReference(reference: string) { return this.items.find(item => item.reference === reference) ?? null; }
+  async save(item: Omit<CatalogItem, "id" | "createdAt" | "updatedAt">) { const now = new Date(); const saved = { ...item, id: this.nextId++, createdAt: now, updatedAt: now }; this.items.push(saved); return saved; }
+  async update(id: number, changes: Partial<Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate" | "active">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Partida de catálogo"); const next = { ...old, ...changes, updatedAt: new Date() }; this.items[this.items.indexOf(old)] = next; return next; }
 }
 
 export class InMemoryEstimateRepository implements IEstimateRepository {
@@ -188,23 +159,6 @@ export class InMemoryChangeOrderRepository implements IChangeOrderRepository {
 
 // In production: Redis with TTL — challenges auto-expire without a cleanup job.
 // Here we check `exp` on every get().
-export class InMemoryChallengeRepository implements IChallengeRepository {
-  private readonly challenges = new Map<number, Challenge>();
-
-  async get(budgetId: number): Promise<Challenge | null> {
-    const c = this.challenges.get(budgetId);
-    if (!c) return null;
-    if (Date.now() > c.exp) { this.challenges.delete(budgetId); return null; }
-    return c;
-  }
-  async set(budgetId: number, challenge: Challenge): Promise<void> {
-    this.challenges.set(budgetId, challenge);
-  }
-  async delete(budgetId: number): Promise<void> {
-    this.challenges.delete(budgetId);
-  }
-}
-
 export class InMemoryAuditRepository implements IAuditRepository {
   private readonly entries: AuditEntry[] = [];
 

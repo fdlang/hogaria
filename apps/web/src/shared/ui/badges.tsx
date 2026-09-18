@@ -5,16 +5,10 @@
 
 import { Badge } from "@/shared/ui";
 import {
-  BUDGET_ESTADOS, BudgetEstadoKey,
   PROJECT_ESTADOS, ProjectEstadoKey,
   USER_ROLES,
   PROFESIONES, Profesion,
 } from "@reformapro/domain";
-
-export function BudgetStatusBadge({ estado }: { estado: BudgetEstadoKey }) {
-  const info = BUDGET_ESTADOS[estado];
-  return <Badge color={info.color}>{info.label}</Badge>;
-}
 
 export function ProjectStatusBadge({ estado }: { estado: ProjectEstadoKey }) {
   const info = PROJECT_ESTADOS[estado];

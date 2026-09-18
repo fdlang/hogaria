@@ -8,7 +8,7 @@
  */
 
 import {
-  InMemoryUserRepository, InMemoryProjectRepository, InMemoryOpportunityRepository, InMemoryEstimateRepository, InMemoryChangeOrderRepository,
+  InMemoryUserRepository, InMemoryProjectRepository, InMemoryCatalogRepository, InMemoryOpportunityRepository, InMemoryEstimateRepository, InMemoryChangeOrderRepository,
   InMemoryAuditRepository,
 } from "./infrastructure/database/inMemoryRepositories.js";
 import { BcryptPasswordHasher } from "./infrastructure/database/passwordHasher.js";
@@ -38,13 +38,14 @@ import {
 } from "./application/use-cases/file.use-cases.js";
 import { VercelBlobFileStorage } from "./infrastructure/storage/vercelBlobFileStorage.js";
 import { ChangeOrderUseCases, EstimateUseCases, OpportunityUseCases } from "./application/use-cases/sales.use-cases.js";
+import { CatalogUseCases } from "./application/use-cases/catalog.use-cases.js";
 import { AccountActivationUseCases, configureActivationPasswordHasher, IActivationTokenRepository } from "./application/use-cases/account-activation.use-cases.js";
 import { InMemoryActivationTokenRepository, PostgresActivationTokenRepository } from "./infrastructure/database/activationTokenRepositories.js";
 import { ResendTransactionalEmail } from "./infrastructure/email/resendTransactionalEmail.js";
 import { NotFoundError } from "@reformapro/domain/errors";
 import { Email } from "@reformapro/domain/value-objects";
-import { IAuditRepository, IChangeOrderRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
-import { PostgresAuditRepository, PostgresChangeOrderRepository, PostgresEstimateRepository, PostgresFileRepository, PostgresOpportunityRepository, PostgresProjectRepository, PostgresSolicitudRepository, PostgresUserRepository } from "./infrastructure/database/postgresRepositories.js";
+import { IAuditRepository, ICatalogRepository, IChangeOrderRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
+import { PostgresAuditRepository, PostgresCatalogRepository, PostgresChangeOrderRepository, PostgresEstimateRepository, PostgresFileRepository, PostgresOpportunityRepository, PostgresProjectRepository, PostgresSolicitudRepository, PostgresUserRepository } from "./infrastructure/database/postgresRepositories.js";
 import pg from "pg";
 
 // ─────────────────────────────────────────────────────────────
@@ -99,12 +100,12 @@ export interface AppDependencies {
   audit:        IAuditRepository;
   events:       InMemoryEventEmitter;
   tokens:       WebCryptoTokenService;
-  signatureCrypto: WebCryptoSignatureService;
   files:        IFileRepository;
   solicitudes:  ISolicitudRepository;
   opportunities: IOpportunityRepository;
   estimates: IEstimateRepository;
   changes: IChangeOrderRepository;
+  catalog: ICatalogRepository;
 
   useCases: {
     login:                     LoginUseCase;
@@ -129,6 +130,7 @@ export interface AppDependencies {
     opportunities:             OpportunityUseCases;
     estimates:                 EstimateUseCases;
     changes:                   ChangeOrderUseCases;
+    catalog:                   CatalogUseCases;
     activation:                AccountActivationUseCases;
   };
 }
@@ -158,6 +160,7 @@ export async function buildApp(): Promise<AppDependencies> {
   const opportunities: IOpportunityRepository = pool ? new PostgresOpportunityRepository(pool) : new InMemoryOpportunityRepository();
   const estimates: IEstimateRepository = pool ? new PostgresEstimateRepository(pool) : new InMemoryEstimateRepository();
   const changes: IChangeOrderRepository = pool ? new PostgresChangeOrderRepository(pool) : new InMemoryChangeOrderRepository();
+  const catalog: ICatalogRepository = pool ? new PostgresCatalogRepository(pool) : new InMemoryCatalogRepository();
   const activationTokens: IActivationTokenRepository = pool ? new PostgresActivationTokenRepository(pool) : new InMemoryActivationTokenRepository();
   configureActivationPasswordHasher(value => hasher.hash(value));
   const activation = new AccountActivationUseCases(users, activationTokens, new ResendTransactionalEmail(process.env.RESEND_API_KEY, process.env.EMAIL_FROM), process.env.APP_URL ?? "http://localhost:5173");
@@ -205,8 +208,9 @@ export async function buildApp(): Promise<AppDependencies> {
     opportunities:              new OpportunityUseCases(users, opportunities, events),
     estimates:                  new EstimateUseCases(users, opportunities, estimates, projects, events, sigCrypto),
     changes:                    new ChangeOrderUseCases(users, projects, changes),
+    catalog:                    new CatalogUseCases(users, catalog),
     activation,
   };
 
-  return { users, projects, audit, events, tokens, signatureCrypto: sigCrypto, files, solicitudes, opportunities, estimates, changes, useCases };
+  return { users, projects, audit, events, tokens, files, solicitudes, opportunities, estimates, changes, catalog, useCases };
 }

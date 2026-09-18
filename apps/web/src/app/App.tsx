@@ -20,6 +20,7 @@ import { ProjectDetail }       from "@/features/projects/components/ProjectDetai
 import { SalesApi } from "@/features/sales/api/sales.api";
 import { SalesPipeline } from "@/features/sales/components/SalesPipeline";
 import { ClientEstimates } from "@/features/sales/components/ClientEstimates";
+import { CatalogManager } from "@/features/catalog/CatalogManager";
 
 import { AdminUsers }         from "@/features/users/components/AdminUsers";
 import { AdminProfesionales } from "@/features/users/components/AdminProfesionales";
@@ -59,6 +60,7 @@ export function App({ apis }: { apis: AllApis }) {
     { path: "#/admin/projects",        roles: ["admin"],        element: <AdminProjectsRoute apis={apis} /> },
     { path: "#/admin/projects/",       roles: ["admin"],        element: <AdminProjectDetailRoute apis={apis} /> },
     { path: "#/admin/budgets",         roles: ["admin"],        element: <SalesPipeline api={apis.sales} users={apis.users} /> },
+    { path: "#/admin/catalog",         roles: ["admin"],        element: <CatalogManager api={apis.sales} /> },
     { path: "#/admin/users",           roles: ["admin"],        element: <AdminUsers api={apis.users} /> },
     { path: "#/admin/profesionales",   roles: ["admin"],        element: <AdminProfesionales apis={apis} /> },
     { path: "#/admin/solicitudes",     roles: ["admin"],        element: <AdminSolicitudes api={apis.adminSolicitudes} /> },
@@ -97,6 +99,7 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
       { to: "#/admin",               label: "Inicio" },
       { to: "#/admin/projects",      label: "Proyectos" },
       { to: "#/admin/budgets",       label: "Presupuestos" },
+      { to: "#/admin/catalog",       label: "Catálogo" },
       { to: "#/admin/users",         label: "Usuarios" },
       { to: "#/admin/profesionales", label: "Profesionales" },
       { to: "#/admin/solicitudes",   label: "Solicitudes" },
@@ -158,6 +161,7 @@ function AdminHome() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
         <Tile href="#/admin/projects"      title="Proyectos"      subtitle="Gestiona obras activas" />
         <Tile href="#/admin/budgets"       title="Presupuestos"   subtitle="Crea, envía, firma" />
+        <Tile href="#/admin/catalog"       title="Catálogo"       subtitle="Precios y partidas base" />
         <Tile href="#/admin/users"         title="Usuarios"       subtitle="Clientes, profesionales, admins" />
         <Tile href="#/admin/profesionales" title="Profesionales"  subtitle="Asignaciones y permisos" />
         <Tile href="#/admin/solicitudes"   title="Solicitudes"    subtitle="Contactos de la landing" />

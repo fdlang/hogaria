@@ -5,9 +5,15 @@
  * - Timing-safe verification via re-derivation
  */
 
-import { ISignatureCrypto } from "../../application/use-cases/sign-budget.use-case.js";
 import { ITokenService } from "../../application/use-cases/auth.use-cases.js";
 import { DocumentHash } from "@reformapro/domain/value-objects";
+
+/** Cryptographic operations used to seal a proposal version. */
+export interface ISignatureCrypto {
+  generateSignatureToken(documentId: number, userId: number, timestamp: number): Promise<string>;
+  verifySignatureToken(token: string, documentId: number, userId: number, timestamp: number): Promise<boolean>;
+  hashDocument(serialized: string): Promise<DocumentHash>;
+}
 
 const enc = new TextEncoder();
 
@@ -88,10 +94,6 @@ export class WebCryptoSignatureService implements ISignatureCrypto {
     return DocumentHash.of(`sha256-${toHex(digest)}`);
   }
 
-  randomChallenge(): string {
-    return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map(b => b.toString(16).padStart(2, "0")).join("");
-  }
 }
 
 // Generates a cryptographically random provisional password with UNIFORM distribution.

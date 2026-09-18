@@ -1,8 +1,7 @@
 import pg from "pg";
-import { AuditEntry, Budget, BudgetLine, ChangeOrder, Estimate, EstimateDraft, EstimateVersion, Opportunity, OpportunityStatus, Project, User, UserRole } from "@reformapro/domain/entities";
-import { Email, IVARate, Money, Percentage, DocumentHash } from "@reformapro/domain/value-objects";
-import { Signature } from "@reformapro/domain/entities";
-import { IAuditRepository, IBudgetRepository, IChangeOrderRepository, IChallengeRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository, Challenge } from "@reformapro/domain/repositories";
+import { AuditEntry, CatalogItem, ChangeOrder, Estimate, EstimateDraft, EstimateVersion, Opportunity, OpportunityStatus, Project, User, UserRole } from "@reformapro/domain/entities";
+import { Email, Money, Percentage } from "@reformapro/domain/value-objects";
+import { IAuditRepository, ICatalogRepository, IChangeOrderRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
 import { NotFoundError } from "@reformapro/domain/errors";
 import type { PasswordHasher } from "./inMemoryRepositories.js";
 import type { ProjectFile, IFileRepository } from "../../application/use-cases/file.use-cases.js";
@@ -12,8 +11,6 @@ type Row = Record<string, any>;
 const date = (value: string | Date) => new Date(value);
 const projectPayload = (p: Project) => ({ ...p, progreso: p.progreso.value, presupuesto: p.presupuesto.amount, fechaInicio: p.fechaInicio.toISOString(), fechaFinPrevista: p.fechaFinPrevista.toISOString(), createdAt: p.createdAt.toISOString(), hitos: p.hitos.map(h => ({ ...h, fecha: h.fecha.toISOString() })) });
 const restoreProject = (id: number, p: any): Project => ({ ...p, id, progreso: Percentage.of(p.progreso), presupuesto: Money.of(p.presupuesto), fechaInicio: date(p.fechaInicio), fechaFinPrevista: date(p.fechaFinPrevista), createdAt: date(p.createdAt), hitos: p.hitos.map((h: any) => ({ ...h, fecha: date(h.fecha) })) });
-const budgetPayload = (b: Budget) => ({ ...b, ivaDefault: b.ivaDefault.value, fechaCreacion: b.fechaCreacion.toISOString(), fechaEnvio: b.fechaEnvio?.toISOString() ?? null, partidas: b.partidas.map(p => ({ ...p, precioUnit: p.precioUnit.amount, descuento: p.descuento.value, iva: p.iva?.value ?? null })), firma: b.firma ? { ...b.firma, firmanteEmail: b.firma.firmanteEmail.value, fechaFirma: b.firma.fechaFirma.toISOString(), hash: b.firma.hash.value, auditTrail: b.firma.auditTrail.map(a => ({ ...a, timestamp: a.timestamp.toISOString() })) } : null });
-const restoreBudget = (id: number, b: any) => new Budget(id, b.proyectoId, b.clienteId, b.nombre, b.referencia, b.estado, IVARate.of(b.ivaDefault), b.validezDias, date(b.fechaCreacion), b.fechaEnvio ? date(b.fechaEnvio) : null, b.condicionesPago, b.garantia, b.notas, b.partidas.map((p: any) => new BudgetLine(p.id, p.categoria, p.descripcion, p.cantidad, p.unidad, Money.of(p.precioUnit), Percentage.of(p.descuento), p.iva == null ? null : IVARate.of(p.iva), p.ref, p.nota)), b.firma ? new Signature(b.firma.firmado, b.firma.firmante, Email.of(b.firma.firmanteEmail), date(b.firma.fechaFirma), b.firma.ip, DocumentHash.of(b.firma.hash), b.firma.token, b.firma.consentimiento, b.firma.auditTrail.map((a: any) => ({ ...a, timestamp: date(a.timestamp) }))) : null);
 
 export class PostgresUserRepository implements IUserRepository {
   constructor(private readonly pool: pg.Pool, private readonly hasher: PasswordHasher) {}
@@ -35,10 +32,6 @@ export class PostgresProjectRepository implements IProjectRepository {
   async save(p:Project){const r=await this.pool.query("INSERT INTO projects(cliente_id,estimate_id,payload) VALUES($1,$2,$3) RETURNING *",[p.clienteId,p.estimateId,projectPayload(p)]);return this.map(r.rows[0])} async update(id:number,c:Partial<Omit<Project,"id"|"createdAt">>){const old=await this.findById(id);if(!old)throw new NotFoundError("Proyecto");const next={...old,...c};const r=await this.pool.query("UPDATE projects SET cliente_id=$2,payload=$3 WHERE id=$1 RETURNING *",[id,next.clienteId,projectPayload(next)]);return this.map(r.rows[0])} async delete(id:number){await this.pool.query("DELETE FROM projects WHERE id=$1",[id])}
 }
 
-export class PostgresBudgetRepository implements IBudgetRepository {
-  constructor(private readonly pool: pg.Pool) {} private map(r:Row){return restoreBudget(Number(r.id),r.payload)} async findById(id:number){const r=await this.pool.query("SELECT * FROM budgets WHERE id=$1",[id]);return r.rows[0]?this.map(r.rows[0]):null} async findByProject(id:number){return(await this.pool.query("SELECT * FROM budgets WHERE proyecto_id=$1 ORDER BY id DESC",[id])).rows.map(r=>this.map(r))} async findByClient(id:number){return(await this.pool.query("SELECT * FROM budgets WHERE cliente_id=$1 ORDER BY id DESC",[id])).rows.map(r=>this.map(r))} async findAll(){return(await this.pool.query("SELECT * FROM budgets ORDER BY id DESC")).rows.map(r=>this.map(r))} async save(b:Budget){const r=await this.pool.query("INSERT INTO budgets(proyecto_id,cliente_id,payload) VALUES($1,$2,$3) RETURNING *",[b.proyectoId,b.clienteId,budgetPayload(b)]);return this.map(r.rows[0])} async update(id:number,c:Partial<Budget>){const old=await this.findById(id);if(!old)throw new NotFoundError("Presupuesto");const next=Object.assign(Object.create(Object.getPrototypeOf(old)),old,c) as Budget;const r=await this.pool.query("UPDATE budgets SET payload=$2 WHERE id=$1 RETURNING *",[id,budgetPayload(next)]);return this.map(r.rows[0])} async delete(id:number){await this.pool.query("DELETE FROM budgets WHERE id=$1",[id])}
-}
-
 export class PostgresOpportunityRepository implements IOpportunityRepository {
   constructor(private readonly pool: pg.Pool) {}
   private map(r: Row): Opportunity { return { id: Number(r.id), clienteId: r.cliente_id == null ? null : Number(r.cliente_id), nombre: r.nombre, email: r.email, telefono: r.telefono, direccion: r.direccion, tipo: r.tipo, descripcion: r.descripcion, estado: r.estado as OpportunityStatus, fechaVisita: r.fecha_visita ? date(r.fecha_visita) : null, notasInternas: r.notas_internas, createdAt: date(r.created_at), updatedAt: date(r.updated_at) }; }
@@ -46,6 +39,28 @@ export class PostgresOpportunityRepository implements IOpportunityRepository {
   async findAll(status?: OpportunityStatus) { const r = await this.pool.query(status ? "SELECT * FROM opportunities WHERE estado=$1 ORDER BY updated_at DESC" : "SELECT * FROM opportunities ORDER BY updated_at DESC", status ? [status] : []); return r.rows.map(row => this.map(row)); }
   async save(o: Omit<Opportunity, "id" | "createdAt" | "updatedAt">) { const r = await this.pool.query("INSERT INTO opportunities(cliente_id,nombre,email,telefono,direccion,tipo,descripcion,estado,fecha_visita,notas_internas) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *", [o.clienteId,o.nombre,o.email,o.telefono,o.direccion,o.tipo,o.descripcion,o.estado,o.fechaVisita,o.notasInternas]); return this.map(r.rows[0]); }
   async update(id: number, changes: Partial<Omit<Opportunity, "id" | "createdAt" | "updatedAt">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Oportunidad"); const next = { ...old, ...changes }; const r = await this.pool.query("UPDATE opportunities SET cliente_id=$2,nombre=$3,email=$4,telefono=$5,direccion=$6,tipo=$7,descripcion=$8,estado=$9,fecha_visita=$10,notas_internas=$11,updated_at=NOW() WHERE id=$1 RETURNING *", [id,next.clienteId,next.nombre,next.email,next.telefono,next.direccion,next.tipo,next.descripcion,next.estado,next.fechaVisita,next.notasInternas]); return this.map(r.rows[0]); }
+}
+
+export class PostgresCatalogRepository implements ICatalogRepository {
+  constructor(private readonly pool: pg.Pool) {}
+  private map(row: Row): CatalogItem {
+    return {
+      id: Number(row.id), reference: row.reference, category: row.category,
+      description: row.description, unit: row.unit, salePrice: Number(row.sale_price),
+      vatRate: Number(row.vat_rate), active: row.active,
+      createdAt: date(row.created_at), updatedAt: date(row.updated_at),
+    };
+  }
+  async findAll(includeInactive = false) {
+    const query = includeInactive
+      ? "SELECT * FROM catalog_items ORDER BY category, reference"
+      : "SELECT * FROM catalog_items WHERE active=true ORDER BY category, reference";
+    return (await this.pool.query(query)).rows.map(row => this.map(row));
+  }
+  async findById(id: number) { const result = await this.pool.query("SELECT * FROM catalog_items WHERE id=$1", [id]); return result.rows[0] ? this.map(result.rows[0]) : null; }
+  async findByReference(reference: string) { const result = await this.pool.query("SELECT * FROM catalog_items WHERE reference=$1", [reference]); return result.rows[0] ? this.map(result.rows[0]) : null; }
+  async save(item: Omit<CatalogItem, "id" | "createdAt" | "updatedAt">) { const result = await this.pool.query("INSERT INTO catalog_items(reference,category,description,unit,sale_price,vat_rate,active) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *", [item.reference,item.category,item.description,item.unit,item.salePrice,item.vatRate,item.active]); return this.map(result.rows[0]); }
+  async update(id: number, changes: Partial<Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate" | "active">>) { const current = await this.findById(id); if (!current) throw new NotFoundError("Partida de catálogo"); const next = { ...current, ...changes }; const result = await this.pool.query("UPDATE catalog_items SET reference=$2,category=$3,description=$4,unit=$5,sale_price=$6,vat_rate=$7,active=$8,updated_at=NOW() WHERE id=$1 RETURNING *", [id,next.reference,next.category,next.description,next.unit,next.salePrice,next.vatRate,next.active]); return this.map(result.rows[0]); }
 }
 
 export class PostgresEstimateRepository implements IEstimateRepository {
@@ -70,7 +85,6 @@ export class PostgresChangeOrderRepository implements IChangeOrderRepository {
   async update(id: number, changes: Partial<Pick<ChangeOrder, "estado" | "payload" | "aprobadoAt">>) { const r = await this.pool.query("UPDATE change_orders SET estado=COALESCE($2,estado),payload=COALESCE($3,payload),aprobado_at=COALESCE($4,aprobado_at) WHERE id=$1 RETURNING *", [id,changes.estado ?? null,changes.payload ?? null,changes.aprobadoAt ?? null]); if (!r.rows[0]) throw new NotFoundError("Orden de cambio"); return this.map(r.rows[0]); }
 }
 
-export class PostgresChallengeRepository implements IChallengeRepository { constructor(private readonly pool:pg.Pool){} async get(id:number){const r=await this.pool.query("SELECT * FROM signature_challenges WHERE budget_id=$1 AND expires_at>NOW()",[id]);return r.rows[0]?{challenge:r.rows[0].challenge,timestamp:Number(r.rows[0].timestamp_ms),exp:date(r.rows[0].expires_at).getTime(),userId:Number(r.rows[0].user_id)}:null} async set(id:number,c:Challenge){await this.pool.query("INSERT INTO signature_challenges(budget_id,challenge,timestamp_ms,expires_at,user_id) VALUES($1,$2,$3,$4,$5) ON CONFLICT (budget_id) DO UPDATE SET challenge=$2,timestamp_ms=$3,expires_at=$4,user_id=$5",[id,c.challenge,c.timestamp,new Date(c.exp),c.userId])} async delete(id:number){await this.pool.query("DELETE FROM signature_challenges WHERE budget_id=$1",[id])} }
 export class PostgresAuditRepository implements IAuditRepository { constructor(private readonly pool:pg.Pool){} async append(e:AuditEntry){await this.pool.query("INSERT INTO audit_entries(id,payload,timestamp) VALUES($1,$2,$3)",[e.id,{...e,timestamp:e.timestamp.toISOString()},e.timestamp])} async findAll(){const r=await this.pool.query("SELECT payload FROM audit_entries ORDER BY timestamp DESC");const items=r.rows.map(x=>({...x.payload,timestamp:date(x.payload.timestamp)}));return{items,total:items.length,page:0,limit:50,pages:1}} }
 export class PostgresSolicitudRepository implements ISolicitudRepository {
   constructor(private readonly pool: pg.Pool) {}

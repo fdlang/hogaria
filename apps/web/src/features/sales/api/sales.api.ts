@@ -6,10 +6,16 @@ export type EstimateDraftDTO = { titulo: string; referencia?: string; validezDia
 export type PublicEstimateLineDTO = Pick<EstimateLineDTO, "id" | "categoria" | "descripcion" | "cantidad" | "unidad" | "precioVentaUnitario" | "descuento" | "iva" | "notaCliente">;
 export type PublicProposalDTO = { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; partidas: PublicEstimateLineDTO[]; totalSinIva: number; totalIva: number; totalConIva: number; enviadoAt: string | null; expiresAt: string | null; firmadoAt: string | null; hash: string | null };
 export type EstimateDTO = { id: number; numero: string; titulo: string; estado: string; versionActual: number; motivoRechazo: string | null; propuesta: PublicProposalDTO | null; createdAt: string; updatedAt: string };
+export type CatalogItemDTO = { id: number; reference: string; category: string; description: string; unit: string; salePrice: number; vatRate: number; active: boolean; updatedAt: string };
 
 export class SalesApi {
   constructor(private readonly http: ApiClient) {}
   opportunities() { return this.http.get<OpportunityDTO[]>("/opportunities"); }
+  catalog() { return this.http.get<CatalogItemDTO[]>("/catalog"); }
+  adminCatalog() { return this.http.get<CatalogItemDTO[]>("/catalog?includeInactive=true"); }
+  createCatalogItem(input: Omit<CatalogItemDTO, "id" | "active" | "updatedAt">) { return this.http.post<CatalogItemDTO>("/catalog", input); }
+  updateCatalogItem(id: number, input: Partial<Omit<CatalogItemDTO, "id" | "updatedAt">>) { return this.http.patch<CatalogItemDTO>(`/catalog/${id}`, input); }
+  archiveCatalogItem(id: number) { return this.http.delete<CatalogItemDTO>(`/catalog/${id}`); }
   createOpportunity(input: Omit<OpportunityDTO, "id" | "createdAt" | "updatedAt">) { return this.http.post<OpportunityDTO>("/opportunities", input); }
   estimates() { return this.http.get<EstimateDTO[]>("/estimates"); }
   createEstimate(oportunidadId: number, borrador: EstimateDraftDTO) { return this.http.post<EstimateDTO>("/estimates", { oportunidadId, borrador }); }

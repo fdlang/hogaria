@@ -7,7 +7,7 @@ import { EstimateUseCases } from "./sales.use-cases.js";
 import { PermissionPolicy } from "@reformapro/domain/services";
 
 const hasher = { hash: async () => "hash", verify: async (_plain: string, hash: string) => hash === "hash" };
-const cryptoPort = { hashDocument: async () => ({ value: "sha256:test" }), generateSignatureToken: async () => "token", verifySignatureToken: async () => true, randomChallenge: () => "challenge" };
+const cryptoPort = { hashDocument: async () => ({ value: "sha256:test" }), generateSignatureToken: async () => "token", verifySignatureToken: async () => true };
 const draft = {
   titulo: "Reforma de vivienda", validezDias: 30, condicionesPago: "50% al inicio", garantia: "", notasCliente: "", notasInternas: "Margen reservado",
   partidas: [{ id: "linea-1", categoria: "Obra", descripcion: "Revestimiento", cantidad: 2, unidad: "m²", precioVentaUnitario: 100, costeUnitario: 45, descuento: 0, iva: 21, notaInterna: "Proveedor preferente" }],
