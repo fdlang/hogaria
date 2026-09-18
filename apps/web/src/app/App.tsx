@@ -163,7 +163,7 @@ function LoginRoute() {
 
 function AdminHome() {
   return (
-    <section>
+    <section className="admin-home">
       <h1 style={{ fontSize: 38, fontWeight: 700, color: "#302d29", marginBottom: 24 }}>Panel de administración</h1>
       <AdminHomeGroup label="Operativa" hint="Del primer contacto a la obra">
         <Tile href="#/admin/solicitudes" title="Solicitudes" subtitle="Contactos de la landing" />
@@ -183,7 +183,7 @@ function AdminHome() {
 }
 
 function AdminHomeGroup({ label, hint, children }: { label: string; hint: string; children: ReactNode }) {
-  return <section style={{ marginBottom: 28 }}><header style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12 }}><h2 style={{ margin: 0, fontSize: 16 }}>{label}</h2><p style={{ margin: 0, color: "#71685e", fontSize: 12 }}>{hint}</p></header><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>{children}</div></section>;
+  return <section className="admin-home-group"><header><h2>{label}</h2><p>{hint}</p></header><div className="admin-home-grid">{children}</div></section>;
 }
 
 function Tile({ href, title, subtitle }: { href: string; title: string; subtitle: string }) {
