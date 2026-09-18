@@ -32,6 +32,7 @@ const ACTION_CODES: Record<DomainEvent["type"], string> = {
   EstimateCreated:             "PRESUPUESTO_CREADO",
   EstimateSent:                "PRESUPUESTO_ENVIADO",
   EstimateAccepted:            "PRESUPUESTO_ACEPTADO",
+  EstimateRejected:            "PRESUPUESTO_RECHAZADO",
 };
 
 export class AuditSubscriber {

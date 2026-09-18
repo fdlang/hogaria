@@ -72,7 +72,7 @@ export function App({ apis }: { apis: AllApis }) {
     // Cliente
     { path: "#/cliente",               roles: ["cliente"],      element: <ClientDashboardRoute apis={apis} /> },
     { path: "#/cliente/projects/",     roles: ["cliente"],      element: <ClientProjectDetailRoute apis={apis} /> },
-    { path: "#/cliente/budgets",       roles: ["cliente"],      element: <ClientEstimates api={apis.sales} /> },
+    { path: "#/cliente/budgets",       roles: ["cliente"],      element: <ClientEstimates api={apis.sales} projectsApi={apis.projects} /> },
 
     // Profesional
     { path: "#/profesional",           roles: ["profesional"],  element: <ProfesionalDashboardRoute apis={apis} /> },
@@ -211,7 +211,7 @@ function AdminProjectDetailRoute({ apis }: { apis: AllApis }) {
 }
 
 function ClientDashboardRoute({ apis }: { apis: AllApis }) {
-  return <ClientEstimates api={apis.sales} />;
+  return <ClientEstimates api={apis.sales} projectsApi={apis.projects} />;
 }
 
 function ClientProjectDetailRoute({ apis }: { apis: AllApis }) {

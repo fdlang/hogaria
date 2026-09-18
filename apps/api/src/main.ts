@@ -84,7 +84,7 @@ function getRuntime(): Promise<Runtime> {
     });
     const sales = salesController({ opportunities: app.useCases.opportunities, estimates: app.useCases.estimates, changes: app.useCases.changes });
 
-    return { authMiddleware: requireAuth(app.tokens), routes: [
+    return { authMiddleware: requireAuth(app.tokens, app.users), routes: [
   // Auth (public)
   route("POST", "/auth/login",  async req => auth.login(req)),
   route("GET",  "/auth/me",     async req => auth.me(req)),
@@ -110,6 +110,7 @@ function getRuntime(): Promise<Runtime> {
   route("PATCH", "/estimates/:id",       req => sales.updateEstimate(req as never),    { protected: true }),
   route("POST",  "/estimates/:id/send",  req => sales.sendEstimate(req as never),      { protected: true }),
   route("POST",  "/estimates/:id/sign",  req => sales.signEstimate(req as never),      { protected: true }),
+  route("POST",  "/estimates/:id/reject",req => sales.rejectEstimate(req as never),    { protected: true }),
   route("POST",  "/estimates/:id/revise",req => sales.reviseEstimate(req as never),    { protected: true }),
   route("POST",  "/estimates/:id/accept",req => sales.acceptEstimate(req as never),    { protected: true }),
   route("GET",   "/estimates/:id/versions", req => sales.versions(req as never),       { protected: true }),

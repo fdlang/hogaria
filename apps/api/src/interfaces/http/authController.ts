@@ -58,12 +58,14 @@ export function authController(deps: {
 }
 
 // Generic auth middleware — extracts actorId for controllers downstream
-export function requireAuth(tokens: import("../../application/use-cases/auth.use-cases.js").ITokenService) {
+export function requireAuth(tokens: import("../../application/use-cases/auth.use-cases.js").ITokenService, users: IUserRepository) {
   return async (req: HttpRequest): Promise<{ actorId: number } | { status: 401; body: unknown }> => {
     try {
       const bearer  = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
       const payload = await tokens.verify(bearer);
       if (!payload) return { status: 401, body: { code: "UNAUTHORIZED", message: "Token inválido o expirado" } };
+      const user = await users.findById(payload.userId);
+      if (!user || !user.activo) return { status: 401, body: { code: "UNAUTHORIZED", message: "Sesión no disponible" } };
       return { actorId: payload.userId };
     } catch { return { status: 401, body: { code: "UNAUTHORIZED", message: "Token inválido" } }; }
   };
