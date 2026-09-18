@@ -18,6 +18,9 @@
 .sales-card input, .sales-card select, .sales-card textarea { width: 100%; min-height: 42px; padding: 9px 10px; color: var(--ink); font: inherit; border: 1px solid var(--line); border-radius: 6px; background: #fffdf9; }
 .sales-card textarea { min-height: 92px; resize: vertical; }
 .sales-card--wide { max-width: 980px; }
+.sales-card:has(+ .catalog-manager__registered), .catalog-manager__registered { max-width: 100%; }
+.sales-card:has(+ .catalog-manager__registered) .estimate-line__main { grid-template-columns: minmax(160px, .8fr) minmax(170px, 1fr) minmax(260px, 2fr) minmax(90px, .5fr) minmax(140px, .7fr) minmax(100px, .45fr); }
+.sales-card:has(+ .catalog-manager__registered) .estimate-line__main label:first-child { grid-column: auto; }
 .catalog-manager__registered { display: grid; gap: 22px; }
 .catalog-manager__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .catalog-manager__heading h2 { margin: 0; }
@@ -32,6 +35,18 @@
 .catalog-manager__group > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 16px; border-bottom: 1px solid var(--line); background: rgba(245,241,236,.72); }
 .catalog-manager__group .eyebrow { margin: 0 0 5px; font-size: 10px; }
 .catalog-manager__group h3 { margin: 0; font-size: 18px; letter-spacing: -.035em; }
+.catalog-manager__table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+.catalog-manager__table th, .catalog-manager__table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.catalog-manager__table th { color: var(--graphite); font-size: 12px; }
+.catalog-manager__table tbody tr:last-child td { border-bottom: 0; }
+.catalog-manager__table th:nth-child(1), .catalog-manager__table td:nth-child(1) { width: 11%; white-space: nowrap; }
+.catalog-manager__table th:nth-child(2), .catalog-manager__table td:nth-child(2) { width: 44%; }
+.catalog-manager__table th:nth-child(3), .catalog-manager__table td:nth-child(3) { width: 12%; white-space: nowrap; }
+.catalog-manager__table th:nth-child(4), .catalog-manager__table td:nth-child(4) { width: 10%; white-space: nowrap; }
+.catalog-manager__table th:nth-child(5), .catalog-manager__table td:nth-child(5) { width: 23%; }
+.catalog-manager__table td:nth-child(2) strong { display: inline-block; line-height: 1.35; }
+.catalog-manager__table td:nth-child(2) small { color: var(--muted); }
+.catalog-manager__table td:last-child > div { flex-wrap: wrap; }
 .catalog-manager__empty { margin: 0; padding: 28px; border: 1px dashed rgba(84,80,72,.3); border-radius: 7px; color: var(--muted); text-align: center; }
 .sales-page-header { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 24px; }.sales-page-header h1 { margin: 0; }.sales-page-header p { color: var(--muted); }.sales-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 24px; }.sales-step { padding: 11px 8px; color: #51493f; font-weight: 700; border: 1px solid var(--line); border-radius: 6px; background: #fffaf4; cursor: pointer; }.sales-step:disabled { cursor: default; }.sales-step--active { color: white; border-color: var(--copper); background: var(--copper); }.sales-error { color: #a43c32; }.sales-next-action { margin-top: 20px; }
 .estimate-list { max-width: 980px; }.estimate-list > header { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-top: 34px; }.estimate-list > header h2 { margin: 0; }.estimate-list > header > p { margin: 0; color: var(--muted); font-size: 13px; }.estimate-list article { padding: 16px 0; }.estimate-list__summary { display: grid; gap: 3px; min-width: 0; }.estimate-list__summary > strong { color: var(--copper-dark); font-size: 13px; }.estimate-list__summary > span { color: var(--ink); font-weight: 700; }.estimate-list__summary > small { color: var(--muted); }.estimate-list__summary > b { margin-top: 3px; color: var(--ink); }.estimate-list__actions { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 0 auto; }.estimate-list__empty { padding: 20px 0; color: var(--muted); }
@@ -42,6 +57,7 @@
 .client-row { padding: 18px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .client-modal-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 20px; }
 @media (max-width: 720px) { .sales-card { padding: 16px; }.catalog-manager__heading, .catalog-manager__group > header { align-items: flex-start; flex-direction: column; gap: 10px; }.catalog-manager__filters { grid-template-columns: 1fr; align-items: stretch; }.catalog-manager__filters .ui-button { width: 100%; }.catalog-manager__archived { min-height: 36px; }.estimate-lines__heading { align-items: flex-start; flex-direction: column; gap: 10px; }.estimate-line__main { grid-template-columns: repeat(2, minmax(0, 1fr)); }.estimate-line__main label:first-child { grid-column: 1 / -1; }.estimate-line__internal > div { grid-template-columns: 1fr; }.estimate-line > footer { align-items: flex-start; flex-direction: column; }.estimate-list article { align-items: flex-start; flex-direction: column; }.estimate-list article > div { width: 100%; }.estimate-list .ui-button { width: 100%; } }
+@media (max-width: 720px) { .sales-card:has(+ .catalog-manager__registered) .estimate-line__main { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .estimate-catalog > header { align-items: flex-start; flex-direction: column; gap: 4px; }.estimate-catalog > header span { text-align: left; }.catalog-item { align-items: flex-start !important; flex-direction: column; }.catalog-item__actions { width: 100%; justify-content: space-between; } }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -218,6 +234,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .private-brand-symbol { width: 42px; height: 42px; object-fit: contain; }
 .private-brand-wordmark { width: 160px; height: 39px; object-fit: contain; }
 .private-nav { min-width: 0; margin-left: auto; justify-self: auto; }
+.private-mobile-menu-toggle, .private-mobile-menu-backdrop { display: none; }
 .admin-home { max-width: 1040px; }
 .admin-home-group { margin-bottom: 30px; }
 .admin-home-group > header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
@@ -304,13 +321,24 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 
   .private-main { padding: 16px !important; }
   .private-topbar { min-height: auto !important; padding: 10px 16px !important; }
+  .private-topbar { align-items: center !important; flex-wrap: nowrap !important; }
   .private-brand-symbol { width: 36px; height: 36px; }
   .private-brand-wordmark { width: 136px; height: 33px; }
-  .private-nav { margin-inline: 0; width: 100%; padding-inline: 0; }
-  .private-nav > span { display: none; }
-  .private-nav { flex-wrap: wrap !important; overflow: visible !important; gap: 4px 6px !important; }
-  .private-nav > a, .private-nav > button { flex: 0 0 auto; }
-  .private-nav-link { min-height: 38px; padding: 8px 7px !important; font-size: 11px !important; letter-spacing: .035em !important; }
+  .private-nav { display: none !important; }
+  .private-mobile-menu-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; margin-left: auto; padding: 8px 11px; color: var(--graphite); border: 1px solid rgba(84,80,72,.28); border-radius: 6px; background: rgba(255,253,250,.72); font: 700 12px "DM Sans", sans-serif; }
+  .private-mobile-menu-toggle > span:first-child { font-size: 17px; line-height: 1; }
+  .private-mobile-menu-backdrop { position: fixed; z-index: 60; inset: 0; display: flex; justify-content: flex-end; background: rgba(48,45,41,.32); }
+  .private-mobile-menu-panel { display: flex; flex-direction: column; width: min(350px, calc(100vw - 28px)); min-height: 100svh; padding: 22px 18px 18px; overflow-y: auto; background: var(--marble-light); box-shadow: -14px 0 36px rgba(48,45,41,.18); }
+  .private-mobile-menu-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .private-mobile-menu-panel > header .eyebrow { margin: 0 0 6px; font-size: 10px; }
+  .private-mobile-menu-panel > header strong { color: var(--ink); font-size: 18px; }
+  .private-mobile-menu-close { display: grid; width: 38px; height: 38px; place-items: center; padding: 0; color: var(--graphite); border: 1px solid var(--line); border-radius: 50%; background: transparent; font-size: 25px; line-height: 1; }
+  .private-mobile-menu-panel nav { display: grid; gap: 20px; padding: 22px 0; }
+  .private-mobile-menu-panel nav section { display: grid; gap: 3px; }
+  .private-mobile-menu-panel nav section > p { margin: 0 0 5px; color: var(--copper-dark); font: 500 10px "DM Mono", monospace; letter-spacing: .14em; text-transform: uppercase; }
+  .private-mobile-menu-panel nav a { min-height: 42px; padding: 11px 10px; color: var(--ink); border-radius: 5px; font-size: 15px; font-weight: 700; text-decoration: none; }
+  .private-mobile-menu-panel nav a:hover, .private-mobile-menu-panel nav a:focus-visible { color: var(--copper-dark); background: rgba(193,113,72,.1); }
+  .private-mobile-menu-panel > .ui-button { width: 100%; margin-top: auto; min-height: 44px; }
   .private-nav > a, .private-nav > button, .ui-button { min-height: 44px; }
   .admin-home-grid { grid-template-columns: 1fr; }
   .admin-home-grid > a { min-height: 0; }
@@ -339,6 +367,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .catalog-manager__table { display: block; min-width: 0 !important; width: 100%; }
   .catalog-manager__table thead { display: none; }
   .catalog-manager__table tbody, .catalog-manager__table tr, .catalog-manager__table td { display: block; width: 100%; }
+  .catalog-manager__table td:nth-child(n) { width: 100%; white-space: normal; }
   .catalog-manager__table tr { padding: 15px 16px; border-bottom: 1px solid var(--line); }
   .catalog-manager__table tr:last-child { border-bottom: 0; }
   .catalog-manager__table td { padding: 0; border: 0; }

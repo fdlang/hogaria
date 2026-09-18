@@ -31,7 +31,7 @@ import { ActivateAccountPage } from "@/features/auth/components/ActivateAccountP
 import { PublicLanding } from "@/features/solicitudes/components/PublicLanding";
 import { PrivacyPolicyPage } from "@/features/legal/components/PrivacyPolicyPage";
 
-import { Fragment, type ReactNode }    from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { useAuth }                     from "@/features/auth/hooks/useAuth";
 import { Router, Route, useNavigation } from "./Router";
 import { Button, EmptyState }          from "@/shared/ui";
@@ -97,6 +97,7 @@ export function App({ apis }: { apis: AllApis }) {
 type NavigationLink = { to: string; label: string; group?: "start" | "operation" | "resources" | "control" };
 
 function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "cliente" | "profesional" } | null; onSignOut: () => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const links: NavigationLink[] =
     user?.rol === "admin" ? [
       { to: "#/admin",               label: "Inicio", group: "start" },
@@ -116,6 +117,27 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
       { to: "#/profesional", label: "Inicio" },
     ] : [];
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
+  const groups = user?.rol === "admin"
+    ? [
+      { label: "Principal", links: links.filter((link) => link.group === "start") },
+      { label: "Operativa", links: links.filter((link) => link.group === "operation") },
+      { label: "Recursos", links: links.filter((link) => link.group === "resources") },
+      { label: "Control", links: links.filter((link) => link.group === "control") },
+    ]
+    : [{ label: "Navegación", links }];
+
   return (
     <header className="private-topbar" style={{ display: "flex", justifyContent: "space-between", minHeight: 70, padding: "14px 32px", borderBottom: "1px solid var(--line)", background: "rgba(247,239,229,.92)", alignItems: "center", position: "sticky", top: 0, zIndex: 20, backdropFilter: "blur(12px)" }}>
       <a className="private-brand" href={user ? `#/${user.rol}` : "#/"} style={{ color: "var(--graphite)", fontWeight: 700, fontSize: 22, textDecoration: "none" }}>
@@ -124,6 +146,10 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
       </a>
 
       {user ? (
+        <>
+        <button className="private-mobile-menu-toggle" type="button" aria-expanded={menuOpen} aria-controls="private-mobile-navigation" onClick={() => setMenuOpen(true)}>
+          <span aria-hidden="true">☰</span><span>Menú</span>
+        </button>
         <nav className="private-nav" aria-label="Navegación privada" style={{ display: "flex", alignItems: "center", gap: 18 }}>
           {links.map((link, index) => {
             const previous = links[index - 1];
@@ -140,6 +166,14 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
           <span style={{ fontSize: 12, color: "#71685e" }}>{user.nombre}</span>
           <Button small variant="ghost" onClick={onSignOut}>Salir</Button>
         </nav>
+        {menuOpen && <div className="private-mobile-menu-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setMenuOpen(false); }}>
+          <aside id="private-mobile-navigation" className="private-mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Menú privado">
+            <header><div><p className="eyebrow">Área privada</p><strong>{user.nombre}</strong></div><button type="button" className="private-mobile-menu-close" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú">×</button></header>
+            <nav aria-label="Secciones privadas">{groups.map((group) => group.links.length > 0 && <section key={group.label}><p>{group.label}</p>{group.links.map((link) => <a key={link.to} href={link.to} onClick={() => setMenuOpen(false)}>{link.label}</a>)}</section>)}</nav>
+            <Button variant="ghost" onClick={() => { setMenuOpen(false); onSignOut(); }}>Salir del área privada</Button>
+          </aside>
+        </div>}
+        </>
       ) : (
         <a href="#/login" style={{ color: "#c17248", fontSize: 13, textDecoration: "none" }}>Iniciar sesión →</a>
       )}
