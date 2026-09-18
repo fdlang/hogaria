@@ -1,60 +1,243 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/shared/ui";
-import { formatMoney } from "@/shared/lib/formatters";
+import { Button, Modal } from "@/shared/ui";
+import { formatDate, formatMoney } from "@/shared/lib/formatters";
 import { CatalogPicker } from "@/features/catalog/CatalogPicker";
 import { CATALOG, type CatalogCategory, type CatalogItem, CATALOG_UPDATED_AT, setRuntimeCatalog } from "@/features/catalog/catalog";
 import type { UsersApi } from "@/features/users/api/users.api";
 import { SalesApi, type EstimateDraftDTO, type EstimateDTO, type OpportunityDTO } from "../api/sales.api";
 
-const newLine = () => ({ id: crypto.randomUUID(), categoria: "General", descripcion: "", cantidad: 1, unidad: "ud", precioVentaUnitario: 0, costeUnitario: null, descuento: 0, iva: 21 });
-const blankDraft = (): EstimateDraftDTO => ({ titulo: "", validezDias: 30, condicionesPago: "50 % a la aceptación del presupuesto, destinado a la planificación e inicio de los trabajos, y 50 % a la finalización de la obra, una vez comprobada la correcta ejecución.", garantia: "", notasCliente: "", notasInternas: "", partidas: [] });
 const steps = ["Oportunidad", "Alcance", "Partidas", "Revisión"];
 
+const newLine = () => ({
+  id: crypto.randomUUID(), categoria: "General", descripcion: "", cantidad: 1,
+  unidad: "ud", precioVentaUnitario: 0, costeUnitario: null, descuento: 0, iva: 21,
+});
+
+const blankDraft = (): EstimateDraftDTO => ({
+  titulo: "",
+  validezDias: 30,
+  condicionesPago: "50 % a la aceptación del presupuesto, destinado a la planificación e inicio de los trabajos, y 50 % a la finalización de la obra, una vez comprobada la correcta ejecución.",
+  garantia: "",
+  notasCliente: "",
+  notasInternas: "",
+  partidas: [],
+});
+
+const statusLabel = (status: string) => ({
+  borrador: "Borrador",
+  en_revision: "En revisión",
+  enviado: "Enviado",
+  firmado: "Firmado",
+  aceptado: "Convertido en proyecto",
+  rechazado: "Cambios solicitados",
+  caducado: "Caducado",
+}[status] ?? status);
+
 export function SalesPipeline({ api, users }: { api: SalesApi; users: UsersApi }) {
-  const [opportunities, setOpportunities] = useState<OpportunityDTO[]>([]); const [estimates, setEstimates] = useState<EstimateDTO[]>([]); const [clients, setClients] = useState<Array<{ id: number; nombre: string }>>([]);
+  const [opportunities, setOpportunities] = useState<OpportunityDTO[]>([]);
+  const [estimates, setEstimates] = useState<EstimateDTO[]>([]);
+  const [clients, setClients] = useState<Array<{ id: number; nombre: string }>>([]);
   const [catalog, setCatalog] = useState<CatalogCategory[]>(CATALOG);
-  const [step, setStep] = useState(0); const [saving, setSaving] = useState(false); const [converting, setConverting] = useState<number | null>(null); const [sending, setSending] = useState<number | null>(null); const [showCatalog, setShowCatalog] = useState(false); const [error, setError] = useState("");
-  const [opportunity, setOpportunity] = useState({ clienteId: "", nombre: "", direccion: "", tipo: "Reforma integral", descripcion: "" }); const [selected, setSelected] = useState<number | null>(null); const [draft, setDraft] = useState(blankDraft);
-  const refresh = () => Promise.all([api.opportunities(), api.estimates(), users.list("cliente")]).then(([o, e, c]) => { setOpportunities(o); setEstimates(e); setClients(c.map(x => ({ id: x.id, nombre: x.nombre }))); });
+  const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [converting, setConverting] = useState<number | null>(null);
+  const [sending, setSending] = useState<number | null>(null);
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [error, setError] = useState("");
+  const [preview, setPreview] = useState<EstimateDTO | null>(null);
+  const [opportunity, setOpportunity] = useState({ clienteId: "", nombre: "", direccion: "", tipo: "Reforma integral", descripcion: "" });
+  const [selected, setSelected] = useState<number | null>(null);
+  const [draft, setDraft] = useState(blankDraft);
+
+  const refresh = () => Promise.all([api.opportunities(), api.estimates(), users.list("cliente")])
+    .then(([opportunityItems, estimateItems, clientItems]) => {
+      setOpportunities(opportunityItems);
+      setEstimates(estimateItems);
+      setClients(clientItems.map(client => ({ id: client.id, nombre: client.nombre })));
+    });
+
   useEffect(() => { void refresh(); }, []);
+
   useEffect(() => {
     void api.catalog().then(items => {
       if (!items.length) return;
       const grouped = new Map<string, CatalogItem[]>();
-      items.forEach(item => grouped.set(item.category, [...(grouped.get(item.category) ?? []), { ref: item.reference, descripcion: item.description, unidad: item.unit, precio: item.salePrice, iva: item.vatRate }]));
-      const loadedCatalog = [...grouped.entries()].map(([categoria, items]) => ({ categoria, items }));
-      setRuntimeCatalog(loadedCatalog);
-      setCatalog(loadedCatalog);
+      items.forEach(item => grouped.set(item.category, [
+        ...(grouped.get(item.category) ?? []),
+        { ref: item.reference, descripcion: item.description, unidad: item.unit, precio: item.salePrice, iva: item.vatRate },
+      ]));
+      const managedCatalog = [...grouped.entries()].map(([categoria, categoryItems]) => ({ categoria, items: categoryItems }));
+      setRuntimeCatalog(managedCatalog);
+      setCatalog(managedCatalog);
     }).catch(() => {
-      // Keep the bundled list for local development without PostgreSQL.
+      // The bundled catalogue is an intentional fallback for local development.
     });
   }, [api]);
-  const active = useMemo(() => opportunities.find(o => o.id === selected) ?? null, [opportunities, selected]);
+
+  const active = useMemo(() => opportunities.find(item => item.id === selected) ?? null, [opportunities, selected]);
   const opportunityComplete = Boolean(opportunity.clienteId && opportunity.nombre.trim() && opportunity.direccion.trim() && opportunity.tipo.trim());
   const scopeComplete = Boolean(active && draft.titulo.trim() && Number.isInteger(draft.validezDias) && draft.validezDias >= 1 && draft.validezDias <= 365 && draft.condicionesPago.trim());
-  const linesComplete = draft.partidas.length > 0 && draft.partidas.every(line => line.descripcion.trim() && Number.isFinite(line.cantidad) && line.cantidad > 0 && Number.isFinite(line.precioVentaUnitario) && line.precioVentaUnitario >= 0 && Number.isFinite(line.iva) && line.iva >= 0);
+  const linesComplete = draft.partidas.length > 0 && draft.partidas.every(line => (
+    line.descripcion.trim() && Number.isFinite(line.cantidad) && line.cantidad > 0
+    && Number.isFinite(line.precioVentaUnitario) && line.precioVentaUnitario >= 0
+    && Number.isFinite(line.iva) && line.iva >= 0
+  ));
   const totals = useMemo(() => draft.partidas.reduce((result, line) => {
     const sale = line.cantidad * line.precioVentaUnitario * (1 - line.descuento / 100);
     const cost = line.costeUnitario == null ? null : line.cantidad * line.costeUnitario;
     return { sale: result.sale + sale, cost: cost == null || result.cost == null ? null : result.cost + cost };
   }, { sale: 0, cost: 0 as number | null }), [draft.partidas]);
-  const submitOpportunity = async () => { if (!opportunityComplete) return; setError(""); try { setSaving(true); const saved = await api.createOpportunity({ clienteId: Number(opportunity.clienteId), nombre: opportunity.nombre.trim(), email: null, telefono: null, direccion: opportunity.direccion.trim(), tipo: opportunity.tipo.trim(), descripcion: opportunity.descripcion.trim(), estado: "nueva", fechaVisita: null, notasInternas: "" }); setSelected(saved.id); setStep(1); await refresh(); } catch (e) { setError((e as { message?: string }).message ?? "No se pudo guardar la oportunidad"); } finally { setSaving(false); } };
-  const submitEstimate = async () => { if (!selected || !scopeComplete || !linesComplete) return; setError(""); try { setSaving(true); await api.createEstimate(selected, draft); setStep(0); setSelected(null); setDraft(blankDraft()); await refresh(); } catch (e) { setError((e as { message?: string }).message ?? "No se pudo crear la propuesta"); } finally { setSaving(false); } };
-  const convert = async (estimate: EstimateDTO) => { try { setConverting(estimate.id); const project = await api.convertToProject(estimate.id); await refresh(); window.location.hash = `#/admin/projects/${project.id}`; } catch (e) { setError((e as { message?: string }).message ?? "No se pudo crear el proyecto"); } finally { setConverting(null); } };
-  const send = async (estimate: EstimateDTO) => { try { setSending(estimate.id); setError(""); await api.sendEstimate(estimate.id); await refresh(); } catch (e) { setError((e as { message?: string }).message ?? "No se pudo enviar la propuesta"); } finally { setSending(null); } };
-  const updateLine = (index: number, changes: Partial<EstimateDraftDTO["partidas"][number]>) => setDraft({ ...draft, partidas: draft.partidas.map((line, i) => i === index ? { ...line, ...changes } : line) });
+
+  const submitOpportunity = async () => {
+    if (!opportunityComplete) return;
+    setError("");
+    try {
+      setSaving(true);
+      const saved = await api.createOpportunity({
+        clienteId: Number(opportunity.clienteId), nombre: opportunity.nombre.trim(), email: null, telefono: null,
+        direccion: opportunity.direccion.trim(), tipo: opportunity.tipo.trim(), descripcion: opportunity.descripcion.trim(),
+        estado: "nueva", fechaVisita: null, notasInternas: "",
+      });
+      setSelected(saved.id);
+      setStep(1);
+      await refresh();
+    } catch (cause) {
+      setError((cause as { message?: string }).message ?? "No se pudo guardar la oportunidad");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitEstimate = async () => {
+    if (!selected || !scopeComplete || !linesComplete) return;
+    setError("");
+    try {
+      setSaving(true);
+      await api.createEstimate(selected, draft);
+      setStep(0);
+      setSelected(null);
+      setDraft(blankDraft());
+      await refresh();
+    } catch (cause) {
+      setError((cause as { message?: string }).message ?? "No se pudo crear la propuesta");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const send = async (estimate: EstimateDTO) => {
+    try {
+      setSending(estimate.id);
+      setError("");
+      await api.sendEstimate(estimate.id);
+      await refresh();
+    } catch (cause) {
+      setError((cause as { message?: string }).message ?? "No se pudo enviar la propuesta");
+    } finally {
+      setSending(null);
+    }
+  };
+
+  const convert = async (estimate: EstimateDTO) => {
+    try {
+      setConverting(estimate.id);
+      const project = await api.convertToProject(estimate.id);
+      await refresh();
+      window.location.hash = `#/admin/projects/${project.id}`;
+    } catch (cause) {
+      setError((cause as { message?: string }).message ?? "No se pudo crear el proyecto");
+    } finally {
+      setConverting(null);
+    }
+  };
+
+  const updateLine = (index: number, changes: Partial<EstimateDraftDTO["partidas"][number]>) => {
+    setDraft(current => ({ ...current, partidas: current.partidas.map((line, itemIndex) => itemIndex === index ? { ...line, ...changes } : line) }));
+  };
   const removeLine = (index: number) => setDraft(current => ({ ...current, partidas: current.partidas.filter((_, itemIndex) => itemIndex !== index) }));
-  const addCatalogItem = (ref: string) => { const selectedItem = catalog.flatMap(category => category.items.map(item => ({ item, category: category.categoria }))).find(entry => entry.item.ref === ref); if (!selectedItem) return; setDraft(current => ({ ...current, partidas: [...current.partidas, lineFromCatalog(selectedItem.item, selectedItem.category)] })); };
-  const importCatalogCategory = (category: string, items: CatalogItem[]) => setDraft(current => ({ ...current, partidas: [...current.partidas, ...items.map(item => lineFromCatalog(item, category))] }));
-  return <section><header style={{ display: "flex", justifyContent: "space-between", alignItems: "end", gap: 16, marginBottom: 24 }}><div><p className="eyebrow">Ventas y propuestas</p><h1 style={{ margin: 0 }}>De oportunidad a obra</h1><p style={{ color: "#71685e" }}>Una propuesta se crea antes del proyecto y conserva cada versión enviada.</p></div><Button small variant="ghost" onClick={() => void refresh()}>Actualizar</Button></header>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 24 }}>{steps.map((label, index) => <button key={label} onClick={() => index <= step && setStep(index)} style={{ padding: "11px 8px", border: "1px solid var(--line)", background: index === step ? "#c17248" : "#fffaf4", color: index === step ? "white" : "#51493f", borderRadius: 6, fontWeight: 700, cursor: index <= step ? "pointer" : "default" }}>{index + 1}. {label}</button>)}</div>
-    {error && <p role="alert" style={{ color: "#a43c32" }}>{error}</p>}
-    {step === 0 && <div className="sales-card"><h2>Nueva oportunidad</h2><p>Los campos con * son obligatorios.</p><label>Cliente existente *<select required value={opportunity.clienteId} onChange={e => setOpportunity({ ...opportunity, clienteId: e.target.value })}><option value="">Selecciona un cliente</option>{clients.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label><label>Nombre de la oportunidad *<input required value={opportunity.nombre} onChange={e => setOpportunity({ ...opportunity, nombre: e.target.value })} placeholder="Reforma vivienda García" /></label><label>Dirección *<input required value={opportunity.direccion} onChange={e => setOpportunity({ ...opportunity, direccion: e.target.value })} /></label><label>Tipo *<input required value={opportunity.tipo} onChange={e => setOpportunity({ ...opportunity, tipo: e.target.value })} /></label><label>Necesidad del cliente<textarea value={opportunity.descripcion} onChange={e => setOpportunity({ ...opportunity, descripcion: e.target.value })} /></label><Button disabled={!opportunityComplete} onClick={() => void submitOpportunity()} loading={saving}>Continuar</Button></div>}
-    {step === 1 && <div className="sales-card"><h2>Alcance de la propuesta</h2><p>{active ? `${active.nombre} · ${active.direccion}` : "Selecciona una oportunidad"}</p><label>Título visible al cliente *<input required value={draft.titulo} onChange={e => setDraft({ ...draft, titulo: e.target.value })} placeholder="Reforma integral de vivienda" /></label><label>Validez (días) *<input required min="1" max="365" type="number" value={draft.validezDias} onChange={e => setDraft({ ...draft, validezDias: Number(e.target.value) })} /></label><label>Condiciones de pago *<textarea required value={draft.condicionesPago} onChange={e => setDraft({ ...draft, condicionesPago: e.target.value })} /></label><Button disabled={!scopeComplete} onClick={() => setStep(2)}>Continuar</Button></div>}
-    {step === 2 && <div className="sales-card sales-card--wide"><header className="estimate-lines__heading"><div><h2>Partidas y control interno</h2><p>Selecciona una partida base o crea una manual. Todo se puede ajustar para esta propuesta.</p></div><strong>{draft.partidas.length} {draft.partidas.length === 1 ? "partida" : "partidas"}</strong></header><div className="estimate-lines__actions"><Button small variant="ghost" onClick={() => setDraft(current => ({ ...current, partidas: [...current.partidas, newLine()] }))}>+ Partida manual</Button><Button small variant="ghost" onClick={() => setShowCatalog(value => !value)}>{showCatalog ? "Ocultar catálogo" : "Añadir desde catálogo"}</Button></div>{showCatalog && <section className="estimate-catalog"><header><strong>Catálogo base Madrid</strong><span>Precios de venta orientativos sin IVA · revisión {new Date(CATALOG_UPDATED_AT).toLocaleDateString("es-ES")}</span></header><CatalogPicker onPickItem={addCatalogItem} onImportCategory={importCatalogCategory} /></section>}{draft.partidas.length === 0 ? <p className="estimate-lines__empty">Empieza con una partida del catálogo o crea una manual.</p> : <div className="estimate-lines">{draft.partidas.map((line, index) => <EstimateLineEditor key={line.id} index={index} line={line} canRemove={draft.partidas.length > 1} onChange={changes => updateLine(index, changes)} onRemove={() => removeLine(index)} />)}</div>}<div className="estimate-lines__totals"><span>Venta estimada <strong>{formatMoney(totals.sale)}</strong></span><span>Coste interno <strong>{totals.cost == null ? "Pendiente" : formatMoney(totals.cost)}</strong></span><span>Margen estimado <strong>{totals.cost == null ? "Pendiente" : formatMoney(totals.sale - totals.cost)}</strong></span></div><div style={{ marginTop: 20 }}><Button disabled={!linesComplete} onClick={() => setStep(3)}>Revisar propuesta</Button></div></div>}
-    {step === 3 && <div className="sales-card"><h2>Revisión antes de guardar</h2><p><strong>{draft.titulo}</strong> · {draft.partidas.length} partidas · cliente: {active?.nombre}</p><p>Las notas y costes internos no forman parte de la versión que verá el cliente.</p><Button disabled={!scopeComplete || !linesComplete} onClick={() => void submitEstimate()} loading={saving}>Guardar como borrador</Button></div>}
-    <div className="estimate-list"><h2>Propuestas recientes</h2>{estimates.length ? estimates.map(e => <article key={e.id}><span><strong>{e.numero}</strong> · {e.titulo} · v{e.versionActual} · {e.estado}</span><div>{(e.estado === "borrador" || e.estado === "en_revision") && <Button small loading={sending === e.id} onClick={() => void send(e)}>Enviar al cliente</Button>}{e.estado === "firmado" && <Button small loading={converting === e.id} onClick={() => void convert(e)}>Crear proyecto</Button>}</div></article>) : <p>Aún no hay propuestas.</p>}</div>
-  </section>;
+  const addCatalogItem = (ref: string) => {
+    const entry = catalog.flatMap(category => category.items.map(item => ({ item, category: category.categoria }))).find(candidate => candidate.item.ref === ref);
+    if (!entry) return;
+    setDraft(current => ({ ...current, partidas: [...current.partidas, lineFromCatalog(entry.item, entry.category)] }));
+  };
+  const importCatalogCategory = (category: string, items: CatalogItem[]) => {
+    setDraft(current => ({ ...current, partidas: [...current.partidas, ...items.map(item => lineFromCatalog(item, category))] }));
+  };
+
+  return (
+    <section>
+      <header className="sales-page-header">
+        <div>
+          <p className="eyebrow">Ventas y propuestas</p>
+          <h1>De oportunidad a obra</h1>
+          <p>Una propuesta se crea antes del proyecto y conserva cada versión enviada.</p>
+        </div>
+        <Button small variant="ghost" onClick={() => void refresh()}>Actualizar</Button>
+      </header>
+
+      <div className="sales-steps">
+        {steps.map((label, index) => (
+          <button key={label} type="button" disabled={index > step} onClick={() => setStep(index)} className={index === step ? "sales-step sales-step--active" : "sales-step"}>
+            {index + 1}. {label}
+          </button>
+        ))}
+      </div>
+      {error && <p role="alert" className="sales-error">{error}</p>}
+
+      {step === 0 && (
+        <div className="sales-card">
+          <h2>Nueva oportunidad</h2>
+          <p>Los campos con * son obligatorios.</p>
+          <label>Cliente existente *<select required value={opportunity.clienteId} onChange={event => setOpportunity(current => ({ ...current, clienteId: event.target.value }))}><option value="">Selecciona un cliente</option>{clients.map(client => <option key={client.id} value={client.id}>{client.nombre}</option>)}</select></label>
+          <label>Nombre de la oportunidad *<input required value={opportunity.nombre} onChange={event => setOpportunity(current => ({ ...current, nombre: event.target.value }))} placeholder="Reforma vivienda García" /></label>
+          <label>Dirección *<input required value={opportunity.direccion} onChange={event => setOpportunity(current => ({ ...current, direccion: event.target.value }))} /></label>
+          <label>Tipo *<input required value={opportunity.tipo} onChange={event => setOpportunity(current => ({ ...current, tipo: event.target.value }))} /></label>
+          <label>Necesidad del cliente<textarea value={opportunity.descripcion} onChange={event => setOpportunity(current => ({ ...current, descripcion: event.target.value }))} /></label>
+          <Button disabled={!opportunityComplete} onClick={() => void submitOpportunity()} loading={saving}>Continuar</Button>
+        </div>
+      )}
+
+      {step === 1 && (
+        <div className="sales-card">
+          <h2>Alcance de la propuesta</h2>
+          <p>{active ? `${active.nombre} · ${active.direccion}` : "Selecciona una oportunidad"}</p>
+          <label>Título visible al cliente *<input required value={draft.titulo} onChange={event => setDraft(current => ({ ...current, titulo: event.target.value }))} placeholder="Reforma integral de vivienda" /></label>
+          <label>Validez (días) *<input required min="1" max="365" type="number" value={draft.validezDias} onChange={event => setDraft(current => ({ ...current, validezDias: Number(event.target.value) }))} /></label>
+          <label>Condiciones de pago *<textarea required value={draft.condicionesPago} onChange={event => setDraft(current => ({ ...current, condicionesPago: event.target.value }))} /></label>
+          <Button disabled={!scopeComplete} onClick={() => setStep(2)}>Continuar</Button>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="sales-card sales-card--wide">
+          <header className="estimate-lines__heading"><div><h2>Partidas y control interno</h2><p>Selecciona una partida base o crea una manual. Todo se puede ajustar para esta propuesta.</p></div><strong>{draft.partidas.length} {draft.partidas.length === 1 ? "partida" : "partidas"}</strong></header>
+          <div className="estimate-lines__actions"><Button small variant="ghost" onClick={() => setDraft(current => ({ ...current, partidas: [...current.partidas, newLine()] }))}>+ Partida manual</Button><Button small variant="ghost" onClick={() => setShowCatalog(current => !current)}>{showCatalog ? "Ocultar catálogo" : "Añadir desde catálogo"}</Button></div>
+          {showCatalog && <section className="estimate-catalog"><header><strong>Catálogo base Madrid</strong><span>Precios de venta orientativos sin IVA · revisión {new Date(CATALOG_UPDATED_AT).toLocaleDateString("es-ES")}</span></header><CatalogPicker onPickItem={addCatalogItem} onImportCategory={importCatalogCategory} /></section>}
+          {draft.partidas.length === 0 ? <p className="estimate-lines__empty">Empieza con una partida del catálogo o crea una manual.</p> : <div className="estimate-lines">{draft.partidas.map((line, index) => <EstimateLineEditor key={line.id} index={index} line={line} canRemove={draft.partidas.length > 1} onChange={changes => updateLine(index, changes)} onRemove={() => removeLine(index)} />)}</div>}
+          <div className="estimate-lines__totals"><span>Venta estimada <strong>{formatMoney(totals.sale)}</strong></span><span>Coste interno <strong>{totals.cost == null ? "Pendiente" : formatMoney(totals.cost)}</strong></span><span>Margen estimado <strong>{totals.cost == null ? "Pendiente" : formatMoney(totals.sale - totals.cost)}</strong></span></div>
+          <div className="sales-next-action"><Button disabled={!linesComplete} onClick={() => setStep(3)}>Revisar propuesta</Button></div>
+        </div>
+      )}
+
+      {step === 3 && <div className="sales-card"><h2>Revisión antes de guardar</h2><p><strong>{draft.titulo}</strong> · {draft.partidas.length} partidas · cliente: {active?.nombre}</p><p>Las notas y costes internos no forman parte de la versión que verá el cliente.</p><Button disabled={!scopeComplete || !linesComplete} onClick={() => void submitEstimate()} loading={saving}>Guardar como borrador</Button></div>}
+
+      <RecentEstimates estimates={estimates} sending={sending} converting={converting} onPreview={setPreview} onSend={send} onConvert={convert} />
+      <Modal open={preview !== null} onClose={() => setPreview(null)} title={preview?.numero ?? "Propuesta"} width={820}>
+        <EstimatePreview estimate={preview} />
+      </Modal>
+    </section>
+  );
+}
+
+function RecentEstimates({ estimates, sending, converting, onPreview, onSend, onConvert }: { estimates: EstimateDTO[]; sending: number | null; converting: number | null; onPreview: (estimate: EstimateDTO) => void; onSend: (estimate: EstimateDTO) => void; onConvert: (estimate: EstimateDTO) => void }) {
+  return <section className="estimate-list" aria-labelledby="recent-estimates"><header><div><p className="eyebrow">Seguimiento comercial</p><h2 id="recent-estimates">Propuestas recientes</h2></div><p>{estimates.length} {estimates.length === 1 ? "propuesta" : "propuestas"}</p></header>{estimates.length ? estimates.map(estimate => <article key={estimate.id}><div className="estimate-list__summary"><strong>{estimate.numero}</strong><span>{estimate.titulo}</span><small>v{estimate.versionActual} · {statusLabel(estimate.estado)} · actualizada {formatDate(estimate.updatedAt)}</small>{estimate.propuesta && <b>{formatMoney(estimate.propuesta.totalConIva)}</b>}</div><div className="estimate-list__actions"><Button small variant="ghost" onClick={() => onPreview(estimate)}>Ver presupuesto</Button>{(estimate.estado === "borrador" || estimate.estado === "en_revision") && <Button small loading={sending === estimate.id} onClick={() => void onSend(estimate)}>Enviar al cliente</Button>}{estimate.estado === "firmado" && <Button small loading={converting === estimate.id} onClick={() => void onConvert(estimate)}>Crear proyecto</Button>}</div></article>) : <p className="estimate-list__empty">Aún no hay propuestas. Crea una oportunidad para preparar la primera.</p>}</section>;
+}
+
+function EstimatePreview({ estimate }: { estimate: EstimateDTO | null }) {
+  if (!estimate) return null;
+  if (!estimate.propuesta) return <div className="estimate-preview__empty"><h2>{statusLabel(estimate.estado)}</h2><p>Este presupuesto aún es un borrador interno. Al enviarlo se guardará una versión inmutable y se podrá consultar aquí exactamente como la verá el cliente.</p></div>;
+  const proposal = estimate.propuesta;
+  return <div className="estimate-preview"><p className="estimate-preview__meta">Versión {estimate.versionActual} · {statusLabel(estimate.estado)} · enviada {proposal.enviadoAt ? formatDate(proposal.enviadoAt) : "pendiente"}</p><div className="private-table-scroll"><table><thead><tr><th>Partida</th><th>Cantidad</th><th>Precio unitario</th><th>IVA</th></tr></thead><tbody>{proposal.partidas.map(line => <tr key={line.id}><td>{line.descripcion}</td><td>{line.cantidad} {line.unidad}</td><td>{formatMoney(line.precioVentaUnitario)}</td><td>{line.iva}%</td></tr>)}</tbody></table></div><div className="estimate-preview__totals"><span>Base imponible <strong>{formatMoney(proposal.totalSinIva)}</strong></span><span>IVA <strong>{formatMoney(proposal.totalIva)}</strong></span><span>Total <strong>{formatMoney(proposal.totalConIva)}</strong></span></div><section><h3>Condiciones de pago</h3><p>{proposal.condicionesPago}</p></section>{proposal.garantia && <section><h3>Garantía</h3><p>{proposal.garantia}</p></section>}{estimate.motivoRechazo && <section><h3>Solicitud del cliente</h3><p>{estimate.motivoRechazo}</p></section>}{proposal.firmadoAt && <p className="estimate-preview__signature">Firmada el {formatDate(proposal.firmadoAt)} · huella {proposal.hash}</p>}</div>;
 }
 
 function EstimateLineEditor({ index, line, canRemove, onChange, onRemove }: { index: number; line: EstimateDraftDTO["partidas"][number]; canRemove: boolean; onChange: (changes: Partial<EstimateDraftDTO["partidas"][number]>) => void; onRemove: () => void }) {

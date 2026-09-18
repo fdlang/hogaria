@@ -1,5 +1,5 @@
 import type { IChangeOrderRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
-import type { Estimate, EstimateDraft, Opportunity, OpportunityStatus, Project, User } from "@reformapro/domain/entities";
+import type { ChangeOrder, Estimate, EstimateDraft, Opportunity, OpportunityStatus, Project, User } from "@reformapro/domain/entities";
 import type { IEventEmitter } from "@reformapro/domain/events";
 import { Money, Percentage } from "@reformapro/domain/value-objects";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@reformapro/domain/errors";
@@ -9,6 +9,15 @@ import type { ISignatureCrypto } from "../../infrastructure/crypto/crypto.servic
 type OpportunityInput = Pick<Opportunity, "clienteId" | "nombre" | "email" | "telefono" | "direccion" | "tipo" | "descripcion" | "estado" | "fechaVisita" | "notasInternas">;
 type PublicEstimateLine = Pick<EstimateDraft["partidas"][number], "id" | "categoria" | "descripcion" | "cantidad" | "unidad" | "precioVentaUnitario" | "descuento" | "iva" | "notaCliente">;
 type PublicEstimateSnapshot = Pick<EstimateDraft, "titulo" | "referencia" | "validezDias" | "condicionesPago" | "garantia" | "notasCliente"> & { partidas: PublicEstimateLine[] };
+export type PublicChangeOrder = {
+  id: number;
+  projectId: number;
+  numero: string;
+  estado: "enviado" | "aprobado" | "rechazado";
+  propuesta: PublicEstimateSnapshot;
+  aprobadoAt: Date | null;
+  createdAt: Date;
+};
 
 function assertAdmin(user: User | null): asserts user is User { if (!user || user.rol !== "admin") throw new ForbiddenError(); }
 function validateDraft(draft: EstimateDraft) {
@@ -20,6 +29,7 @@ function validateDraft(draft: EstimateDraft) {
 function publicSnapshot(draft: EstimateDraft): PublicEstimateSnapshot { return { titulo: draft.titulo, ...(draft.referencia === undefined ? {} : { referencia: draft.referencia }), validezDias: draft.validezDias, condicionesPago: draft.condicionesPago, garantia: draft.garantia, notasCliente: draft.notasCliente, partidas: draft.partidas.map(({ id, categoria, descripcion, cantidad, unidad, precioVentaUnitario, descuento, iva, notaCliente }) => ({ id, categoria, descripcion, cantidad, unidad, precioVentaUnitario, descuento, iva, ...(notaCliente === undefined ? {} : { notaCliente }) })) }; }
 function isExpired(enviadoAt: Date | null, validezDias: number, now = new Date()) { return !!enviadoAt && enviadoAt.getTime() + validezDias * 86_400_000 < now.getTime(); }
 function validSignatureImage(value: string) { return /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(value) && value.length <= 700_000; }
+function isClientVisibleChangeStatus(status: ChangeOrder["estado"]): status is PublicChangeOrder["estado"] { return status !== "borrador"; }
 
 export class OpportunityUseCases {
   constructor(private readonly users: IUserRepository, private readonly opportunities: IOpportunityRepository, private readonly events: IEventEmitter) {}
@@ -38,8 +48,27 @@ export class OpportunityUseCases {
 export class EstimateUseCases {
   constructor(private readonly users: IUserRepository, private readonly opportunities: IOpportunityRepository, private readonly estimates: IEstimateRepository, private readonly projects: IProjectRepository, private readonly events: IEventEmitter, private readonly crypto: ISignatureCrypto) {}
   async list(actorId: number) { const actor = await this.users.findById(actorId); if (!actor) throw new ForbiddenError(); return actor.rol === "admin" ? this.estimates.findAll() : (await this.estimates.findAll()).filter(e => e.clienteId === actor.id); }
-  async publicList(actorId: number) { const actor = await this.users.findById(actorId); if (!actor) throw new ForbiddenError(); const items = actor.rol === "admin" ? await this.estimates.findAll() : (await this.estimates.findAll()).filter(e => e.clienteId === actor.id); return Promise.all(items.map(item => this.publicView(item))); }
-  async publicGet(actorId: number, id: number) { await this.get(actorId, id); return this.publicView(await this.require(id)); }
+  async publicList(actorId: number) {
+    const actor = await this.users.findById(actorId);
+    if (!actor) throw new ForbiddenError();
+    const all = await this.estimates.findAll();
+    // A proposal does not belong to the client portal until the business has
+    // explicitly moved it beyond the internal draft state. This keeps titles,
+    // numbers and workflow state of work-in-progress private as well.
+    const items = actor.rol === "admin"
+      ? all
+      : all.filter(estimate => estimate.clienteId === actor.id && estimate.estado !== "borrador");
+    return Promise.all(items.map(item => this.publicView(item)));
+  }
+  async publicGet(actorId: number, id: number) {
+    const actor = await this.users.findById(actorId);
+    if (!actor) throw new ForbiddenError();
+    const estimate = await this.get(actorId, id);
+    // Do not turn a known numeric identifier into a way of inspecting a
+    // proposal that has not been shared with its owner yet.
+    if (actor.rol === "cliente" && estimate.estado === "borrador") throw new NotFoundError("Presupuesto");
+    return this.publicView(estimate);
+  }
   async get(actorId: number, id: number) { const actor = await this.users.findById(actorId); if (!actor) throw new ForbiddenError(); const estimate = await this.require(id); if (actor.rol !== "admin" && estimate.clienteId !== actor.id) throw new ForbiddenError(); return estimate; }
   async create(actorId: number, opportunityId: number, draft: EstimateDraft, ctx: ClientContext) {
     const actor = await this.users.findById(actorId); assertAdmin(actor); validateDraft(draft);
@@ -82,6 +111,30 @@ export class EstimateUseCases {
 
 export class ChangeOrderUseCases {
   constructor(private readonly users: IUserRepository, private readonly projects: IProjectRepository, private readonly changes: IChangeOrderRepository) {}
-  async list(actorId: number, projectId: number) { const actor = await this.users.findById(actorId); if (!actor) throw new ForbiddenError(); const project = await this.projects.findById(projectId); if (!project || (actor.rol !== "admin" && project.clienteId !== actor.id)) throw new ForbiddenError(); return this.changes.findByProject(projectId); }
+  async list(actorId: number, projectId: number): Promise<Array<ChangeOrder | PublicChangeOrder>> {
+    const actor = await this.users.findById(actorId);
+    if (!actor) throw new ForbiddenError();
+    const project = await this.projects.findById(projectId);
+    if (!project || (actor.rol !== "admin" && project.clienteId !== actor.id)) throw new ForbiddenError();
+
+    const orders = await this.changes.findByProject(projectId);
+    if (actor.rol === "admin") return orders;
+
+    // Change orders follow the same boundary as estimates: a client receives
+    // only an explicitly sent decision and never the internal draft payload.
+    const visibleOrders = orders.filter(
+      (order): order is ChangeOrder & { estado: PublicChangeOrder["estado"] } => isClientVisibleChangeStatus(order.estado),
+    );
+    return visibleOrders
+      .map(order => ({
+        id: order.id,
+        projectId: order.projectId,
+        numero: order.numero,
+        estado: order.estado,
+        propuesta: publicSnapshot(order.payload),
+        aprobadoAt: order.aprobadoAt,
+        createdAt: order.createdAt,
+      }));
+  }
   async create(actorId: number, projectId: number, payload: EstimateDraft) { assertAdmin(await this.users.findById(actorId)); if (!(await this.projects.findById(projectId))) throw new NotFoundError("Proyecto"); validateDraft(payload); const existing = await this.changes.findByProject(projectId); return this.changes.save({ projectId, numero: `OC-${String(existing.length + 1).padStart(3, "0")}`, estado: "borrador", payload, aprobadoAt: null }); }
 }

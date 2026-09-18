@@ -31,6 +31,7 @@ import { ActivateAccountPage } from "@/features/auth/components/ActivateAccountP
 import { PublicLanding } from "@/features/solicitudes/components/PublicLanding";
 import { PrivacyPolicyPage } from "@/features/legal/components/PrivacyPolicyPage";
 
+import { Fragment, type ReactNode }    from "react";
 import { useAuth }                     from "@/features/auth/hooks/useAuth";
 import { Router, Route, useNavigation } from "./Router";
 import { Button, EmptyState }          from "@/shared/ui";
@@ -93,17 +94,19 @@ export function App({ apis }: { apis: AllApis }) {
 // ─────────────────────────────────────────────────────────────
 // TopBar — role-aware navigation
 // ─────────────────────────────────────────────────────────────
+type NavigationLink = { to: string; label: string; group?: "start" | "operation" | "resources" | "control" };
+
 function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "cliente" | "profesional" } | null; onSignOut: () => void }) {
-  const links =
+  const links: NavigationLink[] =
     user?.rol === "admin" ? [
-      { to: "#/admin",               label: "Inicio" },
-      { to: "#/admin/projects",      label: "Proyectos" },
-      { to: "#/admin/budgets",       label: "Presupuestos" },
-      { to: "#/admin/catalog",       label: "Catálogo" },
-      { to: "#/admin/users",         label: "Usuarios" },
-      { to: "#/admin/profesionales", label: "Profesionales" },
-      { to: "#/admin/solicitudes",   label: "Solicitudes" },
-      { to: "#/admin/audit",         label: "Actividad" },
+      { to: "#/admin",               label: "Inicio", group: "start" },
+      { to: "#/admin/solicitudes",   label: "Solicitudes", group: "operation" },
+      { to: "#/admin/budgets",       label: "Presupuestos", group: "operation" },
+      { to: "#/admin/projects",      label: "Proyectos", group: "operation" },
+      { to: "#/admin/catalog",       label: "Catálogo", group: "resources" },
+      { to: "#/admin/users",         label: "Usuarios", group: "resources" },
+      { to: "#/admin/profesionales", label: "Profesionales", group: "resources" },
+      { to: "#/admin/audit",         label: "Actividad", group: "control" },
     ] :
     user?.rol === "cliente" ? [
       { to: "#/cliente",           label: "Inicio" },
@@ -122,13 +125,17 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
 
       {user ? (
         <nav className="private-nav" aria-label="Navegación privada" style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          {links.map(l => (
-            <a key={l.to} href={l.to}
-              className="private-nav-link"
-              style={{ fontSize: 13, fontWeight: 700, color: "#71685e", textDecoration: "none", textTransform: "uppercase", letterSpacing: ".05em", transition: "color .18s ease" }}>
-              {l.label}
-            </a>
-          ))}
+          {links.map((link, index) => {
+            const previous = links[index - 1];
+            return <Fragment key={link.to}>
+              {link.group && previous?.group && link.group !== previous.group && <span aria-hidden="true" style={{ fontSize: 12, color: "#85786b" }}>·</span>}
+              <a href={link.to}
+                className="private-nav-link"
+                style={{ fontSize: 13, fontWeight: 700, color: "#71685e", textDecoration: "none", textTransform: "uppercase", letterSpacing: ".05em", transition: "color .18s ease" }}>
+                {link.label}
+              </a>
+            </Fragment>;
+          })}
           <span style={{ fontSize: 12, color: "#85786b" }}>·</span>
           <span style={{ fontSize: 12, color: "#71685e" }}>{user.nombre}</span>
           <Button small variant="ghost" onClick={onSignOut}>Salir</Button>
@@ -158,17 +165,25 @@ function AdminHome() {
   return (
     <section>
       <h1 style={{ fontSize: 38, fontWeight: 700, color: "#302d29", marginBottom: 24 }}>Panel de administración</h1>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
-        <Tile href="#/admin/projects"      title="Proyectos"      subtitle="Gestiona obras activas" />
-        <Tile href="#/admin/budgets"       title="Presupuestos"   subtitle="Crea, envía, firma" />
-        <Tile href="#/admin/catalog"       title="Catálogo"       subtitle="Precios y partidas base" />
-        <Tile href="#/admin/users"         title="Usuarios"       subtitle="Clientes, profesionales, admins" />
-        <Tile href="#/admin/profesionales" title="Profesionales"  subtitle="Asignaciones y permisos" />
-        <Tile href="#/admin/solicitudes"   title="Solicitudes"    subtitle="Contactos de la landing" />
-        <Tile href="#/admin/audit"         title="Actividad"      subtitle="Audit log y trazabilidad" />
-      </div>
+      <AdminHomeGroup label="Operativa" hint="Del primer contacto a la obra">
+        <Tile href="#/admin/solicitudes" title="Solicitudes" subtitle="Contactos de la landing" />
+        <Tile href="#/admin/budgets" title="Presupuestos" subtitle="Oportunidades, propuestas y firma" />
+        <Tile href="#/admin/projects" title="Proyectos" subtitle="Gestiona obras activas" />
+      </AdminHomeGroup>
+      <AdminHomeGroup label="Recursos" hint="Configuración que alimenta la operativa">
+        <Tile href="#/admin/catalog" title="Catálogo" subtitle="Precios y partidas base" />
+        <Tile href="#/admin/users" title="Usuarios" subtitle="Clientes, profesionales y admins" />
+        <Tile href="#/admin/profesionales" title="Profesionales" subtitle="Asignaciones y permisos" />
+      </AdminHomeGroup>
+      <AdminHomeGroup label="Control" hint="Trazabilidad de las acciones">
+        <Tile href="#/admin/audit" title="Actividad" subtitle="Audit log y trazabilidad" />
+      </AdminHomeGroup>
     </section>
   );
+}
+
+function AdminHomeGroup({ label, hint, children }: { label: string; hint: string; children: ReactNode }) {
+  return <section style={{ marginBottom: 28 }}><header style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12 }}><h2 style={{ margin: 0, fontSize: 16 }}>{label}</h2><p style={{ margin: 0, color: "#71685e", fontSize: 12 }}>{hint}</p></header><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>{children}</div></section>;
 }
 
 function Tile({ href, title, subtitle }: { href: string; title: string; subtitle: string }) {
