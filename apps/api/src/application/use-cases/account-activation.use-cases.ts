@@ -18,7 +18,12 @@ const newToken = () => base64Url(crypto.getRandomValues(new Uint8Array(32)));
 
 export class AccountActivationUseCases {
   constructor(private readonly users: IUserRepository, private readonly tokens: IActivationTokenRepository, private readonly email: ITransactionalEmail, private readonly appUrl: string, private readonly ttlMs = 24 * 60 * 60 * 1000) {}
-  ensureConfigured() { if (!this.email.isConfigured()) throw new ConflictError("El servicio de invitaciones no está configurado"); }
+  ensureConfigured() {
+    const hasPublicUrl = /^https?:\/\/[^\s/$.?#][^\s]*$/i.test(this.appUrl);
+    if (!this.email.isConfigured() || !hasPublicUrl) {
+      throw new ConflictError("No se puede enviar la invitación: configura RESEND_API_KEY, EMAIL_FROM y APP_URL en Producción y vuelve a desplegar");
+    }
+  }
   async invite(actorId: number, userId: number, context: ClientContext) {
     this.ensureConfigured(); const actor = await this.users.findById(actorId); if (!actor || actor.rol !== "admin") throw new ForbiddenError();
     const user = await this.users.findById(userId); if (!user || user.rol !== "cliente") throw new ValidationError("Solo se pueden invitar cuentas de cliente", "userId");

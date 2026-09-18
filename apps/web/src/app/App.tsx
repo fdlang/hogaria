@@ -28,6 +28,7 @@ import { AdminActivity }      from "@/features/audit/components/AdminActivity";
 import { LoginPage }     from "@/features/auth/components/LoginPage";
 import { ActivateAccountPage } from "@/features/auth/components/ActivateAccountPage";
 import { PublicLanding } from "@/features/solicitudes/components/PublicLanding";
+import { PrivacyPolicyPage } from "@/features/legal/components/PrivacyPolicyPage";
 
 import { useAuth }                     from "@/features/auth/hooks/useAuth";
 import { Router, Route, useNavigation } from "./Router";
@@ -49,6 +50,7 @@ export function App({ apis }: { apis: AllApis }) {
   const routes: Route[] = [
     // Public
     { path: "#/",      element: <PublicLandingRoute apis={apis} /> },
+    { path: "#/privacidad", element: <PrivacyPolicyPage /> },
     { path: "#/login", element: <LoginRoute /> },
     { path: "#/activar-cuenta", element: <ActivateAccountPage api={apis.users} /> },
 

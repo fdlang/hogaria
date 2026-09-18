@@ -35,30 +35,33 @@ export function AdminUsers({ api }: Props) {
 
   const [modal, setModal] = useState<ModalState>({ kind: "closed" });
   const [filterRol, setFilterRol] = useState<UserDTO["rol"] | "all">("all");
+  const [filterStatus, setFilterStatus] = useState<"active" | "inactive" | "all">("active");
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
     return (users.data ?? []).filter(u => {
       if (filterRol !== "all" && u.rol !== filterRol) return false;
+      if (filterStatus === "active" && !u.activo) return false;
+      if (filterStatus === "inactive" && u.activo) return false;
       if (search) {
         const q = search.toLowerCase();
         if (!u.nombre.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [users.data, filterRol, search]);
+  }, [users.data, filterRol, filterStatus, search]);
 
   const handleDelete = async (user: UserDTO) => {
     const ok = await confirm({
-      title: "Desactivar usuario",
-      message: <>¿Desactivar a <strong>{user.nombre}</strong>? Los proyectos históricos se conservarán. Puedes reactivarle después.</>,
+      title: "Archivar usuario",
+      message: <>¿Archivar a <strong>{user.nombre}</strong>? Los proyectos históricos se conservarán. Puedes reactivarle después.</>,
       variant: "danger",
-      confirmLabel: "Desactivar",
+      confirmLabel: "Archivar",
     });
     if (!ok) return;
     try {
       await mutations.remove.mutate(user.id);
-      push("Usuario desactivado", "success");
+      push("Usuario archivado. Puedes recuperarlo desde el filtro Archivados.", "success");
       users.refresh();
     } catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
   };
@@ -108,6 +111,12 @@ export function AdminUsers({ api }: Props) {
           <option value="cliente">Clientes</option>
           <option value="profesional">Profesionales</option>
         </select>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
+          style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", minWidth: 145 }}>
+          <option value="active">Activos</option>
+          <option value="inactive">Archivados</option>
+          <option value="all">Todos los estados</option>
+        </select>
       </div>
 
       <DataTable
@@ -116,7 +125,7 @@ export function AdminUsers({ api }: Props) {
         rowKey={u => u.id}
         loading={users.loading}
         error={users.error}
-        emptyMessage={search ? `Sin resultados para "${search}"` : "No hay usuarios"}
+        emptyMessage={search ? `Sin resultados para "${search}"` : filterStatus === "inactive" ? "No hay usuarios archivados" : "No hay usuarios activos"}
         actions={u => (
           <div style={{ display: "flex", gap: 6 }}>
             {can("user.manage") && <Button small variant="ghost" onClick={() => setModal({ kind: "edit", user: u })}>Editar</Button>}
