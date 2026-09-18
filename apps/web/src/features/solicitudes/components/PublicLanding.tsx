@@ -5,6 +5,7 @@ import { Input, Textarea, Select, Button } from "@/shared/ui";
 import { useNotifications } from "@/shared/ui/notifications";
 import { PROJECT_TIPOS } from "@reformapro/domain";
 import { portfolioServices, portfolioWorks } from "../portfolio.data";
+import { validateSolicitud } from "../solicitudes.validation";
 
 interface Props { api: SolicitudesApi; onLogin: () => void; }
 const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
@@ -111,15 +112,7 @@ export function PublicLanding({ api, onLogin }: Props) {
   const [form, setForm] = useState({ nombre: "", email: "", telefono: "", tipo: "", descripcion: "" });
   const [errors, setErrors] = useState<Partial<typeof form>>({});
   const send = async (e: React.FormEvent) => {
-    e.preventDefault(); const next: Partial<typeof form> = {};
-    if (!form.nombre.trim()) next.nombre = "Obligatorio";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = "Introduce un email válido";
-    const phone = form.telefono.replace(/[\s().-]/g, "");
-    if (phone && !/^(?:(?:\+|00)34)?[6789]\d{8}$/.test(phone)) {
-      next.telefono = "Introduce un teléfono español válido";
-    }
-    if (!form.tipo) next.tipo = "Selecciona un proyecto";
-    if (form.descripcion.trim().length < 20) next.descripcion = "Mínimo 20 caracteres";
+    e.preventDefault(); const next = validateSolicitud(form);
     setErrors(next); if (Object.keys(next).length) return;
     try {
       await submit(form);

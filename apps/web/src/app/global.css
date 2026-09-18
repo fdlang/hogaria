@@ -90,7 +90,6 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 
 @media (min-width: 1024px) {
   .portfolio nav .nav-brand { margin-right: 0; }
-  .portfolio nav .nav-links { position: absolute; left: 50%; transform: translateX(-50%); }
 }
 
 .hero { min-height: 610px; padding: 88px clamp(24px, 4vw, 56px) 62px; position: relative; isolation: isolate; overflow: hidden; background: var(--marble-light); }
@@ -382,6 +381,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
     grid-column: 1 / -1;
     grid-row: 2;
     display: flex;
+    justify-content: center;
     gap: 6px;
     width: 100%;
     justify-content: center;
