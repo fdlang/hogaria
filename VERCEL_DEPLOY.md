@@ -10,9 +10,16 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
    `@reformapro/web`.
 3. Crea una base PostgreSQL gestionada y aplica la migración antes de publicar:
    `npm run db:migrate --workspace @reformapro/api`.
+
+   Si ya utilizas el esquema comercial versionado, ejecuta además una sola vez:
+   `npm run db:migrate-sales-signature --workspace @reformapro/api` y
+   `npm run db:migrate-estimate-rejection --workspace @reformapro/api`.
 4. Configura estas variables para Preview y Production:
 
    - `DATABASE_URL`: URL de PostgreSQL gestionado.
+   - `RESEND_API_KEY`: clave API de Resend para invitaciones de cuentas.
+   - `EMAIL_FROM`: remitente verificado, por ejemplo `Hogaria <info@hogaria.design>`.
+   - `APP_URL`: `https://www.hogaria.design`.
    - `HMAC_SECRET`: secreto aleatorio de al menos 32 caracteres.
    - `ALLOWED_ORIGINS`: dominios adicionales autorizados, separados por comas.
      El dominio del propio despliegue se admite automáticamente.

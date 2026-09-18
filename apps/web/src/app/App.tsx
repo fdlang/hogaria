@@ -6,8 +6,6 @@
  * route actually needs.
  */
 
-import { useState } from "react";
-import { BudgetsApi }     from "@/features/budgets/api/budgets.api";
 import { ProjectsApi }    from "@/features/projects/api/projects.api";
 import { UsersApi }       from "@/features/users/api/users.api";
 import { FilesApi }       from "@/features/files/api/files.api";
@@ -16,32 +14,26 @@ import { SolicitudesApi } from "@/features/solicitudes/api/solicitudes.api";
 import { AdminSolicitudesApi, AdminSolicitudes } from "@/features/solicitudes/components/AdminSolicitudes";
 
 import { AdminProjects }       from "@/features/projects/components/AdminProjects";
-import { ClientDashboard }     from "@/features/projects/components/ClientDashboard";
 import { ProfesionalDashboard } from "@/features/projects/components/ProfesionalDashboard";
 import { ProjectDetail }       from "@/features/projects/components/ProjectDetail";
-import { ProjectForm }         from "@/features/projects/components/ProjectForm";
 
-import { AdminBudgets }  from "@/features/budgets/components/AdminBudgets";
 import { SalesApi } from "@/features/sales/api/sales.api";
 import { SalesPipeline } from "@/features/sales/components/SalesPipeline";
 import { ClientEstimates } from "@/features/sales/components/ClientEstimates";
-import { ClientBudgets } from "@/features/budgets/components/ClientBudgets";
-import { SignatureWizard } from "@/features/signatures/components/SignatureWizard";
 
 import { AdminUsers }         from "@/features/users/components/AdminUsers";
 import { AdminProfesionales } from "@/features/users/components/AdminProfesionales";
 import { AdminActivity }      from "@/features/audit/components/AdminActivity";
 
 import { LoginPage }     from "@/features/auth/components/LoginPage";
+import { ActivateAccountPage } from "@/features/auth/components/ActivateAccountPage";
 import { PublicLanding } from "@/features/solicitudes/components/PublicLanding";
 
 import { useAuth }                     from "@/features/auth/hooks/useAuth";
-import { useUsers }                    from "@/features/users/hooks/useUsers";
 import { Router, Route, useNavigation } from "./Router";
-import { Button, EmptyState, Modal }   from "@/shared/ui";
+import { Button, EmptyState }          from "@/shared/ui";
 
 interface AllApis {
-  budgets:          BudgetsApi;
   projects:         ProjectsApi;
   users:            UsersApi;
   files:            FilesApi;
@@ -58,6 +50,7 @@ export function App({ apis }: { apis: AllApis }) {
     // Public
     { path: "#/",      element: <PublicLandingRoute apis={apis} /> },
     { path: "#/login", element: <LoginRoute /> },
+    { path: "#/activar-cuenta", element: <ActivateAccountPage api={apis.users} /> },
 
     // Admin
     { path: "#/admin",                 roles: ["admin"],        element: <AdminHome /> },
@@ -183,25 +176,7 @@ function Tile({ href, title, subtitle }: { href: string; title: string; subtitle
 
 function AdminProjectsRoute({ apis }: { apis: AllApis }) {
   const { navigate } = useNavigation();
-  const clients = useUsers(apis.users, "cliente");
-  const [creating, setCreating] = useState(false);
-
-  return (
-    <>
-      <AdminProjects
-        api={apis.projects}
-        onOpenProject={id => navigate(`#/admin/projects/${id}`)}
-        onCreateProject={() => setCreating(true)}
-      />
-      <Modal open={creating} onClose={() => setCreating(false)} title="Nuevo proyecto" width={600}>
-        {creating && (
-          <ProjectForm api={apis.projects} clients={clients.data ?? []}
-            onSaved={p => { setCreating(false); navigate(`#/admin/projects/${p.id}`); }}
-            onCancel={() => setCreating(false)} />
-        )}
-      </Modal>
-    </>
-  );
+  return <AdminProjects api={apis.projects} onOpenProject={id => navigate(`#/admin/projects/${id}`)} />;
 }
 
 function AdminProjectDetailRoute({ apis }: { apis: AllApis }) {

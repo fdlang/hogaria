@@ -154,8 +154,8 @@ function UserFormView({ api, initialUser, onSaved, onCancel }: {
     try {
       const res = await form.submit();
       if (!res) return;
-      if ("temporaryPassword" in res) {
-        push(`Usuario creado. Contraseña temporal: ${res.temporaryPassword}`, "success");
+      if ("invitationSent" in res) {
+        push(res.invitationSent ? "Cliente creado e invitación enviada" : "Usuario creado", "success");
         onSaved(res.user);
       } else {
         push("Usuario actualizado", "success");

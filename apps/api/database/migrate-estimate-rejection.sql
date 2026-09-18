@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE estimates
+  ADD COLUMN IF NOT EXISTS motivo_rechazo TEXT;
+
+COMMIT;

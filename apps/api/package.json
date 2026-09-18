@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "node --env-file=.env ./scripts/migrate.mjs",
     "db:reset-operational": "node --env-file=.env ./scripts/reset-operational.mjs",
-    "db:migrate-sales-signature": "node --env-file=.env ./scripts/migrate-sales-signature.mjs"
+    "db:migrate-sales-signature": "node --env-file=.env ./scripts/migrate-sales-signature.mjs",
+    "db:migrate-estimate-rejection": "node --env-file=.env ./scripts/migrate-estimate-rejection.mjs",
+    "db:migrate-account-activation": "node --env-file=.env ./scripts/migrate-account-activation.mjs"
   },
   "dependencies": {
     "@reformapro/domain": "*",

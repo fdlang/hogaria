@@ -10,7 +10,6 @@ import ReactDOM from "react-dom/client";
 import { ApiClient } from "@/shared/lib/api-client";
 import { AuthStore } from "@/features/auth/auth.store";
 import { AuthStoreProvider } from "@/features/auth/hooks/useAuth";
-import { BudgetsApi }     from "@/features/budgets/api/budgets.api";
 import { ProjectsApi }    from "@/features/projects/api/projects.api";
 import { UsersApi }       from "@/features/users/api/users.api";
 import { FilesApi }       from "@/features/files/api/files.api";
@@ -36,7 +35,6 @@ authStore = new AuthStore(api);
 
 // 3) Feature APIs — each receives the shared transport
 const apis = {
-  budgets:          new BudgetsApi(api),
   projects:         new ProjectsApi(api),
   users:            new UsersApi(api),
   files:            new FilesApi(api),

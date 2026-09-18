@@ -16,7 +16,6 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { URL } from "node:url";
 import { buildApp } from "./bootstrap.js";
 import { authController, requireAuth, HttpRequest, HttpResponse } from "./interfaces/http/authController.js";
-import { budgetController } from "./interfaces/http/budgetController.js";
 import { userController }    from "./interfaces/http/userController.js";
 import { projectController } from "./interfaces/http/projectController.js";
 import { auditController, solicitudController, fileController } from "./interfaces/http/otherControllers.js";
@@ -59,18 +58,13 @@ function getRuntime(): Promise<Runtime> {
 
   runtimePromise = buildApp().then(app => {
     const auth = authController({ loginUseCase: app.useCases.login, users: app.users, tokens: app.tokens });
-    const budgets = budgetController({
-      create: app.useCases.createBudget, send: app.useCases.sendBudget,
-      delete: app.useCases.deleteBudget, list: app.useCases.listBudgets,
-      get: app.useCases.getBudget, update: app.useCases.updateBudget,
-      challenge: app.useCases.requestSignatureChallenge, sign: app.useCases.signBudget,
-    });
     const users = userController({
       create: app.useCases.createUser, update: app.useCases.updateUser,
       delete: app.useCases.deleteUser, list: app.useCases.listUsers,
+      activation: app.useCases.activation,
     });
     const projects = projectController({
-      create: app.useCases.createProject, update: app.useCases.updateProject,
+      update: app.useCases.updateProject,
       delete: app.useCases.deleteProject, list: app.useCases.listProjects,
       get: app.useCases.getProject,
       assign: app.useCases.assignProjectProfessional,
@@ -89,16 +83,7 @@ function getRuntime(): Promise<Runtime> {
   route("POST", "/auth/login",  async req => auth.login(req)),
   route("GET",  "/auth/me",     async req => auth.me(req)),
   route("POST", "/auth/logout", async ()  => auth.logout()),
-
-  // Budgets
-  route("GET",    "/budgets",                          req => budgets.list(req as never),                 { protected: true }),
-  route("POST",   "/budgets",                          req => budgets.create(req as never),               { protected: true }),
-  route("GET",    "/budgets/:id",                      req => budgets.get(req as never),                  { protected: true }),
-  route("PATCH",  "/budgets/:id",                      req => budgets.update(req as never),               { protected: true }),
-  route("POST",   "/budgets/:id/send",                 req => budgets.send(req   as never),               { protected: true }),
-  route("DELETE", "/budgets/:id",                      req => budgets.delete(req as never),               { protected: true }),
-  route("POST",   "/budgets/:id/signature/challenge",  req => budgets.requestChallenge(req as never),     { protected: true }),
-  route("POST",   "/budgets/:id/signature",            req => budgets.sign(req   as never),               { protected: true }),
+  route("POST", "/auth/activate", async req => users.activate(req)),
 
   // Commercial pipeline: opportunity -> versioned estimate -> project.
   route("GET",   "/opportunities",       req => sales.listOpportunities(req as never), { protected: true }),
@@ -113,7 +98,6 @@ function getRuntime(): Promise<Runtime> {
   route("POST",  "/estimates/:id/reject",req => sales.rejectEstimate(req as never),    { protected: true }),
   route("POST",  "/estimates/:id/revise",req => sales.reviseEstimate(req as never),    { protected: true }),
   route("POST",  "/estimates/:id/accept",req => sales.acceptEstimate(req as never),    { protected: true }),
-  route("GET",   "/estimates/:id/versions", req => sales.versions(req as never),       { protected: true }),
   route("GET",   "/projects/:projectId/change-orders", req => sales.listChanges(req as never), { protected: true }),
   route("POST",  "/projects/:projectId/change-orders", req => sales.createChange(req as never), { protected: true }),
 
@@ -122,10 +106,10 @@ function getRuntime(): Promise<Runtime> {
   route("POST",   "/users",        req => users.create(req as never), { protected: true }),
   route("PATCH",  "/users/:id",    req => users.update(req as never), { protected: true }),
   route("DELETE", "/users/:id",    req => users.delete(req as never), { protected: true }),
+  route("POST", "/users/:id/invitation", req => users.resendInvitation(req as never), { protected: true }),
 
   // Projects
   route("GET",    "/projects",          req => projects.list(req   as never), { protected: true }),
-  route("POST",   "/projects",          req => projects.create(req as never), { protected: true }),
   route("GET",    "/projects/:id",      req => projects.get(req    as never), { protected: true }),
   route("PATCH",  "/projects/:id",      req => projects.update(req as never), { protected: true }),
   route("DELETE", "/projects/:id",      req => projects.delete(req as never), { protected: true }),

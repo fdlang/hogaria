@@ -10,6 +10,7 @@ import { Email } from "@reformapro/domain/value-objects";
 import { ValidationError, ForbiddenError, NotFoundError, ConflictError } from "@reformapro/domain/errors";
 import { ClientContext } from "./auth.use-cases.js";
 import { PasswordHasher } from "../../infrastructure/database/inMemoryRepositories.js";
+import { AccountActivationUseCases } from "./account-activation.use-cases.js";
 
 export interface CreateUserCommand {
   actorId: number;
@@ -27,9 +28,10 @@ export class CreateUserUseCase {
     private readonly hasher: PasswordHasher,
     private readonly tempPasswordGen: () => string,
     private readonly events: IEventEmitter,
+    private readonly activation?: AccountActivationUseCases,
   ) {}
 
-  async execute(cmd: CreateUserCommand): Promise<{ user: User; temporaryPassword: string }> {
+  async execute(cmd: CreateUserCommand): Promise<{ user: User; invitationSent: boolean }> {
     const actor = await this.users.findById(cmd.actorId);
     if (!actor || actor.rol !== "admin") throw new ForbiddenError();
 
@@ -41,15 +43,21 @@ export class CreateUserUseCase {
     const email = Email.of(cmd.email); // throws ValidationError if malformed
     const existing = await this.users.findByEmail(email.value);
     if (existing) throw new ConflictError("Ya existe un usuario con ese email");
+    const activation = this.activation;
+    if (cmd.rol === "cliente") {
+      if (!activation) throw new ConflictError("El servicio de invitaciones no está configurado");
+      activation.ensureConfigured();
+    }
 
-    // Generate a cryptographically random temp password and hash it immediately
+    // A client never receives this random placeholder. They set their own password
+    // through the one-time activation link.
     const temporaryPassword = this.tempPasswordGen();
     const passwordHash = await this.hasher.hash(temporaryPassword);
 
     const user: User = {
       id: 0, // repository assigns
       email, nombre: cmd.nombre.trim(), rol: cmd.rol,
-      activo: true, createdAt: new Date(),
+      activo: cmd.rol === "cliente" ? false : true, createdAt: new Date(),
       ...(cmd.profesion !== undefined ? { profesion: cmd.profesion } : {}),
       ...(cmd.telefono  !== undefined ? { telefono:  cmd.telefono  } : {}),
     };
@@ -62,8 +70,10 @@ export class CreateUserUseCase {
       userId: saved.id, role: cmd.rol,
     });
 
-    // Temp password is returned ONCE to the admin; never persisted in plaintext
-    return { user: saved, temporaryPassword };
+    if (saved.rol === "cliente") {
+      await activation!.invite(actor.id, saved.id, cmd.ctx);
+    }
+    return { user: saved, invitationSent: saved.rol === "cliente" };
   }
 }
 

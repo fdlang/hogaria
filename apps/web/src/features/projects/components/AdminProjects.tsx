@@ -20,10 +20,9 @@ import { formatMoney, formatDate } from "@/shared/lib/formatters";
 interface Props {
   api: ProjectsApi;
   onOpenProject: (id: number) => void;
-  onCreateProject: () => void;
 }
 
-export function AdminProjects({ api, onOpenProject, onCreateProject }: Props) {
+export function AdminProjects({ api, onOpenProject }: Props) {
   const projects = useProjects(api);
   const mutations = useProjectMutations(api);
   const { can } = usePermissions();
@@ -91,7 +90,6 @@ export function AdminProjects({ api, onOpenProject, onCreateProject }: Props) {
         actions={
           <>
             <Button small variant="ghost" onClick={projects.refresh}>↻ Actualizar</Button>
-            {can("project.update") && <Button small onClick={onCreateProject}>+ Nuevo proyecto</Button>}
           </>
         }
       />

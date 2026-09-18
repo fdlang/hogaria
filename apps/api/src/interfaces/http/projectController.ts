@@ -4,7 +4,7 @@
  * are enforced inside the use cases via PermissionPolicy.
  */
 
-import { AssignProjectProfessionalUseCase, CreateProjectUseCase, DeleteProjectUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "../../application/use-cases/project.use-cases.js";
+import { AssignProjectProfessionalUseCase, DeleteProjectUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "../../application/use-cases/project.use-cases.js";
 import { Project } from "@reformapro/domain/entities";
 import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
@@ -26,7 +26,6 @@ export function toProjectDTO(p: Project) {
 }
 
 export function projectController(deps: {
-  create: CreateProjectUseCase;
   update: UpdateProjectUseCase;
   delete: DeleteProjectUseCase;
   list:   ListProjectsUseCase;
@@ -37,18 +36,6 @@ export function projectController(deps: {
   const ctxOf = (req: HttpRequest) => ({ ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" });
 
   return {
-    // POST /projects
-    async create(req: HttpRequest & { actorId: number }): Promise<HttpResponse> {
-      try {
-        const body = (req.body ?? {}) as Record<string, unknown>;
-        const project = await deps.create.execute({
-          ...body,
-          actorId: req.actorId, ctx: ctxOf(req),
-        } as never);
-        return { status: 201, body: toProjectDTO(project) };
-      } catch (e) { return toHttpError(e); }
-    },
-
     // PATCH /projects/:id
     async update(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {

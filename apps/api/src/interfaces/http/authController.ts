@@ -44,7 +44,7 @@ export function authController(deps: {
         const payload = await deps.tokens.verify(bearer);
         if (!payload) throw new UnauthorizedError();
         const user = await deps.users.findById(payload.userId);
-        if (!user) throw new UnauthorizedError();
+        if (!user || !user.activo) throw new UnauthorizedError();
         return { status: 200, body: user };
       } catch (e) { const { status, body } = toHttpError(e); return { status, body }; }
     },

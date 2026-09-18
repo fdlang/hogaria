@@ -31,6 +31,7 @@ const ACTION_CODES: Record<DomainEvent["type"], string> = {
   OpportunityCreated:          "OPORTUNIDAD_CREADA",
   EstimateCreated:             "PRESUPUESTO_CREADO",
   EstimateSent:                "PRESUPUESTO_ENVIADO",
+  EstimateSigned:              "DOCUMENTO_FIRMADO",
   EstimateAccepted:            "PRESUPUESTO_ACEPTADO",
   EstimateRejected:            "PRESUPUESTO_RECHAZADO",
 };

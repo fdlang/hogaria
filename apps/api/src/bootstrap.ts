@@ -8,8 +8,8 @@
  */
 
 import {
-  InMemoryUserRepository, InMemoryProjectRepository, InMemoryBudgetRepository, InMemoryOpportunityRepository, InMemoryEstimateRepository, InMemoryChangeOrderRepository,
-  InMemoryChallengeRepository, InMemoryAuditRepository,
+  InMemoryUserRepository, InMemoryProjectRepository, InMemoryOpportunityRepository, InMemoryEstimateRepository, InMemoryChangeOrderRepository,
+  InMemoryAuditRepository,
 } from "./infrastructure/database/inMemoryRepositories.js";
 import { BcryptPasswordHasher } from "./infrastructure/database/passwordHasher.js";
 import bcrypt from "bcryptjs";
@@ -22,15 +22,10 @@ import { AuditSubscriber }       from "./infrastructure/audit/audit.subscriber.j
 
 import { LoginUseCase } from "./application/use-cases/auth.use-cases.js";
 import {
-  CreateBudgetUseCase, SendBudgetUseCase, DeleteBudgetUseCase,
-  GetBudgetUseCase, ListBudgetsUseCase, RequestSignatureChallengeUseCase, UpdateBudgetUseCase,
-} from "./application/use-cases/budget.use-cases.js";
-import { SignBudgetUseCase } from "./application/use-cases/sign-budget.use-case.js";
-import {
   CreateUserUseCase, UpdateUserUseCase, DeleteUserUseCase, ListUsersUseCase,
 } from "./application/use-cases/user.use-cases.js";
 import {
-  AssignProjectProfessionalUseCase, CreateProjectUseCase, DeleteProjectUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase,
+  AssignProjectProfessionalUseCase, DeleteProjectUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase,
 } from "./application/use-cases/project.use-cases.js";
 import { QueryAuditLogUseCase } from "./application/use-cases/audit.use-cases.js";
 import {
@@ -43,10 +38,13 @@ import {
 } from "./application/use-cases/file.use-cases.js";
 import { VercelBlobFileStorage } from "./infrastructure/storage/vercelBlobFileStorage.js";
 import { ChangeOrderUseCases, EstimateUseCases, OpportunityUseCases } from "./application/use-cases/sales.use-cases.js";
+import { AccountActivationUseCases, configureActivationPasswordHasher, IActivationTokenRepository } from "./application/use-cases/account-activation.use-cases.js";
+import { InMemoryActivationTokenRepository, PostgresActivationTokenRepository } from "./infrastructure/database/activationTokenRepositories.js";
+import { ResendTransactionalEmail } from "./infrastructure/email/resendTransactionalEmail.js";
 import { NotFoundError } from "@reformapro/domain/errors";
 import { Email } from "@reformapro/domain/value-objects";
-import { IAuditRepository, IBudgetRepository, IChangeOrderRepository, IChallengeRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
-import { PostgresAuditRepository, PostgresBudgetRepository, PostgresChangeOrderRepository, PostgresChallengeRepository, PostgresEstimateRepository, PostgresFileRepository, PostgresOpportunityRepository, PostgresProjectRepository, PostgresSolicitudRepository, PostgresUserRepository } from "./infrastructure/database/postgresRepositories.js";
+import { IAuditRepository, IChangeOrderRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
+import { PostgresAuditRepository, PostgresChangeOrderRepository, PostgresEstimateRepository, PostgresFileRepository, PostgresOpportunityRepository, PostgresProjectRepository, PostgresSolicitudRepository, PostgresUserRepository } from "./infrastructure/database/postgresRepositories.js";
 import pg from "pg";
 
 // ─────────────────────────────────────────────────────────────
@@ -98,8 +96,6 @@ class InMemoryFileRepository implements IFileRepository {
 export interface AppDependencies {
   users:        IUserRepository;
   projects:     IProjectRepository;
-  budgets:      IBudgetRepository;
-  challenges:   IChallengeRepository;
   audit:        IAuditRepository;
   events:       InMemoryEventEmitter;
   tokens:       WebCryptoTokenService;
@@ -112,19 +108,10 @@ export interface AppDependencies {
 
   useCases: {
     login:                     LoginUseCase;
-    createBudget:              CreateBudgetUseCase;
-    sendBudget:                SendBudgetUseCase;
-    deleteBudget:              DeleteBudgetUseCase;
-    listBudgets:               ListBudgetsUseCase;
-    getBudget:                 GetBudgetUseCase;
-    updateBudget:              UpdateBudgetUseCase;
-    requestSignatureChallenge: RequestSignatureChallengeUseCase;
-    signBudget:                SignBudgetUseCase;
     createUser:                CreateUserUseCase;
     updateUser:                UpdateUserUseCase;
     deleteUser:                DeleteUserUseCase;
     listUsers:                 ListUsersUseCase;
-    createProject:             CreateProjectUseCase;
     updateProject:             UpdateProjectUseCase;
     deleteProject:             DeleteProjectUseCase;
     listProjects:              ListProjectsUseCase;
@@ -142,6 +129,7 @@ export interface AppDependencies {
     opportunities:             OpportunityUseCases;
     estimates:                 EstimateUseCases;
     changes:                   ChangeOrderUseCases;
+    activation:                AccountActivationUseCases;
   };
 }
 
@@ -163,8 +151,6 @@ export async function buildApp(): Promise<AppDependencies> {
   const pool = databaseUrl ? new pg.Pool({ connectionString: databaseUrl }) : null;
   const users: IUserRepository = pool ? new PostgresUserRepository(pool, hasher) : new InMemoryUserRepository(hasher);
   const projects: IProjectRepository = pool ? new PostgresProjectRepository(pool) : new InMemoryProjectRepository();
-  const budgets: IBudgetRepository = pool ? new PostgresBudgetRepository(pool) : new InMemoryBudgetRepository();
-  const challenges: IChallengeRepository = pool ? new PostgresChallengeRepository(pool) : new InMemoryChallengeRepository();
   const audit: IAuditRepository = pool ? new PostgresAuditRepository(pool) : new InMemoryAuditRepository();
   const files: IFileRepository = pool ? new PostgresFileRepository(pool) : new InMemoryFileRepository();
   const fileStorage: IFileStorage = new VercelBlobFileStorage();
@@ -172,6 +158,9 @@ export async function buildApp(): Promise<AppDependencies> {
   const opportunities: IOpportunityRepository = pool ? new PostgresOpportunityRepository(pool) : new InMemoryOpportunityRepository();
   const estimates: IEstimateRepository = pool ? new PostgresEstimateRepository(pool) : new InMemoryEstimateRepository();
   const changes: IChangeOrderRepository = pool ? new PostgresChangeOrderRepository(pool) : new InMemoryChangeOrderRepository();
+  const activationTokens: IActivationTokenRepository = pool ? new PostgresActivationTokenRepository(pool) : new InMemoryActivationTokenRepository();
+  configureActivationPasswordHasher(value => hasher.hash(value));
+  const activation = new AccountActivationUseCases(users, activationTokens, new ResendTransactionalEmail(process.env.RESEND_API_KEY, process.env.EMAIL_FROM), process.env.APP_URL ?? "http://localhost:5173");
 
   // Development seed. PostgreSQL deployments use the same credentials only
   // during the first bootstrap; override all values through environment vars.
@@ -195,19 +184,10 @@ export async function buildApp(): Promise<AppDependencies> {
   // ── Use cases ──────────────────────────────────────────────────
   const useCases = {
     login:                      new LoginUseCase(users, tokens, events),
-    createBudget:               new CreateBudgetUseCase(users, projects, budgets, events),
-    sendBudget:                 new SendBudgetUseCase(users, budgets, events),
-    deleteBudget:               new DeleteBudgetUseCase(users, budgets),
-    listBudgets:                new ListBudgetsUseCase(users, budgets),
-    getBudget:                  new GetBudgetUseCase(users, budgets),
-    updateBudget:               new UpdateBudgetUseCase(users, budgets),
-    requestSignatureChallenge:  new RequestSignatureChallengeUseCase(users, budgets, challenges, sigCrypto, events),
-    signBudget:                 new SignBudgetUseCase(users, budgets, challenges, sigCrypto, events),
-    createUser:                 new CreateUserUseCase(users, hasher, generateTempPassword, events),
+    createUser:                 new CreateUserUseCase(users, hasher, generateTempPassword, events, activation),
     updateUser:                 new UpdateUserUseCase(users, hasher, events),
     deleteUser:                 new DeleteUserUseCase(users, events),
     listUsers:                  new ListUsersUseCase(users),
-    createProject:              new CreateProjectUseCase(users, projects, events),
     updateProject:              new UpdateProjectUseCase(users, projects, events),
     deleteProject:              new DeleteProjectUseCase(users, projects),
     listProjects:               new ListProjectsUseCase(users, projects),
@@ -225,7 +205,8 @@ export async function buildApp(): Promise<AppDependencies> {
     opportunities:              new OpportunityUseCases(users, opportunities, events),
     estimates:                  new EstimateUseCases(users, opportunities, estimates, projects, events, sigCrypto),
     changes:                    new ChangeOrderUseCases(users, projects, changes),
+    activation,
   };
 
-  return { users, projects, budgets, challenges, audit, events, tokens, signatureCrypto: sigCrypto, files, solicitudes, opportunities, estimates, changes, useCases };
+  return { users, projects, audit, events, tokens, signatureCrypto: sigCrypto, files, solicitudes, opportunities, estimates, changes, useCases };
 }

@@ -4,6 +4,7 @@
  */
 
 import { CreateUserUseCase, UpdateUserUseCase, DeleteUserUseCase, ListUsersUseCase } from "../../application/use-cases/user.use-cases.js";
+import { AccountActivationUseCases } from "../../application/use-cases/account-activation.use-cases.js";
 import { User, UserRole } from "@reformapro/domain/entities";
 import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
@@ -21,6 +22,7 @@ export function userController(deps: {
   update: UpdateUserUseCase;
   delete: DeleteUserUseCase;
   list:   ListUsersUseCase;
+  activation: AccountActivationUseCases;
 }) {
   const ctxOf = (req: HttpRequest) => ({ ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" });
 
@@ -29,13 +31,21 @@ export function userController(deps: {
     async create(req: HttpRequest & { actorId: number }): Promise<HttpResponse> {
       try {
         const body = req.body as { email: string; nombre: string; rol: UserRole; profesion?: string; telefono?: string };
-        const { user, temporaryPassword } = await deps.create.execute({
+        const { user, invitationSent } = await deps.create.execute({
           actorId: req.actorId, ctx: ctxOf(req),
           email: body.email, nombre: body.nombre, rol: body.rol,
           profesion: body.profesion as never, telefono: body.telefono,
         });
-        return { status: 201, body: { user: toUserDTO(user), temporaryPassword } };
+        return { status: 201, body: { user: toUserDTO(user), invitationSent } };
       } catch (e) { return toHttpError(e); }
+    },
+
+    async resendInvitation(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try { const result = await deps.activation.invite(req.actorId, parseInt(req.params.id, 10), ctxOf(req)); return { status: 202, body: { email: result.email, expiresAt: result.expiresAt.toISOString() } }; } catch (e) { return toHttpError(e); }
+    },
+
+    async activate(req: HttpRequest): Promise<HttpResponse> {
+      try { const body = req.body as { token?: string; password?: string }; await deps.activation.activate(body.token ?? "", body.password ?? ""); return { status: 204, body: null }; } catch (e) { return toHttpError(e); }
     },
 
     // PATCH /users/:id

@@ -36,6 +36,7 @@ CREATE TABLE estimates (
   estado TEXT NOT NULL CHECK (estado IN ('borrador','en_revision','enviado','firmado','aceptado','rechazado','caducado','sustituido')) DEFAULT 'borrador',
   version_actual INTEGER NOT NULL DEFAULT 1,
   borrador JSONB NOT NULL DEFAULT '{}'::jsonb,
+  motivo_rechazo TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

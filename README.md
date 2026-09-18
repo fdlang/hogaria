@@ -66,6 +66,14 @@ docker compose up -d
 npm run db:migrate --workspace @reformapro/api
 ```
 
+Tras desplegar el flujo comercial versionado, aplica también las migraciones
+incrementales pendientes (una sola vez por base de datos):
+
+```bash
+npm run db:migrate-sales-signature --workspace @reformapro/api
+npm run db:migrate-estimate-rejection --workspace @reformapro/api
+```
+
 La primera ejecución puede crear un administrador usando las variables
 `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME` de `apps/api/.env`.
 No uses las credenciales de ejemplo fuera de tu entorno local.
@@ -88,6 +96,9 @@ npm run db:migrate --workspace @reformapro/api
 | Variable | Uso |
 | --- | --- |
 | `DATABASE_URL` | Conexión PostgreSQL. Obligatoria en producción. |
+| `RESEND_API_KEY` | Clave de Resend para invitaciones seguras de clientes. |
+| `EMAIL_FROM` | Remitente verificado en Resend, p. ej. `Hogaria <info@hogaria.design>`. |
+| `APP_URL` | URL pública, p. ej. `https://www.hogaria.design`. |
 | `HMAC_SECRET` | Secreto de al menos 32 caracteres para sesiones y firmas. Obligatorio en producción. |
 | `ALLOWED_ORIGINS` | Orígenes CORS adicionales, separados por comas. |
 | `SEED_ADMIN_EMAIL` | Email del administrador inicial. |
