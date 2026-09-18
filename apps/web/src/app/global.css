@@ -308,9 +308,9 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .private-brand-wordmark { width: 136px; height: 33px; }
   .private-nav { margin-inline: 0; width: 100%; padding-inline: 0; }
   .private-nav > span { display: none; }
-  .private-nav { flex-wrap: nowrap !important; overflow-x: auto !important; overscroll-behavior-x: contain; scrollbar-width: thin; }
+  .private-nav { flex-wrap: wrap !important; overflow: visible !important; gap: 4px 6px !important; }
   .private-nav > a, .private-nav > button { flex: 0 0 auto; }
-  .private-nav-link { font-size: 12px !important; }
+  .private-nav-link { min-height: 38px; padding: 8px 7px !important; font-size: 11px !important; letter-spacing: .035em !important; }
   .private-nav > a, .private-nav > button, .ui-button { min-height: 44px; }
   .admin-home-grid { grid-template-columns: 1fr; }
   .admin-home-grid > a { min-height: 0; }
@@ -334,6 +334,21 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .private-table-scroll table { min-width: 620px; }
   .data-table-scroll table { min-width: 680px; }
   .data-table-scroll::after, .private-table-scroll::after { content: "Desliza horizontalmente para ver todas las columnas"; display: block; padding: 8px 16px; color: var(--muted); font-size: 12px; background: var(--marble-light); }
+  .catalog-manager__table-scroll { margin: 0 !important; border-radius: 0 0 8px 8px !important; overflow: visible; }
+  .catalog-manager__table-scroll::after { display: none !important; }
+  .catalog-manager__table { display: block; min-width: 0 !important; width: 100%; }
+  .catalog-manager__table thead { display: none; }
+  .catalog-manager__table tbody, .catalog-manager__table tr, .catalog-manager__table td { display: block; width: 100%; }
+  .catalog-manager__table tr { padding: 15px 16px; border-bottom: 1px solid var(--line); }
+  .catalog-manager__table tr:last-child { border-bottom: 0; }
+  .catalog-manager__table td { padding: 0; border: 0; }
+  .catalog-manager__table td[data-label]::before { display: block; margin-bottom: 3px; color: var(--muted); content: attr(data-label); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .catalog-manager__table td:nth-child(2) { margin-top: 10px; }
+  .catalog-manager__table td:nth-child(2) strong { font-size: 16px; line-height: 1.25; }
+  .catalog-manager__table td:nth-child(2) small { color: var(--muted); font-size: 12px; }
+  .catalog-manager__table td:nth-child(3), .catalog-manager__table td:nth-child(4) { display: inline-block; width: auto; margin: 11px 18px 0 0; vertical-align: top; }
+  .catalog-manager__table td:last-child { margin-top: 12px; }
+  .catalog-manager__table td:last-child > div { flex-wrap: wrap; }
 
   .private-action-card { gap: 12px !important; }
   .private-action-card > div:first-child > div:first-child { flex-wrap: wrap; }
