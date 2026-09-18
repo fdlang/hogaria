@@ -147,8 +147,8 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
 
       {user ? (
         <>
-        <button className="private-mobile-menu-toggle" type="button" aria-expanded={menuOpen} aria-controls="private-mobile-navigation" onClick={() => setMenuOpen(true)}>
-          <span aria-hidden="true">☰</span><span>Menú</span>
+        <button className="private-mobile-menu-toggle" type="button" aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"} aria-expanded={menuOpen} aria-controls="private-mobile-navigation" onClick={() => setMenuOpen((open) => !open)}>
+          <span className="private-mobile-menu-icon" aria-hidden="true"><span /><span /><span /></span>
         </button>
         <nav className="private-nav" aria-label="Navegación privada" style={{ display: "flex", alignItems: "center", gap: 18 }}>
           {links.map((link, index) => {
@@ -168,7 +168,7 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
         </nav>
         {menuOpen && <div className="private-mobile-menu-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setMenuOpen(false); }}>
           <aside id="private-mobile-navigation" className="private-mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Menú privado">
-            <header><div><p className="eyebrow">Área privada</p><strong>{user.nombre}</strong></div><button type="button" className="private-mobile-menu-close" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú">×</button></header>
+            <header><div><p className="eyebrow">Área privada</p><strong>{user.nombre}</strong></div><button type="button" className="private-mobile-menu-close" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú"><span className="private-mobile-menu-icon private-mobile-menu-icon--close" aria-hidden="true"><span /><span /><span /></span></button></header>
             <nav aria-label="Secciones privadas">{groups.map((group) => group.links.length > 0 && <section key={group.label}><p>{group.label}</p>{group.links.map((link) => <a key={link.to} href={link.to} onClick={() => setMenuOpen(false)}>{link.label}</a>)}</section>)}</nav>
             <Button variant="ghost" onClick={() => { setMenuOpen(false); onSignOut(); }}>Salir del área privada</Button>
           </aside>
