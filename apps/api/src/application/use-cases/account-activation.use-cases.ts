@@ -6,7 +6,8 @@ export interface ActivationToken { userId: number; tokenHash: string; expiresAt:
 export interface IActivationTokenRepository {
   replace(token: ActivationToken): Promise<void>;
   findValid(tokenHash: string, now: Date): Promise<ActivationToken | null>;
-  consume(tokenHash: string, usedAt: Date): Promise<void>;
+  /** Atomically removes the token. A consumed activation link cannot be replayed. */
+  consume(tokenHash: string): Promise<void>;
 }
 export interface ITransactionalEmail { isConfigured(): boolean; sendActivation(input: { to: string; name: string; activationUrl: string; expiresAt: Date }): Promise<void>; }
 
@@ -40,8 +41,9 @@ export class AccountActivationUseCases {
     const hash = await tokenHash(token); const record = await this.tokens.findValid(hash, new Date());
     if (!record) throw new ConflictError("El enlace ha caducado, ya se utilizó o no es válido");
     const user = await this.users.findById(record.userId); if (!user || user.rol !== "cliente") throw new ConflictError("La invitación ya no está disponible");
-    // Marking the token as consumed before enabling the account prevents replay if requests race.
-    await this.tokens.consume(hash, new Date());
+    // Consume first and atomically. The token is removed rather than merely hidden,
+    // so a successful activation link has no credential material left to replay.
+    await this.tokens.consume(hash);
     const passwordHash = await bcryptHash(password);
     await this.users.updatePassword(user.id, passwordHash);
     await this.users.update(user.id, { activo: true });

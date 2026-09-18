@@ -19,6 +19,19 @@ export type PublicChangeOrder = {
   createdAt: Date;
 };
 
+export interface CommercialRepositories {
+  opportunities: IOpportunityRepository;
+  estimates: IEstimateRepository;
+  projects: IProjectRepository;
+}
+export interface ICommercialTransaction {
+  execute<T>(operation: (repositories: CommercialRepositories) => Promise<T>): Promise<T>;
+}
+export class PassthroughCommercialTransaction implements ICommercialTransaction {
+  constructor(private readonly repositories: CommercialRepositories) {}
+  async execute<T>(operation: (repositories: CommercialRepositories) => Promise<T>) { return operation(this.repositories); }
+}
+
 function assertAdmin(user: User | null): asserts user is User { if (!user || user.rol !== "admin") throw new ForbiddenError(); }
 function validateDraft(draft: EstimateDraft) {
   if (!draft.titulo?.trim()) throw new ValidationError("Título obligatorio", "titulo");
@@ -46,7 +59,10 @@ export class OpportunityUseCases {
 }
 
 export class EstimateUseCases {
-  constructor(private readonly users: IUserRepository, private readonly opportunities: IOpportunityRepository, private readonly estimates: IEstimateRepository, private readonly projects: IProjectRepository, private readonly events: IEventEmitter, private readonly crypto: ISignatureCrypto) {}
+  private readonly transaction: ICommercialTransaction;
+  constructor(private readonly users: IUserRepository, private readonly opportunities: IOpportunityRepository, private readonly estimates: IEstimateRepository, private readonly projects: IProjectRepository, private readonly events: IEventEmitter, private readonly crypto: ISignatureCrypto, transaction?: ICommercialTransaction) {
+    this.transaction = transaction ?? new PassthroughCommercialTransaction({ opportunities, estimates, projects });
+  }
   async list(actorId: number) { const actor = await this.users.findById(actorId); if (!actor) throw new ForbiddenError(); return actor.rol === "admin" ? this.estimates.findAll() : (await this.estimates.findAll()).filter(e => e.clienteId === actor.id); }
   async publicList(actorId: number) {
     const actor = await this.users.findById(actorId);
@@ -97,7 +113,26 @@ export class EstimateUseCases {
     await this.estimates.signVersion(id, current.version, firma, now); const saved = await this.estimates.update(id, { estado: "firmado" });
     await this.events.emit({ type: "EstimateSigned", eventId: crypto.randomUUID(), occurredAt: now, actorId: actor.id, actorName: actor.nombre, ip: ctx.ip, userAgent: ctx.userAgent, estimateId: id, hash: hash.value }); return { estimate: saved, hash: hash.value, fechaFirma: now };
   }
-  async accept(actorId: number, id: number, ctx: ClientContext): Promise<Project> { const actor = await this.users.findById(actorId); assertAdmin(actor); const estimate = await this.require(id); if (estimate.estado !== "firmado") throw new ConflictError("Solo una propuesta firmada puede convertirse en proyecto"); const current = (await this.estimates.findVersions(id)).find(v => v.version === estimate.versionActual); if (!current?.firmadoAt) throw new ConflictError("Falta la firma de la versión vigente"); const opportunity = await this.opportunities.findById(estimate.oportunidadId); if (!opportunity) throw new NotFoundError("Oportunidad"); const subtotal = current.snapshot.partidas.reduce((sum, l) => sum + l.cantidad * l.precioVentaUnitario * (1 - l.descuento / 100), 0); const project: Project = { id: 0, estimateId: estimate.id, nombre: estimate.titulo, descripcion: opportunity.descripcion, clienteId: estimate.clienteId, direccion: opportunity.direccion, tipo: opportunity.tipo, estado: "planificacion", progreso: Percentage.zero(), presupuesto: Money.of(subtotal), fechaInicio: new Date(), fechaFinPrevista: new Date(), profesionalesAsignados: [], hitos: [], createdAt: new Date() }; const saved = await this.projects.save(project); await this.estimates.update(id, { estado: "aceptado" }); await this.opportunities.update(opportunity.id, { estado: "ganada" }); await this.events.emit({ type: "EstimateAccepted", eventId: crypto.randomUUID(), occurredAt: new Date(), actorId: actor.id, actorName: actor.nombre, ip: ctx.ip, userAgent: ctx.userAgent, estimateId: id, projectId: saved.id }); return saved; }
+  async accept(actorId: number, id: number, ctx: ClientContext): Promise<Project> {
+    const actor = await this.users.findById(actorId); assertAdmin(actor);
+    const saved = await this.transaction.execute(async ({ estimates, opportunities, projects }) => {
+      const estimate = await estimates.findById(id);
+      if (!estimate) throw new NotFoundError("Presupuesto");
+      if (estimate.estado !== "firmado") throw new ConflictError("Solo una propuesta firmada puede convertirse en proyecto");
+      const current = (await estimates.findVersions(id)).find(version => version.version === estimate.versionActual);
+      if (!current?.firmadoAt) throw new ConflictError("Falta la firma de la versión vigente");
+      const opportunity = await opportunities.findById(estimate.oportunidadId);
+      if (!opportunity) throw new NotFoundError("Oportunidad");
+      const subtotal = current.snapshot.partidas.reduce((sum, line) => sum + line.cantidad * line.precioVentaUnitario * (1 - line.descuento / 100), 0);
+      const project: Project = { id: 0, estimateId: estimate.id, nombre: estimate.titulo, descripcion: opportunity.descripcion, clienteId: estimate.clienteId, direccion: opportunity.direccion, tipo: opportunity.tipo, estado: "planificacion", progreso: Percentage.zero(), presupuesto: Money.of(subtotal), fechaInicio: new Date(), fechaFinPrevista: new Date(), profesionalesAsignados: [], hitos: [], createdAt: new Date() };
+      const created = await projects.save(project);
+      await estimates.update(id, { estado: "aceptado" });
+      await opportunities.update(opportunity.id, { estado: "ganada" });
+      return created;
+    });
+    await this.events.emit({ type: "EstimateAccepted", eventId: crypto.randomUUID(), occurredAt: new Date(), actorId: actor.id, actorName: actor.nombre, ip: ctx.ip, userAgent: ctx.userAgent, estimateId: id, projectId: saved.id });
+    return saved;
+  }
   private async require(id: number) { const estimate = await this.estimates.findById(id); if (!estimate) throw new NotFoundError("Presupuesto"); return estimate; }
   private async publicView(estimate: Estimate) {
     const version = (await this.estimates.findVersions(estimate.id)).find(v => v.version === estimate.versionActual) ?? null;

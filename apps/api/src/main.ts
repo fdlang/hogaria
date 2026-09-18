@@ -231,10 +231,12 @@ function parseJsonBody(req: IncomingMessage): Promise<unknown> {
     if (req.method === "GET" || req.method === "DELETE") { resolve({}); return; }
     let raw = "";
     let tooLarge = false;
+    let receivedBytes = 0;
     req.on("data", (chunk: Buffer) => {
+      receivedBytes += chunk.byteLength;
+      // Drain oversized requests without retaining their contents in memory.
+      if (receivedBytes > 4_400_000) { tooLarge = true; return; }
       raw += chunk.toString();
-      // A 3 MiB file is ~4.2 MB after base64 encoding; keep below Vercel's 4.5 MB ceiling.
-      if (raw.length > 4_400_000) tooLarge = true;
     });
     req.on("end", () => {
       if (tooLarge) { reject(new ValidationError("La solicitud supera el límite permitido")); return; }

@@ -62,17 +62,20 @@ export class CreateUserUseCase {
       ...(cmd.telefono  !== undefined ? { telefono:  cmd.telefono  } : {}),
     };
     const saved = await this.users.save(user, passwordHash);
-
+    try {
+      if (saved.rol === "cliente") await activation!.invite(actor.id, saved.id, cmd.ctx);
+    } catch (error) {
+      // No related records exist yet: compensate a failed invitation so the admin
+      // can retry creation instead of inheriting a silent, inactive account.
+      await this.users.delete(saved.id).catch(() => undefined);
+      throw error;
+    }
     await this.events.emit({
       type: "UserCreated", eventId: crypto.randomUUID(), occurredAt: new Date(),
       actorId: actor.id, actorName: actor.nombre,
       ip: cmd.ctx.ip, userAgent: cmd.ctx.userAgent,
       userId: saved.id, role: cmd.rol,
     });
-
-    if (saved.rol === "cliente") {
-      await activation!.invite(actor.id, saved.id, cmd.ctx);
-    }
     return { user: saved, invitationSent: saved.rol === "cliente" };
   }
 }

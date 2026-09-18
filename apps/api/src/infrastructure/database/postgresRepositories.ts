@@ -27,13 +27,13 @@ export class PostgresUserRepository implements IUserRepository {
 }
 
 export class PostgresProjectRepository implements IProjectRepository {
-  constructor(private readonly pool: pg.Pool) {} private map(r: Row) { return restoreProject(Number(r.id), r.payload); }
+  constructor(private readonly pool: pg.Pool | pg.PoolClient) {} private map(r: Row) { return restoreProject(Number(r.id), r.payload); }
   async findById(id:number){const r=await this.pool.query("SELECT * FROM projects WHERE id=$1",[id]);return r.rows[0]?this.map(r.rows[0]):null} async findByClient(id:number){return(await this.pool.query("SELECT * FROM projects WHERE cliente_id=$1",[id])).rows.map(r=>this.map(r))} async findByProfesional(id:number){return(await this.pool.query("SELECT * FROM projects WHERE payload->'profesionalesAsignados' @> $1::jsonb",[JSON.stringify([{userId:id}])])).rows.map(r=>this.map(r))} async findAll(){return(await this.pool.query("SELECT * FROM projects ORDER BY id")).rows.map(r=>this.map(r))}
   async save(p:Project){const r=await this.pool.query("INSERT INTO projects(cliente_id,estimate_id,payload) VALUES($1,$2,$3) RETURNING *",[p.clienteId,p.estimateId,projectPayload(p)]);return this.map(r.rows[0])} async update(id:number,c:Partial<Omit<Project,"id"|"createdAt">>){const old=await this.findById(id);if(!old)throw new NotFoundError("Proyecto");const next={...old,...c};const r=await this.pool.query("UPDATE projects SET cliente_id=$2,payload=$3 WHERE id=$1 RETURNING *",[id,next.clienteId,projectPayload(next)]);return this.map(r.rows[0])} async delete(id:number){await this.pool.query("DELETE FROM projects WHERE id=$1",[id])}
 }
 
 export class PostgresOpportunityRepository implements IOpportunityRepository {
-  constructor(private readonly pool: pg.Pool) {}
+  constructor(private readonly pool: pg.Pool | pg.PoolClient) {}
   private map(r: Row): Opportunity { return { id: Number(r.id), clienteId: r.cliente_id == null ? null : Number(r.cliente_id), nombre: r.nombre, email: r.email, telefono: r.telefono, direccion: r.direccion, tipo: r.tipo, descripcion: r.descripcion, estado: r.estado as OpportunityStatus, fechaVisita: r.fecha_visita ? date(r.fecha_visita) : null, notasInternas: r.notas_internas, createdAt: date(r.created_at), updatedAt: date(r.updated_at) }; }
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM opportunities WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async findAll(status?: OpportunityStatus) { const r = await this.pool.query(status ? "SELECT * FROM opportunities WHERE estado=$1 ORDER BY updated_at DESC" : "SELECT * FROM opportunities ORDER BY updated_at DESC", status ? [status] : []); return r.rows.map(row => this.map(row)); }
@@ -64,7 +64,7 @@ export class PostgresCatalogRepository implements ICatalogRepository {
 }
 
 export class PostgresEstimateRepository implements IEstimateRepository {
-  constructor(private readonly pool: pg.Pool) {}
+  constructor(private readonly pool: pg.Pool | pg.PoolClient) {}
   private map(r: Row): Estimate { return { id: Number(r.id), oportunidadId: Number(r.oportunidad_id), clienteId: Number(r.cliente_id), numero: r.numero, titulo: r.titulo, estado: r.estado, versionActual: Number(r.version_actual), borrador: r.borrador as EstimateDraft, motivoRechazo: r.motivo_rechazo ?? null, createdAt: date(r.created_at), updatedAt: date(r.updated_at) }; }
   private mapVersion(r: Row): EstimateVersion { return { id: Number(r.id), estimateId: Number(r.estimate_id), version: Number(r.version), snapshot: r.snapshot as EstimateDraft, enviadoAt: r.enviado_at ? date(r.enviado_at) : null, firmadoAt: r.firmado_at ? date(r.firmado_at) : null, firma: r.firma ?? null, createdAt: date(r.created_at) }; }
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM estimates WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
@@ -85,7 +85,30 @@ export class PostgresChangeOrderRepository implements IChangeOrderRepository {
   async update(id: number, changes: Partial<Pick<ChangeOrder, "estado" | "payload" | "aprobadoAt">>) { const r = await this.pool.query("UPDATE change_orders SET estado=COALESCE($2,estado),payload=COALESCE($3,payload),aprobado_at=COALESCE($4,aprobado_at) WHERE id=$1 RETURNING *", [id,changes.estado ?? null,changes.payload ?? null,changes.aprobadoAt ?? null]); if (!r.rows[0]) throw new NotFoundError("Orden de cambio"); return this.map(r.rows[0]); }
 }
 
-export class PostgresAuditRepository implements IAuditRepository { constructor(private readonly pool:pg.Pool){} async append(e:AuditEntry){await this.pool.query("INSERT INTO audit_entries(id,payload,timestamp) VALUES($1,$2,$3)",[e.id,{...e,timestamp:e.timestamp.toISOString()},e.timestamp])} async findAll(){const r=await this.pool.query("SELECT payload FROM audit_entries ORDER BY timestamp DESC");const items=r.rows.map(x=>({...x.payload,timestamp:date(x.payload.timestamp)}));return{items,total:items.length,page:0,limit:50,pages:1}} }
+export class PostgresAuditRepository implements IAuditRepository {
+  constructor(private readonly pool: pg.Pool) {}
+  async append(e: AuditEntry) {
+    await this.pool.query("INSERT INTO audit_entries(id,payload,timestamp) VALUES($1,$2,$3)", [e.id, { ...e, timestamp: e.timestamp.toISOString() }, e.timestamp]);
+  }
+  async findAll(opts: { page?: number; limit?: number; action?: string | null; userId?: number | null; from?: Date | null; to?: Date | null }) {
+    const page = Math.max(0, opts.page ?? 0);
+    const limit = Math.min(Math.max(1, opts.limit ?? 50), 200);
+    const clauses: string[] = [];
+    const values: unknown[] = [];
+    const add = (sql: string, value: unknown) => { values.push(value); clauses.push(sql.replace("?", `$${values.length}`)); };
+    if (opts.action) add("payload->>'action'=?", opts.action);
+    if (opts.userId != null) add("(payload->>'userId')::int=?", opts.userId);
+    if (opts.from) add("timestamp>=?", opts.from);
+    if (opts.to) add("timestamp<=?", opts.to);
+    const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";
+    const totalResult = await this.pool.query(`SELECT count(*)::int AS total FROM audit_entries${where}`, values);
+    const total = Number(totalResult.rows[0]?.total ?? 0);
+    values.push(limit, page * limit);
+    const rows = await this.pool.query(`SELECT payload FROM audit_entries${where} ORDER BY timestamp DESC LIMIT $${values.length - 1} OFFSET $${values.length}`, values);
+    const items = rows.rows.map(row => ({ ...row.payload, timestamp: date(row.payload.timestamp) } as AuditEntry));
+    return { items, total, page, limit, pages: Math.ceil(total / limit) };
+  }
+}
 export class PostgresSolicitudRepository implements ISolicitudRepository {
   constructor(private readonly pool: pg.Pool) {}
   private map(r: Row) { return { id: Number(r.id), nombre: r.nombre, email: r.email, telefono: r.telefono, tipo: r.tipo, descripcion: r.descripcion, estado: r.estado, ip: r.ip ?? "", fecha: date(r.fecha), motivo: r.motivo ?? null }; }

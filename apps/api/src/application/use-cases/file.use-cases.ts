@@ -4,7 +4,7 @@
  * Production notes:
  *   - Actual binary storage lives in S3/Cloud Storage; this use-case only
  *     handles metadata + access control.
- *   - Magic-byte validation happens at the upload endpoint, not here.
+ *   - File signatures are checked here, before storage.
  *   - Sensitive files (contracts, invoices) are role-gated at read time.
  */
 
@@ -93,6 +93,7 @@ export class UploadFileUseCase {
     if (cmd.tamaño > MAX_FILE_BYTES)    throw new ValidationError(`Archivo supera ${MAX_FILE_BYTES / 1024 / 1024} MB`);
     if (!ALLOWED_MIMES.has(cmd.tipo))   throw new ValidationError(`Tipo de archivo no permitido: ${cmd.tipo}`);
     if (!cmd.nombre?.trim())            throw new ValidationError("Nombre de archivo obligatorio");
+    assertFileSignature(bytes, cmd.tipo);
 
     const stored = await this.storage.put({ projectId: cmd.projectId, filename: cmd.nombre.trim(), contentType: cmd.tipo, bytes });
     let saved: ProjectFile;
@@ -204,4 +205,27 @@ function decodeBase64(value: string): Uint8Array {
   }
   const binary = atob(value);
   return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+
+function startsWith(bytes: Uint8Array, signature: number[]) {
+  return bytes.length >= signature.length && signature.every((byte, index) => bytes[index] === byte);
+}
+
+/** MIME is client-controlled, so verify the bytes before storage. */
+function assertFileSignature(bytes: Uint8Array, mime: string) {
+  const valid = (() => {
+    switch (mime) {
+      case "image/jpeg": return startsWith(bytes, [0xff, 0xd8, 0xff]);
+      case "image/png": return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      case "image/gif": return startsWith(bytes, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) || startsWith(bytes, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
+      case "image/webp": return startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+      case "application/pdf": return startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d]);
+      case "application/msword":
+      case "application/vnd.ms-excel": return startsWith(bytes, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+      case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+      case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": return startsWith(bytes, [0x50, 0x4b, 0x03, 0x04]);
+      default: return false;
+    }
+  })();
+  if (!valid) throw new ValidationError("El contenido no coincide con el tipo de archivo declarado", "contenidoBase64");
 }

@@ -47,6 +47,8 @@ import { Email } from "@reformapro/domain/value-objects";
 import { IAuditRepository, ICatalogRepository, IChangeOrderRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
 import { PostgresAuditRepository, PostgresCatalogRepository, PostgresChangeOrderRepository, PostgresEstimateRepository, PostgresFileRepository, PostgresOpportunityRepository, PostgresProjectRepository, PostgresSolicitudRepository, PostgresUserRepository } from "./infrastructure/database/postgresRepositories.js";
 import pg from "pg";
+import { PostgresCooldownGate } from "./infrastructure/database/postgresCooldownGate.js";
+import { PostgresCommercialTransaction } from "./infrastructure/database/postgresCommercialTransaction.js";
 
 // ─────────────────────────────────────────────────────────────
 // Tiny in-memory implementations for repos that don't have one yet
@@ -148,9 +150,10 @@ export async function buildApp(): Promise<AppDependencies> {
   const tokens    = new WebCryptoTokenService(hmacKeys);
   const sigCrypto = new WebCryptoSignatureService(hmacKeys);
   const events    = new InMemoryEventEmitter();
-  const cooldown  = new InMemoryCooldownGate();
+  const memoryCooldown = new InMemoryCooldownGate();
 
   const pool = databaseUrl ? new pg.Pool({ connectionString: databaseUrl }) : null;
+  const cooldown = pool ? new PostgresCooldownGate(pool) : memoryCooldown;
   const users: IUserRepository = pool ? new PostgresUserRepository(pool, hasher) : new InMemoryUserRepository(hasher);
   const projects: IProjectRepository = pool ? new PostgresProjectRepository(pool) : new InMemoryProjectRepository();
   const audit: IAuditRepository = pool ? new PostgresAuditRepository(pool) : new InMemoryAuditRepository();
@@ -186,7 +189,7 @@ export async function buildApp(): Promise<AppDependencies> {
 
   // ── Use cases ──────────────────────────────────────────────────
   const useCases = {
-    login:                      new LoginUseCase(users, tokens, events),
+    login:                      new LoginUseCase(users, tokens, events, cooldown),
     createUser:                 new CreateUserUseCase(users, hasher, generateTempPassword, events, activation),
     updateUser:                 new UpdateUserUseCase(users, hasher, events),
     deleteUser:                 new DeleteUserUseCase(users, events),
@@ -206,7 +209,7 @@ export async function buildApp(): Promise<AppDependencies> {
     listFiles:                  new ListFilesUseCase(users, projects, files),
     downloadFile:               new DownloadFileUseCase(users, projects, files, fileStorage),
     opportunities:              new OpportunityUseCases(users, opportunities, events),
-    estimates:                  new EstimateUseCases(users, opportunities, estimates, projects, events, sigCrypto),
+    estimates:                  new EstimateUseCases(users, opportunities, estimates, projects, events, sigCrypto, pool ? new PostgresCommercialTransaction(pool) : undefined),
     changes:                    new ChangeOrderUseCases(users, projects, changes),
     catalog:                    new CatalogUseCases(users, catalog),
     activation,

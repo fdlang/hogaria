@@ -7,6 +7,8 @@ import { IUserRepository } from "@reformapro/domain/repositories";
 import { IEventEmitter } from "@reformapro/domain/events";
 import { UnauthorizedError, ValidationError } from "@reformapro/domain/errors";
 import { User } from "@reformapro/domain/entities";
+import { RateLimitError } from "@reformapro/domain/errors";
+import type { ICooldownGate } from "./solicitud.use-cases.js";
 
 export interface ITokenService {
   sign(payload: { userId: number; email: string; rol: string; exp: number }): Promise<string>;
@@ -29,11 +31,15 @@ export class LoginUseCase {
     private readonly users: IUserRepository,
     private readonly tokens: ITokenService,
     private readonly events: IEventEmitter,
+    private readonly loginGate: ICooldownGate,
     private readonly tokenTTLms: number = 8 * 60 * 60 * 1000, // 8 hours
   ) {}
 
   async execute(email: string, password: string, ctx: ClientContext): Promise<LoginResult> {
     if (!email || !password) throw new ValidationError("Email y contraseña obligatorios");
+    if (!(await this.loginGate.check(`login:${ctx.ip}:${email.trim().toLowerCase()}`, 8, 15 * 60 * 1000))) {
+      throw new RateLimitError("Demasiados intentos. Espera unos minutos antes de volver a intentarlo.");
+    }
 
     const user = await this.users.verifyPassword(email, password);
     if (!user)  throw new UnauthorizedError("Credenciales incorrectas");

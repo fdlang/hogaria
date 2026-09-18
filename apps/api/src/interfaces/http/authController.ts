@@ -9,6 +9,7 @@ import { LoginUseCase } from "../../application/use-cases/auth.use-cases.js";
 import { IUserRepository } from "@reformapro/domain/repositories";
 import { toHttpError } from "./errorMiddleware.js";
 import { UnauthorizedError } from "@reformapro/domain/errors";
+import { toUserDTO } from "./userDTO.js";
 
 export interface HttpRequest {
   body: unknown;
@@ -33,7 +34,7 @@ export function authController(deps: {
         const { email, password } = req.body as { email: string; password: string };
         const ctx = { ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" };
         const { user, token, expiresAt } = await deps.loginUseCase.execute(email, password, ctx);
-        return { status: 200, body: { user, token, expiresAt } };
+        return { status: 200, body: { user: toUserDTO(user), token, expiresAt } };
       } catch (e) { const { status, body } = toHttpError(e); return { status, body }; }
     },
 
@@ -45,7 +46,7 @@ export function authController(deps: {
         if (!payload) throw new UnauthorizedError();
         const user = await deps.users.findById(payload.userId);
         if (!user || !user.activo) throw new UnauthorizedError();
-        return { status: 200, body: user };
+        return { status: 200, body: toUserDTO(user) };
       } catch (e) { const { status, body } = toHttpError(e); return { status, body }; }
     },
 

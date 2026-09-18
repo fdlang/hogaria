@@ -5,17 +5,12 @@
 
 import { CreateUserUseCase, UpdateUserUseCase, DeleteUserUseCase, ListUsersUseCase } from "../../application/use-cases/user.use-cases.js";
 import { AccountActivationUseCases } from "../../application/use-cases/account-activation.use-cases.js";
-import { User, UserRole } from "@reformapro/domain/entities";
+import { UserRole } from "@reformapro/domain/entities";
 import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
 
-export function toUserDTO(u: User) {
-  return {
-    id: u.id, email: u.email.value, nombre: u.nombre, rol: u.rol,
-    profesion: u.profesion ?? null, telefono: u.telefono ?? null,
-    activo: u.activo, createdAt: u.createdAt.toISOString(),
-  };
-}
+export { toUserDTO } from "./userDTO.js";
+import { toUserDTO } from "./userDTO.js";
 
 export function userController(deps: {
   create: CreateUserUseCase;
