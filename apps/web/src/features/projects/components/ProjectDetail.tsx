@@ -35,8 +35,8 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const updateProgress = useProgressUpdater(apis.projects, project);
   const toggleMilestone = useMilestoneToggler(apis.projects, project);
   const files          = useProjectFiles(apis.files, projectId);
-  const professionals  = useUsers(apis.users, "profesional");
-  const { can }        = usePermissions();
+  const { can, isAdmin } = usePermissions();
+  const professionals  = useUsers(apis.users, "profesional", isAdmin);
   const { push }       = useNotifications();
   const confirm        = useConfirm();
   const [editingProgress, setEditingProgress] = useState<number | null>(null);
@@ -49,7 +49,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
   };
 
-  const handleMilestoneToggle = async (id: number) => {
+  const handleMilestoneToggle = async (id: string | number) => {
     try { await toggleMilestone(id); push("Hito actualizado", "success"); }
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
   };
@@ -75,8 +75,8 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
     catch (e) { push((e as { message?: string }).message ?? "No se pudo desasignar", "error"); }
   };
 
-  const handleFileUpload = async (file: File, sensitive: boolean) => {
-    try { await files.upload(file, sensitive); push(`${file.name} subido`, "success"); }
+  const handleFileUpload = async (file: File, sensitive: boolean, classification?: "publico" | "contrato" | "factura" | "reservado") => {
+    try { await files.upload(file, sensitive, classification); push(`${file.name} subido`, "success"); }
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
   };
 
@@ -260,16 +260,18 @@ function Meta({ k, v }: { k: string; v: string }) {
 }
 
 function FileUploadButton({ onUpload, canMarkSensitive }: {
-  onUpload: (file: File, sensitive: boolean) => void;
+  onUpload: (file: File, sensitive: boolean, classification: "publico" | "contrato" | "factura" | "reservado") => void;
   canMarkSensitive: boolean;
 }) {
-  const [sensitive, setSensitive] = useState(false);
+  const [classification, setClassification] = useState<"publico" | "contrato" | "factura" | "reservado">("publico");
   return (
     <div className="file-upload-controls" style={{ display: "flex", alignItems: "center", gap: 10 }}>
       {canMarkSensitive && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#71685e" }}>
-          <input type="checkbox" checked={sensitive} onChange={e => setSensitive(e.target.checked)} />
-          Sensible
+          Tipo de documento
+          <select value={classification} onChange={e => setClassification(e.target.value as typeof classification)}>
+            <option value="publico">General</option><option value="contrato">Contrato</option><option value="factura">Factura</option><option value="reservado">Reservado</option>
+          </select>
         </label>
       )}
       <label style={{ cursor: "pointer", padding: "6px 12px", fontSize: 12, fontWeight: 600, background: "#c17248", color: "#302d29", borderRadius: 6 }}>
@@ -277,7 +279,7 @@ function FileUploadButton({ onUpload, canMarkSensitive }: {
         <input type="file" style={{ display: "none" }}
           onChange={e => {
             const file = e.target.files?.[0];
-            if (file) onUpload(file, sensitive);
+            if (file) onUpload(file, classification !== "publico", classification);
             e.target.value = "";
           }} />
       </label>

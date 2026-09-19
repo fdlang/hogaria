@@ -6,8 +6,8 @@
 import { UsersApi, UserDTO, CreateUserPayload } from "../api/users.api";
 import { useResource, useMutation } from "@/shared/hooks/useResource";
 
-export function useUsers(api: UsersApi, role?: UserDTO["rol"]) {
-  return useResource<UserDTO[]>(() => api.list(role), [api, role]);
+export function useUsers(api: UsersApi, role?: UserDTO["rol"], enabled = true) {
+  return useResource<UserDTO[]>(() => enabled ? api.list(role) : Promise.resolve([]), [api, role, enabled]);
 }
 
 export function useUserMutations(api: UsersApi) {

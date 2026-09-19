@@ -39,7 +39,7 @@ describe("SalesApi", () => {
   it("keeps signing, rejection and conversion as explicit estimate actions", () => {
     const http = createHttp();
     const api = new SalesApi(http);
-    api.signEstimate(7, { password: "clave", canvasSignature: "data:image/png;base64,x", consentimiento: "Acepto" });
+    api.signEstimate(7, { version: 1, password: "clave", canvasSignature: "data:image/png;base64,x", consentimiento: "Acepto" });
     api.rejectEstimate(7, "Revisar la distribución del baño");
     api.convertToProject(7);
 

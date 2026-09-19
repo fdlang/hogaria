@@ -18,6 +18,7 @@ import { SolicitudesApi } from "@/features/solicitudes/api/solicitudes.api";
 import { AdminSolicitudesApi } from "@/features/solicitudes/components/AdminSolicitudes";
 import { SalesApi } from "@/features/sales/api/sales.api";
 import { App } from "./App";
+import { WorkApi } from "@/features/work/work.api";
 import { NotificationsProvider } from "@/shared/ui/notifications";
 import { ConfirmProvider } from "@/shared/ui/confirm";
 import { ErrorBoundary } from "@/shared/ui/error-boundary";
@@ -35,6 +36,7 @@ authStore = new AuthStore(api);
 
 // 3) Feature APIs — each receives the shared transport
 const apis = {
+  work:             new WorkApi(api),
   projects:         new ProjectsApi(api),
   users:            new UsersApi(api),
   files:            new FilesApi(api),

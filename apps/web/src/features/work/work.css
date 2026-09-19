@@ -1,0 +1,122 @@
+.work-page {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.work-page h1 {
+  font-size: clamp(26px, 4vw, 38px);
+}
+.work-page h2 {
+  font-size: 22px;
+}
+.work-page h3 {
+  font-size: 18px;
+}
+.work-page p {
+  line-height: 1.6;
+}
+.work-card,
+.work-record {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+  background: var(--marble-light);
+}
+.work-record {
+  background: rgba(255, 250, 244, 0.65);
+  overflow-wrap: anywhere;
+}
+.work-records {
+  display: grid;
+  gap: 16px;
+}
+.work-form fieldset,
+.work-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+  border: 0;
+  padding: 0;
+  margin: 16px 0;
+  align-items: end;
+  min-width: 0;
+}
+.work-page label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+.work-page input,
+.work-page select {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fffdf9;
+  color: #302d29;
+  font: inherit;
+}
+.work-page button {
+  padding: 12px 16px;
+  min-height: 44px;
+  border: 1px solid #9b5838;
+  border-radius: 6px;
+  background: #995537;
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+.work-page button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.work-page :is(button, input, select, summary):focus-visible {
+  outline: 3px solid #bb774f;
+  outline-offset: 3px;
+}
+.work-page [role="alert"] {
+  color: #a02424;
+}
+.work-page [role="status"] {
+  color: #346440;
+}
+.work-page summary {
+  cursor: pointer;
+  padding: 12px 0;
+  min-height: 24px;
+  font-weight: 600;
+}
+.work-page pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  max-height: 320px;
+  overflow: auto;
+}
+.work-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+.work-review {
+  display: grid;
+  gap: 12px;
+}
+@media (max-width: 600px) {
+  .work-card,
+  .work-record {
+    padding: 16px;
+  }
+  .work-form fieldset,
+  .work-filters {
+    grid-template-columns: 1fr;
+  }
+  .work-page input,
+  .work-page select {
+    font-size: 16px;
+  }
+}

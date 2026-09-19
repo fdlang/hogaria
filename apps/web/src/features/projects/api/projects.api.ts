@@ -12,14 +12,13 @@ export interface ProjectDTO {
   progreso: number; presupuesto: number;
   fechaInicio: string; fechaFinPrevista: string;
   profesionalesAsignados: Array<{ userId: number; profesion: string }>;
-  hitos: Array<{ id: number; nombre: string; completado: boolean; fecha: string }>;
+  hitos: Array<{ id: string | number; nombre: string; completado: boolean; fecha: string }>;
 }
 
 export class ProjectsApi {
   constructor(private readonly http: ApiClient) {}
   list():                              Promise<ProjectDTO[]>   { return this.http.get("/projects"); }
   get(id: number):                     Promise<ProjectDTO>     { return this.http.get(`/projects/${id}`); }
-  create(p: Partial<ProjectDTO>):      Promise<ProjectDTO>     { return this.http.post("/projects", p); }
   update(id: number, changes: Partial<ProjectDTO>): Promise<ProjectDTO> { return this.http.patch(`/projects/${id}`, changes); }
   delete(id: number):                  Promise<void>           { return this.http.delete(`/projects/${id}`); }
   assign(projectId: number, userId: number, profesion: string): Promise<ProjectDTO> { return this.http.post(`/projects/${projectId}/professionals`, { userId, profesion }); }

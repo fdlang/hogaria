@@ -7,6 +7,8 @@
  */
 
 import { ProjectsApi }    from "@/features/projects/api/projects.api";
+import { WorkApi } from "@/features/work/work.api";
+import { WorkPage } from "@/features/work/WorkPage";
 import { UsersApi }       from "@/features/users/api/users.api";
 import { FilesApi }       from "@/features/files/api/files.api";
 import { AuditApi }       from "@/features/audit/api/audit.api";
@@ -34,9 +36,11 @@ import { PrivacyPolicyPage } from "@/features/legal/components/PrivacyPolicyPage
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { useAuth }                     from "@/features/auth/hooks/useAuth";
 import { Router, Route, useNavigation } from "./Router";
+import { adminNavigation, navigationFor, isNavigationActive } from "./navigation";
 import { Button, EmptyState }          from "@/shared/ui";
 
 interface AllApis {
+  work: WorkApi;
   projects:         ProjectsApi;
   users:            UsersApi;
   files:            FilesApi;
@@ -57,6 +61,7 @@ export function App({ apis }: { apis: AllApis }) {
     { path: "#/activar-cuenta", element: <ActivateAccountPage api={apis.users} /> },
 
     // Admin
+    { path: "#/admin/work", roles: ["admin"], element: <WorkPage api={apis.work} projects={apis.projects} users={apis.users}/> },
     { path: "#/admin",                 roles: ["admin"],        element: <AdminHome /> },
     { path: "#/admin/projects",        roles: ["admin"],        element: <AdminProjectsRoute apis={apis} /> },
     { path: "#/admin/projects/",       roles: ["admin"],        element: <AdminProjectDetailRoute apis={apis} /> },
@@ -73,6 +78,7 @@ export function App({ apis }: { apis: AllApis }) {
     { path: "#/cliente/budgets",       roles: ["cliente"],      element: <ClientEstimates api={apis.sales} projectsApi={apis.projects} /> },
 
     // Profesional
+    { path: "#/profesional/work", roles: ["profesional"], element: <WorkPage api={apis.work} projects={apis.projects} users={apis.users}/> },
     { path: "#/profesional",           roles: ["profesional"],  element: <ProfesionalDashboardRoute apis={apis} /> },
     { path: "#/profesional/projects/", roles: ["profesional"],  element: <ProfesionalProjectDetailRoute apis={apis} /> },
   ];
@@ -83,10 +89,12 @@ export function App({ apis }: { apis: AllApis }) {
 
   return (
     <div className={user ? "app-shell app-shell--private" : "app-shell"} style={{ minHeight: "100vh", background: "var(--marble-light)", color: "var(--ink)" }}>
-      {user && <TopBar user={user} onSignOut={signOut} />}
-      <main className={user ? "private-main" : undefined} style={user ? { maxWidth: 1200, margin: "0 auto", padding: 32 } : undefined}>
-        <Router routes={routes} fallback={fallback} />
-      </main>
+      <Router routes={routes} fallback={fallback} layout={(content) => <>
+        {user && <TopBar user={user} onSignOut={signOut} />}
+        <main className={user ? "private-main" : undefined} style={user ? { maxWidth: 1200, margin: "0 auto", padding: 32 } : undefined}>
+          {content}
+        </main>
+      </>} />
     </div>
   );
 }
@@ -94,28 +102,14 @@ export function App({ apis }: { apis: AllApis }) {
 // ─────────────────────────────────────────────────────────────
 // TopBar — role-aware navigation
 // ─────────────────────────────────────────────────────────────
-type NavigationLink = { to: string; label: string; group?: "start" | "operation" | "resources" | "control" };
 
 function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "cliente" | "profesional" } | null; onSignOut: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const links: NavigationLink[] =
-    user?.rol === "admin" ? [
-      { to: "#/admin",               label: "Inicio", group: "start" },
-      { to: "#/admin/solicitudes",   label: "Solicitudes", group: "operation" },
-      { to: "#/admin/budgets",       label: "Presupuestos", group: "operation" },
-      { to: "#/admin/projects",      label: "Proyectos", group: "operation" },
-      { to: "#/admin/catalog",       label: "Catálogo", group: "resources" },
-      { to: "#/admin/users",         label: "Usuarios", group: "resources" },
-      { to: "#/admin/profesionales", label: "Profesionales", group: "resources" },
-      { to: "#/admin/audit",         label: "Actividad", group: "control" },
-    ] :
-    user?.rol === "cliente" ? [
-      { to: "#/cliente",           label: "Inicio" },
-      { to: "#/cliente/budgets",   label: "Presupuestos" },
-    ] :
-    user?.rol === "profesional" ? [
-      { to: "#/profesional", label: "Inicio" },
-    ] : [];
+  const { currentPath } = useNavigation();
+  const groups = navigationFor(user?.rol);
+  const links = groups.flatMap((group) => group.links.map((link) => ({ ...link, group: group.label })));
+
+  useEffect(() => { setMenuOpen(false); }, [currentPath]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -129,14 +123,6 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
     };
   }, [menuOpen]);
 
-  const groups = user?.rol === "admin"
-    ? [
-      { label: "Principal", links: links.filter((link) => link.group === "start") },
-      { label: "Operativa", links: links.filter((link) => link.group === "operation") },
-      { label: "Recursos", links: links.filter((link) => link.group === "resources") },
-      { label: "Control", links: links.filter((link) => link.group === "control") },
-    ]
-    : [{ label: "Navegación", links }];
 
   return (
     <header className={`private-topbar private-topbar--${user?.rol ?? "guest"}`} style={{ display: "flex", justifyContent: "space-between", minHeight: 70, padding: "14px 32px", borderBottom: "1px solid var(--line)", background: "rgba(247,239,229,.92)", alignItems: "center", position: "sticky", top: 0, zIndex: 20, backdropFilter: "blur(12px)" }}>
@@ -156,6 +142,7 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
             return <Fragment key={link.to}>
               {link.group && previous?.group && link.group !== previous.group && <span aria-hidden="true" style={{ fontSize: 12, color: "#85786b" }}>·</span>}
               <a href={link.to}
+                aria-current={isNavigationActive(currentPath, link.to) ? "page" : undefined}
                 className="private-nav-link"
                 style={{ fontSize: 13, fontWeight: 700, color: "#71685e", textDecoration: "none", textTransform: "uppercase", letterSpacing: ".05em", transition: "color .18s ease" }}>
                 {link.label}
@@ -169,7 +156,7 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
         {menuOpen && <div className="private-mobile-menu-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setMenuOpen(false); }}>
           <aside id="private-mobile-navigation" className="private-mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Menú privado">
             <header><div><p className="eyebrow">Área privada</p><strong>{user.nombre}</strong></div><button type="button" className="private-mobile-menu-close" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú"><span className="private-mobile-menu-icon private-mobile-menu-icon--close" aria-hidden="true"><span /><span /><span /></span></button></header>
-            <nav aria-label="Secciones privadas">{groups.map((group) => group.links.length > 0 && <section key={group.label}><p>{group.label}</p>{group.links.map((link) => <a key={link.to} href={link.to} onClick={() => setMenuOpen(false)}>{link.label}</a>)}</section>)}</nav>
+            <nav aria-label="Secciones privadas">{groups.map((group) => group.links.length > 0 && <section key={group.label}><p>{group.label}</p>{group.links.map((link) => <a key={link.to} href={link.to} aria-current={isNavigationActive(currentPath, link.to) ? "page" : undefined} onClick={() => setMenuOpen(false)}>{link.label}</a>)}</section>)}</nav>
             <Button variant="ghost" onClick={() => { setMenuOpen(false); onSignOut(); }}>Salir del área privada</Button>
           </aside>
         </div>}
@@ -199,19 +186,11 @@ function AdminHome() {
   return (
     <section className="admin-home">
       <h1 style={{ fontSize: 38, fontWeight: 700, color: "#302d29", marginBottom: 24 }}>Panel de administración</h1>
-      <AdminHomeGroup label="Operativa" hint="Del primer contacto a la obra">
-        <Tile href="#/admin/solicitudes" title="Solicitudes" subtitle="Contactos de la landing" />
-        <Tile href="#/admin/budgets" title="Presupuestos" subtitle="Oportunidades, propuestas y firma" />
-        <Tile href="#/admin/projects" title="Proyectos" subtitle="Gestiona obras activas" />
-      </AdminHomeGroup>
-      <AdminHomeGroup label="Recursos" hint="Configuración que alimenta la operativa">
-        <Tile href="#/admin/catalog" title="Catálogo" subtitle="Precios y partidas base" />
-        <Tile href="#/admin/users" title="Usuarios" subtitle="Clientes, profesionales y admins" />
-        <Tile href="#/admin/profesionales" title="Profesionales" subtitle="Asignaciones y permisos" />
-      </AdminHomeGroup>
-      <AdminHomeGroup label="Control" hint="Trazabilidad de las acciones">
-        <Tile href="#/admin/audit" title="Actividad" subtitle="Audit log y trazabilidad" />
-      </AdminHomeGroup>
+      {adminNavigation.slice(1).map((group) => (
+        <AdminHomeGroup key={group.label} label={group.label} hint={group.hint}>
+          {group.links.map((link) => <Tile key={link.to} href={link.to} title={link.label} subtitle={link.subtitle ?? ""} />)}
+        </AdminHomeGroup>
+      ))}
     </section>
   );
 }

@@ -38,9 +38,9 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     expect(results[0]?.id).not.toBe(estimateB.id);
   });
 
-  it("never lists an internal draft in the client portal", async () => {
+  it.each(["borrador", "en_revision"] as const)("never lists an internal draft (%s) in the client portal", async (estado) => {
     const { clientA, estimates, estimateUseCases } = await setup();
-    const internalDraft = await estimates.save({ oportunidadId: 1, clienteId: clientA.id, numero: "HOG-DRAFT", titulo: "Borrador interno", estado: "borrador", versionActual: 1, borrador: draft, motivoRechazo: null });
+    const internalDraft = await estimates.save({ oportunidadId: 1, clienteId: clientA.id, numero: "HOG-DRAFT", titulo: "Borrador interno", estado, versionActual: 1, borrador: draft, motivoRechazo: null });
 
     const results = await estimateUseCases.publicList(clientA.id);
 
@@ -79,7 +79,7 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     // The repository setup has a current version; replace it with a one-day validity proposal sent two days ago.
     await estimates.saveVersion({ estimateId: estimateA.id, version: 2, snapshot: { ...draft, validezDias: 1 }, enviadoAt: new Date(Date.now() - 2 * 86_400_000), firmadoAt: null, firma: null });
     await estimates.update(estimateA.id, { versionActual: 2 });
-    await expect(estimateUseCases.sign(clientA.id, estimateA.id, { password: "hash", canvasSignature: "data:image/png;base64,aGVsbG8=", consentimiento: "Acepto" }, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("validez");
+    await expect(estimateUseCases.sign(clientA.id, estimateA.id, { version: 2, password: "hash", canvasSignature: "data:image/png;base64,aGVsbG8=", consentimiento: "Acepto" }, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("validez");
     expect((await estimateUseCases.publicGet(clientA.id, estimateA.id)).estado).toBe("caducado");
   });
 

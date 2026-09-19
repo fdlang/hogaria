@@ -21,8 +21,11 @@ import { projectController } from "./interfaces/http/projectController.js";
 import { auditController, solicitudController, fileController } from "./interfaces/http/otherControllers.js";
 import { salesController } from "./interfaces/http/salesController.js";
 import { catalogController } from "./interfaces/http/catalogController.js";
+import { workController } from "./interfaces/http/workController.js";
+import { estimateDocumentController } from "./interfaces/http/estimateDocumentController.js";
 import { toHttpError } from "./interfaces/http/errorMiddleware.js";
 import { ValidationError } from "@reformapro/domain/errors";
+import { notificationRetryController } from "./interfaces/http/notificationRetryController.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
@@ -79,8 +82,21 @@ function getRuntime(): Promise<Runtime> {
     });
     const sales = salesController({ opportunities: app.useCases.opportunities, estimates: app.useCases.estimates, changes: app.useCases.changes });
     const catalog = catalogController({ catalog: app.useCases.catalog });
+    const work = workController(app.useCases.work);
+    const documents = estimateDocumentController(app.useCases.estimateDocuments);
 
     return { authMiddleware: requireAuth(app.tokens, app.users), routes: [
+  route("GET", "/work/current", work.current, { protected: true }),
+  route("GET", "/work/audit", work.audit, { protected: true }),
+  route("GET", "/work/entries", work.list, { protected: true }),
+  route("POST", "/work/start", work.start, { protected: true }),
+  route("POST", "/work/parts", work.part, { protected: true }),
+  route("POST", "/work/entries/:id/actions", work.action, { protected: true }),
+  route("GET", "/work/entries/:id/history", work.history, { protected: true }),
+  route("GET", "/work/professionals/:id/rates", work.rates, { protected: true }),
+  route("POST", "/work/professionals/:id/rates", work.configure, { protected: true }),
+  route("GET", "/work/projects/:id/summary", work.summary, { protected: true }),
+  route("POST", "/work/projects/:id/budget", work.budget, { protected: true }),
   // Auth (public)
   route("POST", "/auth/login",  async req => auth.login(req)),
   route("GET",  "/auth/me",     async req => auth.me(req)),
@@ -88,6 +104,9 @@ function getRuntime(): Promise<Runtime> {
   route("POST", "/auth/activate", async req => users.activate(req)),
 
   // Commercial pipeline: opportunity -> versioned estimate -> project.
+  route("GET", "/estimates/:id/pdf", documents.pdf, { protected:true }),
+  route("GET", "/internal/notifications/retry", notificationRetryController(app.useCases.notifications,
+    () => ({secret:process.env.CRON_SECRET,enabled:process.env.CLIENT_NOTIFICATIONS_ENABLED==="true"}))),
   route("GET",   "/catalog",             req => catalog.list(req as never), { protected: true }),
   route("POST",  "/catalog",             req => catalog.create(req as never), { protected: true }),
   route("PATCH", "/catalog/:id",         req => catalog.update(req as never), { protected: true }),

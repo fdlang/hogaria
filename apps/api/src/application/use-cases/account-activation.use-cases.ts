@@ -6,8 +6,8 @@ export interface ActivationToken { userId: number; tokenHash: string; expiresAt:
 export interface IActivationTokenRepository {
   replace(token: ActivationToken): Promise<void>;
   findValid(tokenHash: string, now: Date): Promise<ActivationToken | null>;
-  /** Atomically removes the token. A consumed activation link cannot be replayed. */
-  consume(tokenHash: string): Promise<void>;
+  /** Consume a still-valid link and activate its account in one transaction. */
+  complete(tokenHash: string, passwordHash: string): Promise<void>;
 }
 export interface ITransactionalEmail { isConfigured(): boolean; sendActivation(input: { to: string; name: string; activationUrl: string; expiresAt: Date }): Promise<void>; }
 
@@ -42,17 +42,13 @@ export class AccountActivationUseCases {
     return { expiresAt, email: user.email.value, requestedBy: context.ip };
   }
   async activate(token: string, password: string) {
-    if (!token || token.length < 40) throw new ValidationError("Enlace de activación no válido", "token");
-    if (password.length < 12 || !/[a-z]/i.test(password) || !/\d/.test(password)) throw new ValidationError("Usa al menos 12 caracteres, incluyendo letras y números", "password");
+    if (typeof token !== "string" || token.length < 40 || token.length > 200) throw new ValidationError("Enlace de activación no válido", "token");
+    if (typeof password !== "string" || encoder.encode(password).length > 72 || password.length < 12 || !/[a-z]/i.test(password) || !/\d/.test(password)) throw new ValidationError("Usa al menos 12 caracteres, incluyendo letras y números", "password");
     const hash = await tokenHash(token); const record = await this.tokens.findValid(hash, new Date());
     if (!record) throw new ConflictError("El enlace ha caducado, ya se utilizó o no es válido");
-    const user = await this.users.findById(record.userId); if (!user || user.rol !== "cliente") throw new ConflictError("La invitación ya no está disponible");
-    // Consume first and atomically. The token is removed rather than merely hidden,
-    // so a successful activation link has no credential material left to replay.
-    await this.tokens.consume(hash);
+    const user = await this.users.findById(record.userId); if (!user || !["cliente", "profesional"].includes(user.rol)) throw new ConflictError("La invitación ya no está disponible");
     const passwordHash = await bcryptHash(password);
-    await this.users.updatePassword(user.id, passwordHash);
-    await this.users.update(user.id, { activo: true });
+    await this.tokens.complete(hash, passwordHash);
   }
 }
 

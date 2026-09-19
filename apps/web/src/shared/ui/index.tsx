@@ -22,9 +22,10 @@ interface ModalProps {
   children: ReactNode;
   width?: number;
   unclosable?: boolean;
+  className?: string;
 }
 
-export function Modal({ open, onClose, title, children, width = 520, unclosable = false }: ModalProps) {
+export function Modal({ open, onClose, title, children, width = 520, unclosable = false, className = "" }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
@@ -54,7 +55,7 @@ export function Modal({ open, onClose, title, children, width = 520, unclosable 
   return (
     <div className="ui-modal-backdrop" role="presentation" onClick={onBackdrop}
       style={{ position: "fixed", inset: 0, background: "rgba(48,45,41,.52)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 20 }}>
-      <div className="ui-modal" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
+      <div className={`ui-modal ${className}`} ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
         onClick={e => e.stopPropagation()}
         style={{ background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 16, width: "100%", maxWidth: width, maxHeight: "90vh", overflow: "auto" }}>
         <header className="ui-modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", borderBottom: "1px solid #d8c4ad", position: "sticky", top: 0, background: "#fffaf4" }}>

@@ -19,14 +19,13 @@ export function useProject(api: ProjectsApi, id: number | null) {
 }
 
 export function useProjectMutations(api: ProjectsApi) {
-  const create   = useMutation((payload: Partial<ProjectDTO>) => api.create(payload));
   const update   = useMutation((id: number, changes: Partial<ProjectDTO>) => api.update(id, changes));
   const remove   = useMutation((id: number) => api.delete(id));
   const assign   = useMutation((projectId: number, userId: number, profesion: string) =>
     api.assign(projectId, userId, profesion));
   const unassign = useMutation((projectId: number, userId: number) =>
     api.unassign(projectId, userId));
-  return { create, update, remove, assign, unassign };
+  return { update, remove, assign, unassign };
 }
 
 // Specialised optimistic helpers used by detail views
@@ -44,7 +43,7 @@ export function useProgressUpdater(api: ProjectsApi, resource: ReturnType<typeof
 }
 
 export function useMilestoneToggler(api: ProjectsApi, resource: ReturnType<typeof useProject>) {
-  return useCallback(async (milestoneId: number) => {
+  return useCallback(async (milestoneId: string | number) => {
     const current = resource.data;
     if (!current) return;
     const nextHitos = current.hitos.map(h => h.id === milestoneId ? { ...h, completado: !h.completado } : h);

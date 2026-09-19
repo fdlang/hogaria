@@ -5,71 +5,13 @@
 
 import { IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
 import { IEventEmitter } from "@reformapro/domain/events";
-import { Project, ProjectMilestone, ProjectProfessional } from "@reformapro/domain/entities";
-import { Money, Percentage } from "@reformapro/domain/value-objects";
+import { Project, ProjectProfessional } from "@reformapro/domain/entities";
 import { ValidationError, ForbiddenError, NotFoundError, ConflictError } from "@reformapro/domain/errors";
 import { PermissionPolicy } from "@reformapro/domain/services";
 import { ClientContext } from "./auth.use-cases.js";
+import { projectChanges } from "./project-validation.js";
 
-export interface CreateProjectCommand {
-  actorId: number;
-  nombre: string;
-  descripcion: string;
-  clienteId: number;
-  direccion: string;
-  tipo: string;
-  presupuesto: number;
-  fechaInicio: string;       // ISO
-  fechaFinPrevista: string;  // ISO
-  hitos?: Array<{ id: string; nombre: string; completado: boolean; fecha: string }>;
-  ctx: ClientContext;
-}
-
-export class CreateProjectUseCase {
-  constructor(
-    private readonly users: IUserRepository,
-    private readonly projects: IProjectRepository,
-    private readonly events: IEventEmitter,
-  ) {}
-
-  async execute(cmd: CreateProjectCommand): Promise<Project> {
-    const actor = await this.users.findById(cmd.actorId);
-    if (!actor || actor.rol !== "admin") throw new ForbiddenError();
-
-    throw new ConflictError("Los proyectos se crean al aceptar un presupuesto. Usa la conversión desde la propuesta.");
-
-    const client = await this.users.findById(cmd.clienteId);
-    if (!client || client?.rol !== "cliente") throw new ValidationError("Cliente inválido", "clienteId");
-    if (!cmd.nombre?.trim()) throw new ValidationError("Nombre obligatorio", "nombre");
-
-    const project: Project = {
-      id: 0,
-      estimateId: 0,
-      nombre: cmd.nombre.trim(),
-      descripcion: cmd.descripcion,
-      clienteId: cmd.clienteId,
-      direccion: cmd.direccion,
-      tipo: cmd.tipo,
-      estado: "planificacion",
-      progreso: Percentage.zero(),
-      presupuesto: Money.of(cmd.presupuesto),
-      fechaInicio: new Date(cmd.fechaInicio),
-      fechaFinPrevista: new Date(cmd.fechaFinPrevista),
-      profesionalesAsignados: [],
-      hitos: (cmd.hitos ?? []).map(h => ({ ...h, fecha: new Date(h.fecha) })),
-      createdAt: new Date(),
-    };
-
-    const saved = await this.projects.save(project);
-    await this.events.emit({
-      type: "ProjectCreated", eventId: crypto.randomUUID(), occurredAt: new Date(),
-      actorId: actor!.id, actorName: actor!.nombre,
-      ip: cmd.ctx.ip, userAgent: cmd.ctx.userAgent,
-      projectId: saved.id,
-    });
-    return saved;
-  }
-}
+// Direct creation is intentionally absent: projects originate from signed estimates.
 
 export class UpdateProjectUseCase {
   constructor(
@@ -81,7 +23,7 @@ export class UpdateProjectUseCase {
   async execute(cmd: {
     actorId: number;
     projectId: number;
-    changes: Partial<Omit<Project, "id" | "createdAt" | "clienteId" | "profesionalesAsignados">>;
+    changes: unknown;
     ctx: ClientContext;
   }): Promise<Project> {
     const actor   = await this.users.findById(cmd.actorId);
@@ -90,37 +32,44 @@ export class UpdateProjectUseCase {
     if (!project) throw new NotFoundError("Proyecto");
 
     const built: Record<string, unknown> = {};
+    const changes = projectChanges(cmd.changes);
 
     if (actor.rol === "admin") {
       // Admin allowlist — clienteId and profesionalesAsignados are NEVER allowed via this endpoint
       // (use dedicated endpoints for reassigning client or managing professionals)
       const allowed: Array<keyof Project> = ["progreso", "estado", "nombre", "descripcion", "direccion", "tipo", "presupuesto", "fechaInicio", "fechaFinPrevista", "hitos"];
       for (const key of allowed) {
-        const v = (cmd.changes as Record<string, unknown>)[key];
+        const v = (changes as Record<string, unknown>)[key];
         if (v !== undefined) built[key] = v;
       }
     } else if (actor.rol === "profesional") {
+      PermissionPolicy.authorize(actor, "project.read", { project });
       // Profesional: ONLY progreso and hitos, and only if policy allows
-      const forbidden = Object.keys(cmd.changes).filter(k => k !== "progreso" && k !== "hitos");
+      const forbidden = Object.keys(changes).filter(k => k !== "progreso" && k !== "hitos");
       if (forbidden.length) throw new ForbiddenError(`No puedes editar: ${forbidden.join(", ")}`);
-      if (cmd.changes.progreso !== undefined) {
+      if (changes.progreso !== undefined) {
         PermissionPolicy.authorize(actor, "project.update.progress", { project });
-        built.progreso = cmd.changes.progreso;
+        built.progreso = changes.progreso;
       }
-      if (cmd.changes.hitos !== undefined) {
+      if (changes.hitos !== undefined) {
         PermissionPolicy.authorize(actor, "project.update.milestones", { project });
-        built.hitos = cmd.changes.hitos;
+        built.hitos = changes.hitos;
       }
     } else {
       throw new ForbiddenError();
     }
 
     const allowedChanges = built as Partial<Project>;
+    if((allowedChanges.fechaFinPrevista??project.fechaFinPrevista)<(allowedChanges.fechaInicio??project.fechaInicio))throw new ValidationError("La fecha final no puede ser anterior al inicio");
+    // Capture old values before repositories that mutate in place run.
+    const previousState = project.estado;
+    const visibleKeys = ["estado","progreso","hitos","fechaInicio","fechaFinPrevista","nombre","descripcion","direccion","tipo","presupuesto"] as const;
+    const changedFields = visibleKeys.filter(key => key in built && JSON.stringify(project[key]) !== JSON.stringify(built[key]));
 
     const updated = await this.projects.update(cmd.projectId, allowedChanges);
 
     // Emit ProjectCompleted if we just transitioned to finalizado
-    if (cmd.changes.estado === "finalizado" && project.estado !== "finalizado") {
+    if (changes.estado === "finalizado" && previousState !== "finalizado") {
       await this.events.emit({
         type: "ProjectCompleted", eventId: crypto.randomUUID(), occurredAt: new Date(),
         actorId: actor.id, actorName: actor.nombre,
@@ -129,6 +78,11 @@ export class UpdateProjectUseCase {
       });
     }
 
+    if(changedFields.length)await this.events.emit({
+      type:"ProjectUpdated",eventId:crypto.randomUUID(),occurredAt:new Date(),
+      actorId:actor.id,actorName:actor.nombre,ip:cmd.ctx.ip,userAgent:cmd.ctx.userAgent,
+      projectId:project.id,changedFields,
+    });
     return updated;
   }
 }
@@ -137,13 +91,14 @@ export class DeleteProjectUseCase {
   constructor(
     private readonly users: IUserRepository,
     private readonly projects: IProjectRepository,
+    private readonly hasWorkHistory?: (projectId: number) => Promise<boolean>,
   ) {}
   async execute(cmd: { actorId: number; projectId: number }): Promise<void> {
     const actor = await this.users.findById(cmd.actorId);
     if (!actor || actor.rol !== "admin") throw new ForbiddenError();
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
-    // In production: cascade check — reject if there are signed budgets
+    if (await this.hasWorkHistory?.(project.id)) throw new ConflictError("La obra tiene registros o previsiones de trabajo. Conserva el histórico y marca la obra como finalizada");
     await this.projects.delete(cmd.projectId);
   }
 }

@@ -4,8 +4,8 @@
  * In production this would be a message bus (RabbitMQ, SNS, Redis pub/sub)
  * so events survive process restarts and can fan out to multiple consumers.
  *
- * Critical: handlers run sequentially but errors are isolated — one failing
- * subscriber must not block the others or cause the domain event to be lost.
+ * Handlers run concurrently with isolated errors. This emitter is not durable;
+ * critical client notifications are persisted by the SQL transactional outbox.
  */
 
 import { IEventEmitter, DomainEvent } from "@reformapro/domain/events";

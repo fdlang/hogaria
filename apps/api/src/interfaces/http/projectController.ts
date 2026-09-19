@@ -1,6 +1,6 @@
 /**
  * Project HTTP controller.
- * Permissions (admin-only for create/delete; profesional restricted to progreso/hitos)
+ * Permissions (admin-only for delete; profesional restricted to progreso/hitos)
  * are enforced inside the use cases via PermissionPolicy.
  */
 
@@ -68,8 +68,8 @@ export function projectController(deps: {
     // POST /projects/:id/professionals
     async assign(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {
-        const body = req.body as { userId: number; profesion?: string };
-        const project = await deps.assign.execute({ actorId: req.actorId, projectId: parseInt(req.params.id, 10), ...body } as never);
+        const body = (req.body ?? {}) as { userId?: number };
+        const project = await deps.assign.execute({ actorId: req.actorId, projectId: Number(req.params.id), userId: body.userId! });
         return { status: 200, body: toProjectDTO(project) };
       } catch (e) { return toHttpError(e); }
     },

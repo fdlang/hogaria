@@ -18,9 +18,10 @@ export class SalesApi {
   archiveCatalogItem(id: number) { return this.http.delete<CatalogItemDTO>(`/catalog/${id}`); }
   createOpportunity(input: Omit<OpportunityDTO, "id" | "createdAt" | "updatedAt">) { return this.http.post<OpportunityDTO>("/opportunities", input); }
   estimates() { return this.http.get<EstimateDTO[]>("/estimates"); }
+  downloadPdf(id:number,version:number) { return this.http.download(`/estimates/${id}/pdf?version=${version}`); }
   createEstimate(oportunidadId: number, borrador: EstimateDraftDTO) { return this.http.post<EstimateDTO>("/estimates", { oportunidadId, borrador }); }
   sendEstimate(id: number) { return this.http.post<EstimateDTO>(`/estimates/${id}/send`); }
-  signEstimate(id: number, input: { password: string; canvasSignature: string; consentimiento: string }) { return this.http.post<{ estimate: EstimateDTO; hash: string; fechaFirma: string }>(`/estimates/${id}/sign`, input); }
+  signEstimate(id: number, input: { password: string; canvasSignature: string; consentimiento: string; version: number }) { return this.http.post<{ estimate: EstimateDTO; hash: string; fechaFirma: string }>(`/estimates/${id}/sign`, input); }
   rejectEstimate(id: number, motivo: string) { return this.http.post<EstimateDTO>(`/estimates/${id}/reject`, { motivo }); }
   convertToProject(id: number) { return this.http.post<{ id: number; estimateId: number }>(`/estimates/${id}/accept`); }
 }

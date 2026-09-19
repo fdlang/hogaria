@@ -105,6 +105,7 @@ function toFileDTO(f: ProjectFile) {
     id: f.id, projectId: f.projectId, uploadedBy: f.uploadedBy,
     nombre: f.nombre, tipo: f.tipo, tamaño: f.tamaño,
     storageKey: f.storageKey, sensitive: f.sensitive,
+    classification: f.classification ?? (f.sensitive ? "reservado" : "publico"),
     uploadedAt: f.uploadedAt.toISOString(),
   };
 }
@@ -118,15 +119,17 @@ export function fileController(deps: {
   const ctxOf = (req: HttpRequest) => ({ ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" });
 
   return {
-    // POST /projects/:projectId/files — metadata only; presigned URL flow goes elsewhere
+    // POST /projects/:projectId/files — authenticated binary upload.
     async upload(req: HttpRequest & { actorId: number; params: { projectId: string } }): Promise<HttpResponse> {
       try {
-        const body = req.body as { nombre: string; tipo: string; tamaño: number; sensitive: boolean; contenidoBase64: string };
+        const body = (req.body ?? {}) as { nombre: string; tipo: string; tamaño: number; sensitive: boolean; contenidoBase64: string; classification?: string };
         const file = await deps.upload.execute({
           actorId: req.actorId,
           projectId: parseInt(req.params.projectId, 10),
           ctx: ctxOf(req),
-          ...body,
+          nombre: body.nombre, tipo: body.tipo, tamaño: body.tamaño,
+          sensitive: body.sensitive, contenidoBase64: body.contenidoBase64,
+          ...(body.classification === undefined ? {} : { classification: body.classification }),
         });
         return { status: 201, body: toFileDTO(file) };
       } catch (e) { return toHttpError(e); }

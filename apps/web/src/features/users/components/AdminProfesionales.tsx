@@ -55,6 +55,7 @@ export function AdminProfesionales({ apis }: Props) {
         title="Profesionales"
         subtitle={`${userList.length} profesionales · ${userList.filter(u => u.activo).length} activos · ${totalAssignments} asignaciones totales`}
       />
+      <p><a href="#/admin/work">Gestionar jornadas, partes y tarifas internas</a></p>
 
       {/* Profession summary grid */}
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 30 }}>
@@ -82,7 +83,7 @@ export function AdminProfesionales({ apis }: Props) {
                         <h3 style={{ fontSize: 14, fontWeight: 600, color: "#302d29" }}>{u.nombre}</h3>
                         {u.profesion && <ProfesionBadge profesion={u.profesion as Profesion} />}
                         <Badge color="#60a5fa">{assigned} proyectos</Badge>
-                        {!u.activo && <code style={{ fontSize: 12, color: "#c17248", background: "#c1724818", padding: "1px 5px", borderRadius: 3 }}>PENDIENTE DE ACTIVACIÓN</code>}
+                        {!u.activo && <code style={{ fontSize: 12, color: "#c17248", background: "#c1724818", padding: "1px 5px", borderRadius: 3 }}>INACTIVO</code>}
                       </div>
                       <p style={{ fontSize: 12, color: "#71685e" }}>{u.email}{u.telefono && ` · ${u.telefono}`} · desde {formatDate(u.createdAt)}</p>
                       <div style={{ marginTop: 8 }}>

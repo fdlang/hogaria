@@ -1,4 +1,12 @@
 node_modules/
 apps/api/.env
 apps/web/.env
+.vercel/
+.env*.local
+apps/*/.env*.local
 api/_app.*
+apps/web/test-results/
+apps/web/playwright-report/
+
+.env*
+.vercel

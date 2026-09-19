@@ -136,9 +136,24 @@ ruta concreta; no debe reutilizarse el destino de otra obra.
 - Las claves HMAC persisten mediante `HMAC_SECRET`; no se generan por instancia.
 - CORS se limita a mismo origen y a `ALLOWED_ORIGINS`.
 - No subas `apps/api/.env`, credenciales ni secretos al repositorio.
-- La carga de binarios requiere un proveedor de objetos, como Vercel Blob o S3,
-  antes de habilitar cargas reales en producción. La aplicación actual sólo
-  persiste los metadatos de los archivos y su clave de almacenamiento.
+- Los binarios se guardan en Vercel Blob privado (`BLOB_READ_WRITE_TOKEN`).
+  PostgreSQL conserva sus metadatos y clasificación; la API comprueba permisos
+  específicos de contrato/factura antes de servir cada descarga. Los documentos
+  sensibles antiguos sin clasificar no se muestran a profesionales.
+
+## Jornadas y costes
+
+El módulo **Jornadas** permite configurar tarifas históricas, registrar fichajes de empleados o partes de colaboradores, revisar/corregir/aprobar y comparar el coste de mano de obra por obra. Los profesionales acceden desde **Mi trabajo**; los clientes no tienen acceso a esos datos.
+
+Antes de habilitarlo, aplicar `npm run db:migrate-work-tracking --workspace @reformapro/api` y configurar las tarifas. Consulta [la guía y auditoría del módulo](docs/WORK_TRACKING.md) para sus reglas, límites y pruebas.
+
+## Presupuestos: búsqueda y PDF
+
+El listado permite buscar y filtrar por estado. Las propuestas publicadas se pueden
+descargar en PDF. No se envían documentos por correo.
+Consulta [configuración, seguridad y pruebas](docs/ESTIMATE_PDF.md).
+Los avisos automáticos de novedades, sin adjuntos, se activan siguiendo
+[la guía de notificaciones](docs/CLIENT_NOTIFICATIONS.md).
 
 ## Licencia
 

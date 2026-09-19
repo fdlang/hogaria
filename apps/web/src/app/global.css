@@ -234,7 +234,13 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .private-brand-symbol { width: 42px; height: 42px; object-fit: contain; }
 .private-brand-wordmark { width: 160px; height: 39px; object-fit: contain; }
 .private-nav { min-width: 0; margin-left: auto; justify-self: auto; }
+.private-topbar--admin .private-nav { flex-wrap: wrap; justify-content: flex-end; row-gap: 8px !important; }
+.private-nav a[aria-current="page"], .private-mobile-menu-panel nav a[aria-current="page"] { color: var(--copper-dark) !important; background: rgba(193,113,72,.1); border-radius: 5px; box-shadow: inset 0 -2px var(--copper-dark); }
 .private-mobile-menu-toggle, .private-mobile-menu-backdrop { display: none; }
+@media (min-width: 721px) and (max-width: 1600px) {
+  .private-topbar--admin { flex-wrap: wrap; gap: 12px !important; }
+  .private-topbar--admin .private-nav { width: 100%; flex-wrap: wrap; justify-content: flex-end; gap: 6px 10px !important; }
+}
 .admin-home { max-width: 1040px; }
 .admin-home-group { margin-bottom: 30px; }
 .admin-home-group > header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }

@@ -54,7 +54,7 @@ export class LoginUseCase {
     });
 
     await this.events.emit({
-      type: "UserCreated", // semantic mismatch — should be LoginSuccess; adjust if added to DomainEvent union
+      type: "LoginSuccess",
       eventId: crypto.randomUUID(),
       occurredAt: new Date(),
       actorId: user.id,

@@ -39,6 +39,14 @@ import {
 import { VercelBlobFileStorage } from "./infrastructure/storage/vercelBlobFileStorage.js";
 import { ChangeOrderUseCases, EstimateUseCases, OpportunityUseCases } from "./application/use-cases/sales.use-cases.js";
 import { CatalogUseCases } from "./application/use-cases/catalog.use-cases.js";
+import { WorkTrackingUseCases } from "./application/use-cases/work-tracking.use-cases.js";
+import { EstimateDocumentUseCases } from "./application/use-cases/estimate-document.use-cases.js";
+import { PdfEstimateRenderer } from "./infrastructure/documents/estimatePdf.js";
+import { ClientNotifications } from "./application/notifications/client-notifications.js";
+import { PostgresNoticeStore, MemoryNoticeStore } from "./infrastructure/database/clientNoticeStore.js";
+import { ResendClientNotifications } from "./infrastructure/email/resendClientNotifications.js";
+import { MemoryWorkStore } from "./infrastructure/database/memoryWorkStore.js";
+import { PostgresWorkStore } from "./infrastructure/database/postgresWorkStore.js";
 import { AccountActivationUseCases, configureActivationPasswordHasher, IActivationTokenRepository } from "./application/use-cases/account-activation.use-cases.js";
 import { InMemoryActivationTokenRepository, PostgresActivationTokenRepository } from "./infrastructure/database/activationTokenRepositories.js";
 import { ResendTransactionalEmail } from "./infrastructure/email/resendTransactionalEmail.js";
@@ -134,6 +142,9 @@ export interface AppDependencies {
     changes:                   ChangeOrderUseCases;
     catalog:                   CatalogUseCases;
     activation:                AccountActivationUseCases;
+    work:                      WorkTrackingUseCases;
+    estimateDocuments:         EstimateDocumentUseCases;
+    notifications:             ClientNotifications;
   };
 }
 
@@ -164,7 +175,7 @@ export async function buildApp(): Promise<AppDependencies> {
   const estimates: IEstimateRepository = pool ? new PostgresEstimateRepository(pool) : new InMemoryEstimateRepository();
   const changes: IChangeOrderRepository = pool ? new PostgresChangeOrderRepository(pool) : new InMemoryChangeOrderRepository();
   const catalog: ICatalogRepository = pool ? new PostgresCatalogRepository(pool) : new InMemoryCatalogRepository();
-  const activationTokens: IActivationTokenRepository = pool ? new PostgresActivationTokenRepository(pool) : new InMemoryActivationTokenRepository();
+  const activationTokens: IActivationTokenRepository = pool ? new PostgresActivationTokenRepository(pool) : new InMemoryActivationTokenRepository(users as InMemoryUserRepository);
   configureActivationPasswordHasher(value => hasher.hash(value));
   const activation = new AccountActivationUseCases(users, activationTokens, new ResendTransactionalEmail(process.env.RESEND_API_KEY, process.env.EMAIL_FROM), process.env.APP_URL ?? "http://localhost:5173");
 
@@ -186,16 +197,23 @@ export async function buildApp(): Promise<AppDependencies> {
   // ── Cross-cutting: audit subscriber ───────────────────────────
   const auditor = new AuditSubscriber(events, audit);
   auditor.start();
+  const notifications = new ClientNotifications(users, projects, estimates, files,
+    pool ? new PostgresNoticeStore(pool) : new MemoryNoticeStore(),
+    new ResendClientNotifications(process.env.RESEND_API_KEY, process.env.EMAIL_FROM, process.env.APP_URL));
+  if (process.env.CLIENT_NOTIFICATIONS_ENABLED === "true") notifications.start(events, !!pool);
 
   // ── Use cases ──────────────────────────────────────────────────
+  const workStore = pool ? new PostgresWorkStore(pool) : new MemoryWorkStore();
+  const estimateCases = new EstimateUseCases(users, opportunities, estimates, projects, events, sigCrypto, pool ? new PostgresCommercialTransaction(pool, hasher) : undefined);
   const useCases = {
     login:                      new LoginUseCase(users, tokens, events, cooldown),
+    notifications,
     createUser:                 new CreateUserUseCase(users, hasher, generateTempPassword, events, activation),
     updateUser:                 new UpdateUserUseCase(users, hasher, events),
     deleteUser:                 new DeleteUserUseCase(users, events),
     listUsers:                  new ListUsersUseCase(users),
     updateProject:              new UpdateProjectUseCase(users, projects, events),
-    deleteProject:              new DeleteProjectUseCase(users, projects),
+    deleteProject:              new DeleteProjectUseCase(users, projects, async id => (await workStore.list({projectId:id})).total > 0 || !!await workStore.budget(id)),
     listProjects:               new ListProjectsUseCase(users, projects),
     getProject:                 new GetProjectUseCase(users, projects),
     assignProjectProfessional:  new AssignProjectProfessionalUseCase(users, projects),
@@ -209,10 +227,12 @@ export async function buildApp(): Promise<AppDependencies> {
     listFiles:                  new ListFilesUseCase(users, projects, files),
     downloadFile:               new DownloadFileUseCase(users, projects, files, fileStorage),
     opportunities:              new OpportunityUseCases(users, opportunities, events),
-    estimates:                  new EstimateUseCases(users, opportunities, estimates, projects, events, sigCrypto, pool ? new PostgresCommercialTransaction(pool) : undefined),
+    estimates:                  estimateCases,
+    estimateDocuments: new EstimateDocumentUseCases(users,estimateCases,new PdfEstimateRenderer(),cooldown),
     changes:                    new ChangeOrderUseCases(users, projects, changes),
     catalog:                    new CatalogUseCases(users, catalog),
     activation,
+    work: new WorkTrackingUseCases(users, projects, workStore),
   };
 
   return { users, projects, audit, events, tokens, files, solicitudes, opportunities, estimates, changes, catalog, useCases };

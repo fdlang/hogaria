@@ -27,7 +27,7 @@ export function useNavigation() {
   return ctx;
 }
 
-export function Router({ routes, fallback }: { routes: Route[]; fallback: ReactNode }) {
+export function Router({ routes, fallback, layout = (content) => content }: { routes: Route[]; fallback: ReactNode; layout?: (content: ReactNode) => ReactNode }) {
   const readPath = () => {
     if (window.location.hash.startsWith("#/")) {
       const legacyPath = window.location.hash.slice(1);
@@ -71,13 +71,11 @@ export function Router({ routes, fallback }: { routes: Route[]; fallback: ReactN
   if (status === "authenticating" || status === "restoring") return null;
 
   // Route requires a role the user doesn't have
-  if (match?.roles && (!user || !match.roles.includes(user.rol))) {
-    return <>{fallback}</>;
-  }
+  const allowed = !match?.roles || (user && match.roles.includes(user.rol));
 
   return (
     <NavigationContext.Provider value={{ currentPath: path, navigate }}>
-      {match ? match.element : fallback}
+      {layout(allowed && match ? match.element : fallback)}
     </NavigationContext.Provider>
   );
 }

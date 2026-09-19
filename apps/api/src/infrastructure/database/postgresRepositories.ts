@@ -13,7 +13,7 @@ const projectPayload = (p: Project) => ({ ...p, progreso: p.progreso.value, pres
 const restoreProject = (id: number, p: any): Project => ({ ...p, id, progreso: Percentage.of(p.progreso), presupuesto: Money.of(p.presupuesto), fechaInicio: date(p.fechaInicio), fechaFinPrevista: date(p.fechaFinPrevista), createdAt: date(p.createdAt), hitos: p.hitos.map((h: any) => ({ ...h, fecha: date(h.fecha) })) });
 
 export class PostgresUserRepository implements IUserRepository {
-  constructor(private readonly pool: pg.Pool, private readonly hasher: PasswordHasher) {}
+  constructor(private readonly pool: pg.Pool | pg.PoolClient, private readonly hasher: PasswordHasher) {}
   private map(r: Row): User { return { id: Number(r.id), email: Email.of(r.email), nombre: r.nombre, rol: r.rol as UserRole, activo: r.activo, createdAt: date(r.created_at), ...(r.profesion ? { profesion: r.profesion } : {}), ...(r.telefono ? { telefono: r.telefono } : {}) }; }
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM users WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async findByEmail(email: string) { const r = await this.pool.query("SELECT * FROM users WHERE lower(email)=lower($1)", [email]); return r.rows[0] ? this.map(r.rows[0]) : null; }

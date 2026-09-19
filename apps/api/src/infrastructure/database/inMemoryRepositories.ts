@@ -71,6 +71,13 @@ export class InMemoryUserRepository implements IUserRepository {
     return ok ? this.strip(u) : null;
   }
 
+  activateAccount(id: number, passwordHash: string): void {
+    const user = this.users.find(user => user.id === id);
+    if (!user || !["cliente", "profesional"].includes(user.rol)) throw new NotFoundError("Invitación");
+    user.passwordHash = passwordHash;
+    user.activo = true;
+  }
+
   async updatePassword(id: number, newPasswordHash: string): Promise<void> {
     const idx = this.users.findIndex(u => u.id === id);
     const current = this.users[idx];

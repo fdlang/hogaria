@@ -7,6 +7,7 @@ export interface FileDTO {
   id: number; projectId: number; uploadedBy: number;
   nombre: string; tipo: string; tamaño: number;
   storageKey: string; sensitive: boolean;
+  classification?: "publico" | "contrato" | "factura" | "reservado";
   uploadedAt: string;
 }
 
@@ -23,12 +24,12 @@ export class FilesApi {
   constructor(private readonly http: ApiClient) {}
   list(projectId: number): Promise<FileDTO[]> { return this.http.get(`/projects/${projectId}/files`); }
 
-  async upload(projectId: number, file: File, sensitive: boolean): Promise<FileDTO> {
+  async upload(projectId: number, file: File, sensitive: boolean, classification?: FileDTO["classification"]): Promise<FileDTO> {
     if (file.size > MAX_FILE_BYTES) throw new Error("El archivo supera el límite de 3 MB");
     if (!ALLOWED_MIMES.includes(file.type)) throw new Error(`Tipo no permitido: ${file.type}`);
     const contenidoBase64 = await toBase64(file);
     return this.http.post(`/projects/${projectId}/files`, {
-      nombre: file.name, tipo: file.type, tamaño: file.size, sensitive, contenidoBase64,
+      nombre: file.name, tipo: file.type, tamaño: file.size, sensitive, contenidoBase64, ...(classification ? { classification } : {}),
     });
   }
 
@@ -64,9 +65,9 @@ export function useProjectFiles(api: FilesApi, projectId: number | null) {
 
   useEffect(() => { if (projectId != null) refresh(); }, [projectId, refresh]);
 
-  const upload = useCallback(async (file: File, sensitive: boolean) => {
+  const upload = useCallback(async (file: File, sensitive: boolean, classification?: FileDTO["classification"]) => {
     if (projectId == null) return;
-    const created = await api.upload(projectId, file, sensitive);
+    const created = await api.upload(projectId, file, sensitive, classification);
     setData(list => [...list, created]);
     return created;
   }, [api, projectId]);

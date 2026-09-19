@@ -2,8 +2,8 @@
  * File use cases — project documents and images.
  *
  * Production notes:
- *   - Actual binary storage lives in S3/Cloud Storage; this use-case only
- *     handles metadata + access control.
+ *   - Private binary storage is accessed through IFileStorage;
+ *     this use case validates content, persists metadata and enforces access.
  *   - File signatures are checked here, before storage.
  *   - Sensitive files (contracts, invoices) are role-gated at read time.
  */
@@ -23,6 +23,7 @@ export interface ProjectFile {
   tamaño: number;      // bytes
   storageKey: string;  // S3 key
   sensitive: boolean;
+  classification?: "publico" | "contrato" | "factura" | "reservado";
   uploadedAt: Date;
 }
 
@@ -62,12 +63,17 @@ export class UploadFileUseCase {
   async execute(cmd: {
     actorId: number; projectId: number;
     nombre: string; tipo: string; tamaño: number;
-    sensitive: boolean; contenidoBase64: string; ctx: ClientContext;
+    sensitive: boolean; contenidoBase64: string; classification?: string; ctx: ClientContext;
   }): Promise<ProjectFile> {
     const actor   = await this.users.findById(cmd.actorId);
     if (!actor) throw new ForbiddenError();
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
+    if(typeof cmd.sensitive!=="boolean")throw new ValidationError("Indica la privacidad del documento");
+    const classification=cmd.classification??(cmd.sensitive?"reservado":"publico");
+    if(!["publico","contrato","factura","reservado"].includes(classification))throw new ValidationError("Clasificación de documento no válida");
+    if((classification==="publico")===cmd.sensitive)throw new ValidationError("La clasificación y privacidad no coinciden");
+    if(actor.rol!=="admin"&&classification!== "publico"&&classification!=="reservado")throw new ForbiddenError("Solo administración clasifica contratos y facturas");
 
     // Authorization:
     //   - Admin: always
@@ -92,7 +98,7 @@ export class UploadFileUseCase {
     // Content validation
     if (cmd.tamaño > MAX_FILE_BYTES)    throw new ValidationError(`Archivo supera ${MAX_FILE_BYTES / 1024 / 1024} MB`);
     if (!ALLOWED_MIMES.has(cmd.tipo))   throw new ValidationError(`Tipo de archivo no permitido: ${cmd.tipo}`);
-    if (!cmd.nombre?.trim())            throw new ValidationError("Nombre de archivo obligatorio");
+    if (typeof cmd.nombre !== "string" || !cmd.nombre.trim() || cmd.nombre.length > 255)            throw new ValidationError("Nombre de archivo obligatorio");
     assertFileSignature(bytes, cmd.tipo);
 
     const stored = await this.storage.put({ projectId: cmd.projectId, filename: cmd.nombre.trim(), contentType: cmd.tipo, bytes });
@@ -106,6 +112,7 @@ export class UploadFileUseCase {
       tamaño: bytes.byteLength,
       storageKey: stored.key,
       sensitive: cmd.sensitive,
+      classification: classification as ProjectFile["classification"] & string,
       uploadedAt: new Date(),
       });
     } catch (error) {
@@ -168,7 +175,7 @@ export class ListFilesUseCase {
     if (actor.rol === "profesional") {
       const assignment = project.profesionalesAsignados.find(a => a.userId === actor.id);
       const perms = assignment ? PermissionPolicy.PROFESSIONAL_ACCESS[assignment.profesion as Profesion] : null;
-      return all.filter(f => !f.sensitive || perms?.verContrato || perms?.verFactura);
+      return all.filter(f => canReadFile(f, perms));
     }
 
     return all;
@@ -190,15 +197,21 @@ export class DownloadFileUseCase {
     const project = await this.projects.findById(file.projectId);
     if (!project) throw new NotFoundError("Proyecto");
     PermissionPolicy.authorize(actor, "project.read", { project });
-    if (actor.rol === "profesional" && file.sensitive) {
+    if (actor.rol === "profesional") {
       const assignment = project.profesionalesAsignados.find(a => a.userId === actor.id);
       const perms = assignment ? PermissionPolicy.PROFESSIONAL_ACCESS[assignment.profesion as Profesion] : null;
-      if (!perms?.verContrato && !perms?.verFactura) throw new ForbiddenError();
+      if (!canReadFile(file,perms)) throw new ForbiddenError();
     }
     return { file, bytes: await this.storage.get(file.storageKey) };
   }
 }
 
+function canReadFile(file:ProjectFile,perms:{verContrato:boolean;verFactura:boolean}|null|undefined):boolean {
+  if(!file.sensitive&&(!file.classification||file.classification==="publico"))return true;
+  if(file.classification==="contrato")return !!perms?.verContrato;
+  if(file.classification==="factura")return !!perms?.verFactura;
+  return false; // Legacy sensitive files stay reserved until classified by admin.
+}
 function decodeBase64(value: string): Uint8Array {
   if (typeof value !== "string" || !/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 !== 0) {
     throw new ValidationError("Contenido de archivo inválido", "contenidoBase64");

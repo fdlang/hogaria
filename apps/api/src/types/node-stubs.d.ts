@@ -44,7 +44,8 @@ declare module "node:url" {
 }
 
 declare class Buffer {
-  toString(): string;
+  static from(value: Uint8Array): Buffer;
+  toString(encoding?: string): string;
 }
 
 declare const process: {
