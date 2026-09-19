@@ -11,7 +11,9 @@
 
 import { useState } from "react";
 import { ProjectsApi } from "../api/projects.api";
+import { UsersApi } from "@/features/users/api/users.api";
 import { useProject, useProgressUpdater, useMilestoneToggler } from "../hooks/useProjects";
+import { useUsers } from "@/features/users/hooks/useUsers";
 import { FilesApi, useProjectFiles } from "@/features/files/api/files.api";
 import { usePermissions } from "@/shared/hooks/usePermissions";
 import { useNotifications } from "@/shared/ui/notifications";
@@ -23,7 +25,7 @@ import { formatMoney, formatDate, formatBytes } from "@/shared/lib/formatters";
 import { Profesion } from "@reformapro/domain";
 
 interface Props {
-  apis: { projects: ProjectsApi; files: FilesApi };
+  apis: { projects: ProjectsApi; files: FilesApi; users: UsersApi };
   projectId: number;
   onBack: () => void;
 }
@@ -33,10 +35,13 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const updateProgress = useProgressUpdater(apis.projects, project);
   const toggleMilestone = useMilestoneToggler(apis.projects, project);
   const files          = useProjectFiles(apis.files, projectId);
+  const professionals  = useUsers(apis.users, "profesional");
   const { can }        = usePermissions();
   const { push }       = useNotifications();
   const confirm        = useConfirm();
   const [editingProgress, setEditingProgress] = useState<number | null>(null);
+  const [selectedProfessional, setSelectedProfessional] = useState("");
+  const [assigning, setAssigning] = useState(false);
 
   const handleProgressSave = async () => {
     if (editingProgress === null) return;
@@ -47,6 +52,27 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const handleMilestoneToggle = async (id: number) => {
     try { await toggleMilestone(id); push("Hito actualizado", "success"); }
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
+  };
+
+  const handleAssignProfessional = async () => {
+    if (!selectedProfessional) return;
+    try {
+      setAssigning(true);
+      const professional = (professionals.data ?? []).find(item => item.id === Number(selectedProfessional));
+      if (!professional?.profesion) throw new Error("Selecciona un profesional con oficio configurado");
+      await apis.projects.assign(projectId, professional.id, professional.profesion);
+      setSelectedProfessional("");
+      await project.refresh();
+      push("Profesional asignado", "success");
+    } catch (e) { push((e as { message?: string }).message ?? "No se pudo asignar", "error"); }
+    finally { setAssigning(false); }
+  };
+
+  const handleUnassignProfessional = async (userId: number) => {
+    const ok = await confirm({ title: "Quitar del proyecto", message: "El profesional dejará de acceder a esta obra.", variant: "danger", confirmLabel: "Quitar" });
+    if (!ok) return;
+    try { await apis.projects.unassign(projectId, userId); await project.refresh(); push("Profesional desasignado", "success"); }
+    catch (e) { push((e as { message?: string }).message ?? "No se pudo desasignar", "error"); }
   };
 
   const handleFileUpload = async (file: File, sensitive: boolean) => {
@@ -88,6 +114,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const canEditMilestones = can("project.update.milestones", { project: p as never });
   const canManageProject  = can("project.update");
   const canUploadFiles    = can("project.read", { project: p as never });
+  const assignableProfessionals = (professionals.data ?? []).filter(item => item.activo && item.profesion && !p.profesionalesAsignados.some(assignment => assignment.userId === item.id));
 
   return (
     <section>
@@ -193,16 +220,26 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
             </dl>
           </div>
 
-          {p.profesionalesAsignados.length > 0 && (
+          {(p.profesionalesAsignados.length > 0 || canManageProject) && (
             <div style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10 }}>
               <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Equipo ({p.profesionalesAsignados.length})</h3>
               <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
                 {p.profesionalesAsignados.map(a => (
                   <li key={a.userId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#302d29" }}>
                     <ProfesionBadge profesion={a.profesion as Profesion} />
+                    {canManageProject && <Button small variant="ghost" onClick={() => handleUnassignProfessional(a.userId)}>Quitar</Button>}
                   </li>
                 ))}
               </ul>
+              {canManageProject && (
+                <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                  <select aria-label="Asignar profesional" value={selectedProfessional} onChange={event => setSelectedProfessional(event.target.value)} style={{ minWidth: 0, flex: 1 }}>
+                    <option value="">{professionals.loading ? "Cargando profesionales…" : "Asignar profesional"}</option>
+                    {assignableProfessionals.map(item => <option key={item.id} value={item.id}>{item.nombre} · {item.profesion}</option>)}
+                  </select>
+                  <Button small onClick={handleAssignProfessional} disabled={!selectedProfessional || assigning}>{assigning ? "…" : "Añadir"}</Button>
+                </div>
+              )}
             </div>
           )}
         </aside>

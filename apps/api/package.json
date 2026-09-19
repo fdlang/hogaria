@@ -13,6 +13,7 @@
     "db:migrate-estimate-rejection": "node --env-file=.env ./scripts/migrate-estimate-rejection.mjs",
     "db:migrate-account-activation": "node --env-file=.env ./scripts/migrate-account-activation.mjs",
     "db:migrate-rate-limits": "node --env-file=.env ./scripts/migrate-rate-limits.mjs"
+    ,"db:migrate-work-tracking": "node --env-file=.env ./scripts/migrate-work-tracking.mjs"
     ,"db:migrate-catalog": "node --env-file=.env ./scripts/migrate-catalog.mjs"
     ,"db:seed-catalog": "tsx --env-file=.env ./scripts/seed-catalog.ts"
   },

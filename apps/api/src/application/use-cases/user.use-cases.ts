@@ -44,7 +44,7 @@ export class CreateUserUseCase {
     const existing = await this.users.findByEmail(email.value);
     if (existing) throw new ConflictError("Ya existe un usuario con ese email");
     const activation = this.activation;
-    if (cmd.rol === "cliente") {
+    if (cmd.rol === "cliente" || cmd.rol === "profesional") {
       if (!activation) throw new ConflictError("El servicio de invitaciones no está configurado");
       activation.ensureConfigured();
     }
@@ -57,13 +57,14 @@ export class CreateUserUseCase {
     const user: User = {
       id: 0, // repository assigns
       email, nombre: cmd.nombre.trim(), rol: cmd.rol,
-      activo: cmd.rol === "cliente" ? false : true, createdAt: new Date(),
+      // Both external roles set their own password through a one-time link.
+      activo: cmd.rol === "cliente" || cmd.rol === "profesional" ? false : true, createdAt: new Date(),
       ...(cmd.profesion !== undefined ? { profesion: cmd.profesion } : {}),
       ...(cmd.telefono  !== undefined ? { telefono:  cmd.telefono  } : {}),
     };
     const saved = await this.users.save(user, passwordHash);
     try {
-      if (saved.rol === "cliente") await activation!.invite(actor.id, saved.id, cmd.ctx);
+      if (saved.rol === "cliente" || saved.rol === "profesional") await activation!.invite(actor.id, saved.id, cmd.ctx);
     } catch (error) {
       // No related records exist yet: compensate a failed invitation so the admin
       // can retry creation instead of inheriting a silent, inactive account.
@@ -76,7 +77,7 @@ export class CreateUserUseCase {
       ip: cmd.ctx.ip, userAgent: cmd.ctx.userAgent,
       userId: saved.id, role: cmd.rol,
     });
-    return { user: saved, invitationSent: saved.rol === "cliente" };
+    return { user: saved, invitationSent: saved.rol === "cliente" || saved.rol === "profesional" };
   }
 }
 

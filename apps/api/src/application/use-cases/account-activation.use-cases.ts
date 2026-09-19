@@ -27,8 +27,14 @@ export class AccountActivationUseCases {
   }
   async invite(actorId: number, userId: number, context: ClientContext) {
     this.ensureConfigured(); const actor = await this.users.findById(actorId); if (!actor || actor.rol !== "admin") throw new ForbiddenError();
-    const user = await this.users.findById(userId); if (!user || user.rol !== "cliente") throw new ValidationError("Solo se pueden invitar cuentas de cliente", "userId");
-    if (user.activo) throw new ConflictError("La cuenta ya está activada");
+    const user = await this.users.findById(userId);
+    if (!user || (user.rol !== "cliente" && user.rol !== "profesional")) {
+      throw new ValidationError("Solo se pueden invitar cuentas de cliente o profesional", "userId");
+    }
+    // Clients cannot receive a second activation once active. For professionals,
+    // an admin may re-send the secure access link to recover accounts created
+    // before the invitation flow existed.
+    if (user.activo && user.rol !== "profesional") throw new ConflictError("La cuenta ya está activada");
     const token = newToken(); const expiresAt = new Date(Date.now() + this.ttlMs);
     await this.tokens.replace({ userId: user.id, tokenHash: await tokenHash(token), expiresAt, usedAt: null });
     const activationUrl = `${this.appUrl.replace(/\/$/, "")}/#/activar-cuenta?token=${encodeURIComponent(token)}`;

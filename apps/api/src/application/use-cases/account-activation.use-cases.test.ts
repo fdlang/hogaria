@@ -29,4 +29,15 @@ describe("AccountActivationUseCases", () => {
     expect((await users.findById(client.id))?.activo).toBe(true);
     await expect(useCases.activate(token!, "OtraClave2026")).rejects.toThrow("caducado");
   });
+
+  it("invites a professional through the same one-time activation flow", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("admin2@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
+    const professional = await users.save({ id: 0, email: Email.of("pro@hogaria.test"), nombre: "Profesional", rol: "profesional", profesion: "electricista", activo: true, createdAt: new Date() }, "");
+    let delivered = false;
+    const email = { isConfigured: () => true, sendActivation: async () => { delivered = true; } };
+    const useCases = new AccountActivationUseCases(users, new InMemoryActivationTokenRepository(), email, "https://hogaria.test");
+    await useCases.invite(admin.id, professional.id, { ip: "127.0.0.1", userAgent: "vitest" });
+    expect(delivered).toBe(true);
+  });
 });

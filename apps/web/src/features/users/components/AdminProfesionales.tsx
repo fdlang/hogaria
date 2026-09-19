@@ -5,7 +5,7 @@
  * Reuses useUsers and useProjects so data is consistent with other views.
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { UsersApi } from "../api/users.api";
 import { ProjectsApi } from "@/features/projects/api/projects.api";
 import { useUsers } from "../hooks/useUsers";
@@ -15,6 +15,8 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { StatCard }   from "@/shared/ui/stat-card";
 import { ProfesionBadge } from "@/shared/ui/badges";
 import { formatDate } from "@/shared/lib/formatters";
+import { Button } from "@/shared/ui";
+import { useNotifications } from "@/shared/ui/notifications";
 import { PROFESIONES, PermissionPolicy, Profesion } from "@reformapro/domain";
 
 interface Props {
@@ -24,6 +26,14 @@ interface Props {
 export function AdminProfesionales({ apis }: Props) {
   const users    = useUsers(apis.users, "profesional");
   const projects = useProjects(apis.projects);
+  const { push } = useNotifications();
+  const [sendingId, setSendingId] = useState<number | null>(null);
+
+  const sendAccess = async (id: number) => {
+    try { setSendingId(id); await apis.users.resendInvitation(id); push("Enlace de acceso enviado", "success"); }
+    catch (error) { push((error as { message?: string }).message ?? "No se pudo enviar el acceso", "error"); }
+    finally { setSendingId(null); }
+  };
 
   const assignments = useMemo(() => {
     const map = new Map<number, number>();
@@ -72,9 +82,14 @@ export function AdminProfesionales({ apis }: Props) {
                         <h3 style={{ fontSize: 14, fontWeight: 600, color: "#302d29" }}>{u.nombre}</h3>
                         {u.profesion && <ProfesionBadge profesion={u.profesion as Profesion} />}
                         <Badge color="#60a5fa">{assigned} proyectos</Badge>
-                        {!u.activo && <code style={{ fontSize: 12, color: "#f87171", background: "#f8717118", padding: "1px 5px", borderRadius: 3 }}>INACTIVO</code>}
+                        {!u.activo && <code style={{ fontSize: 12, color: "#c17248", background: "#c1724818", padding: "1px 5px", borderRadius: 3 }}>PENDIENTE DE ACTIVACIÓN</code>}
                       </div>
                       <p style={{ fontSize: 12, color: "#71685e" }}>{u.email}{u.telefono && ` · ${u.telefono}`} · desde {formatDate(u.createdAt)}</p>
+                      <div style={{ marginTop: 8 }}>
+                        <Button small variant="ghost" onClick={() => sendAccess(u.id)} disabled={sendingId === u.id}>
+                          {sendingId === u.id ? "Enviando…" : "Enviar acceso"}
+                        </Button>
+                      </div>
                       {perms && (
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
                           {Object.entries(perms).filter(([, v]) => v).map(([k]) => (

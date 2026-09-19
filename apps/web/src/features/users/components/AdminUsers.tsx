@@ -164,7 +164,7 @@ function UserFormView({ api, initialUser, onSaved, onCancel }: {
       const res = await form.submit();
       if (!res) return;
       if ("invitationSent" in res) {
-        push(res.invitationSent ? "Cliente creado e invitación enviada" : "Usuario creado", "success");
+        push(res.invitationSent ? "Usuario creado e invitación enviada" : "Usuario creado", "success");
         onSaved(res.user);
       } else {
         push("Usuario actualizado", "success");

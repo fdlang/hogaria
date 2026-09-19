@@ -174,8 +174,10 @@ export class AssignProjectProfessionalUseCase {
     if (project.profesionalesAsignados.some(p => p.userId === professional.id)) {
       throw new ValidationError("El profesional ya está asignado", "userId");
     }
-    const profesion = cmd.profesion ?? professional.profesion;
-    const assignment: ProjectProfessional = profesion ? { userId: professional.id, profesion } : { userId: professional.id };
+    // The project assignment inherits the verified profession from the account.
+    // Do not accept a client-controlled override that could grant mismatched access.
+    if (!professional.profesion) throw new ValidationError("El profesional no tiene profesión configurada", "userId");
+    const assignment: ProjectProfessional = { userId: professional.id, profesion: professional.profesion };
     return this.projects.update(project.id, { profesionalesAsignados: [...project.profesionalesAsignados, assignment] });
   }
 }
