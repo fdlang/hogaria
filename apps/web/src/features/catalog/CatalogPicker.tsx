@@ -4,17 +4,17 @@
  */
 
 import { useMemo, useState } from "react";
-import { CatalogCategory, CatalogItem, getRuntimeCatalog } from "./catalog";
+import type { CatalogCategory, CatalogItem } from "./catalog";
 import { Input, Button, Badge } from "@/shared/ui";
 import { formatMoney } from "@/shared/lib/formatters";
 
 interface Props {
   onPickItem:     (ref: string) => void;
   onImportCategory: (categoria: string, items: CatalogItem[]) => void;
-  catalog?: CatalogCategory[];
+  catalog: CatalogCategory[];
 }
 
-export function CatalogPicker({ onPickItem, onImportCategory, catalog = getRuntimeCatalog() }: Props) {
+export function CatalogPicker({ onPickItem, onImportCategory, catalog }: Props) {
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {

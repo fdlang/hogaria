@@ -9,11 +9,8 @@ import { filterEstimates } from "../estimate-search";
 import { formatDate, formatMoney } from "@/shared/lib/formatters";
 import { CatalogPicker } from "@/features/catalog/CatalogPicker";
 import {
-  CATALOG,
   type CatalogCategory,
   type CatalogItem,
-  CATALOG_UPDATED_AT,
-  setRuntimeCatalog,
 } from "@/features/catalog/catalog";
 import type { UsersApi } from "@/features/users/api/users.api";
 import {
@@ -22,6 +19,9 @@ import {
   type EstimateDTO,
   type OpportunityDTO,
 } from "../api/sales.api";
+
+import { useCatalog } from "@/features/catalog/useCatalog";
+import { CatalogLoadState } from "@/features/catalog/CatalogLoadState";
 
 const steps = ["Oportunidad", "Alcance", "Partidas", "Revisión"];
 
@@ -71,7 +71,16 @@ export function SalesPipeline({
   const [clients, setClients] = useState<Array<{ id: number; nombre: string }>>(
     [],
   );
-  const [catalog, setCatalog] = useState<CatalogCategory[]>(CATALOG);
+  const { items: catalogItems, loading: catalogLoading, error: catalogError, reload: reloadCatalog } = useCatalog(api);
+  const catalog = useMemo<CatalogCategory[]>(() => {
+    const grouped = new Map<string, CatalogItem[]>();
+    catalogItems.filter(item => item.active).forEach(item => {
+      const entries = grouped.get(item.category) ?? [];
+      entries.push({ ref: item.reference, descripcion: item.description, unidad: item.unit, precio: item.salePrice, iva: item.vatRate });
+      grouped.set(item.category, entries);
+    });
+    return [...grouped].map(([categoria, items]) => ({ categoria, items }));
+  }, [catalogItems]);
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [converting, setConverting] = useState<number | null>(null);
@@ -108,34 +117,6 @@ export function SalesPipeline({
     );
   }, []);
 
-  useEffect(() => {
-    void api
-      .catalog()
-      .then((items) => {
-        if (!items.length) return;
-        const grouped = new Map<string, CatalogItem[]>();
-        items.forEach((item) =>
-          grouped.set(item.category, [
-            ...(grouped.get(item.category) ?? []),
-            {
-              ref: item.reference,
-              descripcion: item.description,
-              unidad: item.unit,
-              precio: item.salePrice,
-              iva: item.vatRate,
-            },
-          ]),
-        );
-        const managedCatalog = [...grouped.entries()].map(
-          ([categoria, categoryItems]) => ({ categoria, items: categoryItems }),
-        );
-        setRuntimeCatalog(managedCatalog);
-        setCatalog(managedCatalog);
-      })
-      .catch(() => {
-        // The bundled catalogue is an intentional fallback for local development.
-      });
-  }, [api]);
 
   const active = useMemo(
     () => opportunities.find((item) => item.id === selected) ?? null,
@@ -541,16 +522,19 @@ export function SalesPipeline({
           {showCatalog && (
             <section className="estimate-catalog">
               <header>
-                <strong>Catálogo base Madrid</strong>
+                <strong>Catálogo de partidas</strong>
                 <span>
-                  Precios de venta orientativos sin IVA · revisión{" "}
-                  {new Date(CATALOG_UPDATED_AT).toLocaleDateString("es-ES")}
+                  Precios guardados en el catálogo · sin IVA
                 </span>
               </header>
-              <CatalogPicker
+              <CatalogLoadState loading={catalogLoading} error={catalogError} reload={reloadCatalog} />
+              {!catalogLoading && !catalogError && (catalog.length === 0
+                ? <p role="status">No hay partidas activas en el catálogo. Puedes crear una partida manual.</p>
+                : <CatalogPicker
+                catalog={catalog}
                 onPickItem={addCatalogItem}
                 onImportCategory={importCatalogCategory}
-              />
+              />)}
             </section>
           )}
           {draft.partidas.length === 0 ? (

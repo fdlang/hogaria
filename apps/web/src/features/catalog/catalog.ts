@@ -102,9 +102,3 @@ export const CATALOG: CatalogCategory[] = [
     { ref: "PIN-003", descripcion: "Esmaltado de puertas o radiadores", unidad: "ud", precio: 82, iva: 21 },
   ] },
 ];
-
-let runtimeCatalog: CatalogCategory[] = CATALOG;
-
-/** Replaces the bundled fallback once the authenticated API returns the managed catalogue. */
-export function setRuntimeCatalog(catalog: CatalogCategory[]) { runtimeCatalog = catalog; }
-export function getRuntimeCatalog(): CatalogCategory[] { return runtimeCatalog; }
