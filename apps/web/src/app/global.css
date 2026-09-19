@@ -121,6 +121,18 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .portfolio nav .nav-brand .brand-wordmark { display: block; width: 205px; height: 50px; object-fit: contain; }
 .portfolio nav .nav-links { display: flex; align-items: center; gap: 10px; }
 .portfolio nav button, .actions button, .portfolio footer button { border: 0; background: none; color: var(--copper-dark); font-size: 12px; }
+.portfolio nav button.private-access { flex: 0 0 auto; min-height: 44px; margin: 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--copper-dark); font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; text-align: center; }
+.portfolio nav button.private-access:hover { background: rgba(193,113,72,.08); border-color: var(--copper-dark); }
+.portfolio nav button.private-access:focus-visible { outline: 2px solid var(--copper-dark); outline-offset: 3px; }
+@media (max-width: 1023px) {
+  .portfolio nav:has(.private-access) { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .portfolio nav button.private-access { grid-column: 2; grid-row: 1; justify-self: end; }
+}
+@media (max-width: 380px) {
+  .portfolio nav:has(.private-access) .nav-brand { gap: 6px; }
+  .portfolio nav:has(.private-access) .nav-brand .brand-symbol { width: 28px; height: 28px; }
+  .portfolio nav:has(.private-access) .nav-brand .brand-wordmark { width: 118px; height: 30px; }
+}
 
 @media (min-width: 1024px) {
   .portfolio nav .nav-brand { margin-right: 0; }
