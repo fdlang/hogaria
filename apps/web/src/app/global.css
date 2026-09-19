@@ -124,6 +124,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .portfolio nav button.private-access { flex: 0 0 auto; min-height: 44px; margin: 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--copper-dark); font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; text-align: center; }
 .portfolio nav button.private-access:hover { background: rgba(193,113,72,.08); border-color: var(--copper-dark); }
 .portfolio nav button.private-access:focus-visible { outline: 2px solid var(--copper-dark); outline-offset: 3px; }
+.private-access__mobile { display: none; }
 @media (max-width: 1023px) {
   .portfolio nav:has(.private-access) { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
   .portfolio nav button.private-access { grid-column: 2; grid-row: 1; justify-self: end; }
@@ -536,5 +537,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .portfolio footer { gap: 20px; padding: 28px 24px 34px; }
   .portfolio footer div { align-items: center; gap: 14px; }
   .portfolio footer .footer-contact { align-items: flex-start; gap: 6px; }
-  .portfolio footer button { min-height: 38px; padding: 7px 10px; border: 1px solid rgba(193,113,72,.42); border-radius: 5px; background: rgba(193,113,72,.08); font-weight: 700; }
+  .private-access__desktop { display: none; }
+  .private-access__mobile { display: inline; }
+  .portfolio footer button, .portfolio nav button.private-access, .portfolio nav button.private-access:hover { min-height: 38px; padding: 7px 10px; border: 1px solid rgba(193,113,72,.42); border-radius: 5px; background: rgba(193,113,72,.08); font-weight: 700; }
 }

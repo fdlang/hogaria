@@ -5,7 +5,7 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/');
     const nav = page.getByRole('navigation', { name: 'Navegación principal' });
-    const button = nav.getByRole('button', { name: 'Área privada' });
+    const button = nav.getByRole('button', { name: width <= 720 ? 'Área cliente' : 'Área privada' });
     await expect(button).toBeVisible();
     const brand = await nav.locator('.nav-brand').boundingBox();
     const access = await button.boundingBox();
