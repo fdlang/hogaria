@@ -269,6 +269,8 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .private-topbar--admin .private-account > span { max-width: 65px; }
 }
 .admin-home { width: 100%; }
+.navigation-icon { display: inline-block; flex: 0 0 18px; vertical-align: middle; }
+.admin-home-tile h3, .private-mobile-menu-panel nav section > p { display: flex; align-items: center; gap: 9px; }
 .estimate-list > header { flex-wrap: wrap; }
 .admin-home-group { margin-bottom: 30px; }
 .admin-home-group > header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }

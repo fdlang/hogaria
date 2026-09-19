@@ -17,9 +17,12 @@ for (const width of [390, 768, 1024, 1440, 1920]) {
       /Solicitudes/, /Presupuestos/, /Proyectos/, /Jornadas y costes/, /Profesionales/, /Catálogo/, /Usuarios y accesos/, /Registro de actividad/,
     ]);
     const mobile = width <= 720;
+    await expect(page.locator('.admin-home-grid .navigation-icon')).toHaveCount(8);
     await page.screenshot({ path: info.outputPath("dashboard.png"), fullPage: true });
     if (mobile) await page.getByRole("button", { name: "Abrir menú" }).click();
     const nav = page.getByRole("navigation", { name: mobile ? "Secciones privadas" : "Navegación privada", exact: true });
+    await expect(nav.locator('.navigation-icon')).toHaveCount(5);
+    await expect(nav.locator('.private-nav-dropdown .navigation-icon')).toHaveCount(0);
     if (mobile) await expect(nav.getByRole("link")).toHaveText(labels);
     else {
       await expect(nav.getByRole("link")).toHaveText(["Inicio"]);

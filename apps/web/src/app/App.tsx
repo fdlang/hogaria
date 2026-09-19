@@ -36,6 +36,7 @@ import { PrivacyPolicyPage } from "@/features/legal/components/PrivacyPolicyPage
 import { useEffect, useState, type ReactNode } from "react";
 import { useAuth }                     from "@/features/auth/hooks/useAuth";
 import { Router, Route, useNavigation } from "./Router";
+import { NavigationIcon, type NavigationIconName } from "./NavigationIcon";
 import { DesktopNavigation } from "./DesktopNavigation";
 import { adminNavigation, navigationFor, isNavigationActive } from "./navigation";
 import { Button, EmptyState }          from "@/shared/ui";
@@ -144,7 +145,7 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
         {menuOpen && <div className="private-mobile-menu-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setMenuOpen(false); }}>
           <aside id="private-mobile-navigation" className="private-mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Menú privado">
             <header><div><p className="eyebrow">Área privada</p><strong>{user.nombre}</strong></div><button type="button" className="private-mobile-menu-close" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú"><span className="private-mobile-menu-icon private-mobile-menu-icon--close" aria-hidden="true"><span /><span /><span /></span></button></header>
-            <nav aria-label="Secciones privadas">{groups.map((group) => group.links.length > 0 && <section key={group.label}><p>{group.label}</p>{group.links.map((link) => <a key={link.to} href={link.to} aria-current={isNavigationActive(currentPath, link.to) ? "page" : undefined} onClick={() => setMenuOpen(false)}>{link.label}</a>)}</section>)}</nav>
+            <nav aria-label="Secciones privadas">{groups.map((group) => group.links.length > 0 && <section key={group.label}><p><NavigationIcon name={group.icon} />{group.label}</p>{group.links.map((link) => <a key={link.to} href={link.to} aria-current={isNavigationActive(currentPath, link.to) ? "page" : undefined} onClick={() => setMenuOpen(false)}>{link.label}</a>)}</section>)}</nav>
             <Button variant="ghost" onClick={() => { setMenuOpen(false); onSignOut(); }}>Salir del área privada</Button>
           </aside>
         </div>}
@@ -176,7 +177,7 @@ function AdminHome() {
       <h1 style={{ fontSize: 38, fontWeight: 700, color: "#302d29", marginBottom: 24 }}>Panel de administración</h1>
       {adminNavigation.slice(1).map((group) => (
         <AdminHomeGroup key={group.label} label={group.label} hint={group.hint}>
-          {group.links.map((link) => <Tile key={link.to} href={link.to} title={link.label} subtitle={link.subtitle ?? ""} />)}
+          {group.links.map((link) => <Tile key={link.to} icon={link.icon} href={link.to} title={link.label} subtitle={link.subtitle ?? ""} />)}
         </AdminHomeGroup>
       ))}
     </section>
@@ -187,10 +188,10 @@ function AdminHomeGroup({ label, hint, children }: { label: string; hint: string
   return <section className="admin-home-group"><header><h2>{label}</h2><p>{hint}</p></header><div className="admin-home-grid">{children}</div></section>;
 }
 
-function Tile({ href, title, subtitle }: { href: string; title: string; subtitle: string }) {
+function Tile({ href, title, subtitle, icon }: { href: string; title: string; subtitle: string; icon?: NavigationIconName }) {
   return (
     <a href={href} className="admin-home-tile">
-      <h3 style={{ color: "#c17248", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>{title}</h3>
+      <h3 style={{ color: "#c17248", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}><NavigationIcon name={icon} />{title}</h3>
       <p style={{ fontSize: 12, color: "#71685e" }}>{subtitle}</p>
     </a>
   );

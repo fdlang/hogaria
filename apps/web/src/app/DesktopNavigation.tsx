@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { NavigationIcon } from "./NavigationIcon";
 import { isNavigationActive, type NavigationGroup } from "./navigation";
 
 export function DesktopNavigation({ groups, currentPath, grouped }: {
@@ -27,7 +28,7 @@ export function DesktopNavigation({ groups, currentPath, grouped }: {
     {groups.map((group, index) => {
       if (!grouped || group.links.length === 1) return group.links.map(link =>
         <a key={link.to} href={link.to} className="private-nav-link"
-          aria-current={isNavigationActive(currentPath, link.to) ? "page" : undefined}>{link.label}</a>);
+          aria-current={isNavigationActive(currentPath, link.to) ? "page" : undefined}><NavigationIcon name={link.icon} />{link.label}</a>);
       const expanded = open === group.label;
       const active = group.links.some(link => isNavigationActive(currentPath, link.to));
       const id = "private-nav-group-" + index;
@@ -37,7 +38,7 @@ export function DesktopNavigation({ groups, currentPath, grouped }: {
         <button type="button" className="private-nav-trigger" data-active={active || undefined}
           aria-expanded={expanded} aria-controls={id}
           onClick={event => setOpen(event.detail > 0 && window.matchMedia("(hover: hover) and (pointer: fine)").matches ? group.label : expanded ? null : group.label)}>
-          {group.label}<span className="private-nav-chevron" aria-hidden="true" />
+          <NavigationIcon name={group.icon} />{group.label}<span className="private-nav-chevron" aria-hidden="true" />
         </button>
         <div id={id} className="private-nav-dropdown" hidden={!expanded}>
           {group.links.map(link => <a key={link.to} href={link.to} tabIndex={0}
