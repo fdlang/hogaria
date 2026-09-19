@@ -33,9 +33,10 @@ import { ActivateAccountPage } from "@/features/auth/components/ActivateAccountP
 import { PublicLanding } from "@/features/solicitudes/components/PublicLanding";
 import { PrivacyPolicyPage } from "@/features/legal/components/PrivacyPolicyPage";
 
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAuth }                     from "@/features/auth/hooks/useAuth";
 import { Router, Route, useNavigation } from "./Router";
+import { DesktopNavigation } from "./DesktopNavigation";
 import { adminNavigation, navigationFor, isNavigationActive } from "./navigation";
 import { Button, EmptyState }          from "@/shared/ui";
 
@@ -107,7 +108,6 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
   const [menuOpen, setMenuOpen] = useState(false);
   const { currentPath } = useNavigation();
   const groups = navigationFor(user?.rol);
-  const links = groups.flatMap((group) => group.links.map((link) => ({ ...link, group: group.label })));
 
   useEffect(() => { setMenuOpen(false); }, [currentPath]);
 
@@ -136,23 +136,11 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
         <button className="private-mobile-menu-toggle" type="button" aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"} aria-expanded={menuOpen} aria-controls="private-mobile-navigation" onClick={() => setMenuOpen((open) => !open)}>
           <span className="private-mobile-menu-icon" aria-hidden="true"><span /><span /><span /></span>
         </button>
-        <nav className="private-nav" aria-label="Navegación privada" style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          {links.map((link, index) => {
-            const previous = links[index - 1];
-            return <Fragment key={link.to}>
-              {link.group && previous?.group && link.group !== previous.group && <span aria-hidden="true" style={{ fontSize: 12, color: "#85786b" }}>·</span>}
-              <a href={link.to}
-                aria-current={isNavigationActive(currentPath, link.to) ? "page" : undefined}
-                className="private-nav-link"
-                style={{ fontSize: 13, fontWeight: 700, color: "#71685e", textDecoration: "none", textTransform: "uppercase", letterSpacing: ".05em", transition: "color .18s ease" }}>
-                {link.label}
-              </a>
-            </Fragment>;
-          })}
-          <span style={{ fontSize: 12, color: "#85786b" }}>·</span>
-          <span style={{ fontSize: 12, color: "#71685e" }}>{user.nombre}</span>
+        <DesktopNavigation groups={groups} currentPath={currentPath} grouped={user.rol === "admin"} />
+        <div className="private-account" aria-label="Cuenta">
+          <span title={user.nombre}>{user.nombre}</span>
           <Button small variant="ghost" onClick={onSignOut}>Salir</Button>
-        </nav>
+        </div>
         {menuOpen && <div className="private-mobile-menu-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setMenuOpen(false); }}>
           <aside id="private-mobile-navigation" className="private-mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Menú privado">
             <header><div><p className="eyebrow">Área privada</p><strong>{user.nombre}</strong></div><button type="button" className="private-mobile-menu-close" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú"><span className="private-mobile-menu-icon private-mobile-menu-icon--close" aria-hidden="true"><span /><span /><span /></span></button></header>
