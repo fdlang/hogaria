@@ -80,8 +80,8 @@ async function fixture(page: Page, role: string) {
   });
   await page.goto(role === "admin" ? "/#/admin/budgets" : "/#/cliente/budgets");
   if (role === "admin") {
-    await expect(page.getByLabel("Buscar presupuestos")).toBeHidden();
-    await page.getByRole("button", { name: "Mostrar propuestas" }).click();
+    await expect(page.getByLabel("Buscar presupuestos")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ver presupuesto" })).toBeHidden();
   }
   return emails;
 }
@@ -123,6 +123,7 @@ for (const role of ["admin", "cliente"])
   }
 test("budget detail offers download only, never email", async ({ page }) => {
   const emails = await fixture(page, "admin");
+  await page.getByRole("button", { name: "Mostrar propuestas" }).click();
   await page.getByRole("button", { name: "Ver presupuesto" }).click();
   await expect(
     page.getByRole("button", { name: "Descargar PDF" }),
@@ -135,12 +136,22 @@ test("budget detail offers download only, never email", async ({ page }) => {
   expect(emails).toHaveLength(0);
 });
 
-test("recent estimates collapse without losing search", async ({ page }) => {
+test("search stays visible and opens results independently of recent estimates", async ({ page }) => {
   await fixture(page, "admin");
   await page.getByLabel("Buscar presupuestos").fill("Pinto");
-  await page.getByRole("button", { name: "Ocultar propuestas" }).click();
-  await expect(page.getByLabel("Buscar presupuestos")).toBeHidden();
-  await page.getByRole("button", { name: "Mostrar propuestas" }).click();
-  await expect(page.getByLabel("Buscar presupuestos")).toHaveValue("Pinto");
+  await expect(page.getByRole("heading", { name: "Resultados de búsqueda" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ver presupuesto" })).toBeVisible();
+  await page.getByRole("button", { name: "Limpiar filtros" }).click();
+  await expect(page.getByRole("button", { name: "Ver presupuesto" })).toBeHidden();
+  await page.getByRole("combobox", { name: "Estado", exact: true }).selectOption("rechazado");
+  await expect(page.getByText("No hay presupuestos que coincidan con los filtros.")).toBeVisible();
+  await page.getByRole("combobox", { name: "Estado", exact: true }).selectOption("enviado");
+  await expect(page.getByRole("button", { name: "Ver presupuesto" })).toBeVisible();
+  await page.getByRole("button", { name: "Limpiar filtros" }).click();
+  await page.getByRole("button", { name: "Mostrar propuestas" }).click();
+  await expect(page.getByRole("button", { name: "Ver presupuesto" })).toBeVisible();
+  await page.getByRole("button", { name: "Ocultar propuestas" }).click();
+  await expect(page.getByLabel("Buscar presupuestos")).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Estado", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ver presupuesto" })).toBeHidden();
 });

@@ -649,29 +649,30 @@ function RecentEstimates({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const hasFilters = Boolean(query.trim() || status);
   const filtered = filterEstimates(estimates, query, status);
   return (
     <section className="estimate-list" aria-labelledby="recent-estimates">
       <header>
         <div>
           <p className="eyebrow">Seguimiento comercial</p>
-          <h2 id="recent-estimates">Propuestas recientes</h2>
+          <h2 id="recent-estimates">{hasFilters ? "Resultados de búsqueda" : "Propuestas recientes"}</h2>
         </div>
         <p>
           {estimates.length}{" "}
           {estimates.length === 1 ? "propuesta" : "propuestas"}
         </p>
-        <Button small variant="ghost" aria-expanded={expanded} aria-controls="recent-estimates-content" onClick={() => setExpanded(value => !value)}>
+        {!hasFilters && <Button small variant="ghost" aria-expanded={expanded} aria-controls="recent-estimates-content" onClick={() => setExpanded(value => !value)}>
           {expanded ? "Ocultar propuestas" : "Mostrar propuestas"}
-        </Button>
+        </Button>}
       </header>
-      <div id="recent-estimates-content" hidden={!expanded}>
       <EstimateSearch
         query={query}
         status={status}
         onQuery={setQuery}
         onStatus={setStatus}
       />
+      <div id="recent-estimates-content" hidden={!expanded && !hasFilters}>
       <p role="status">
         {filtered.length} de {estimates.length} propuestas
       </p>
