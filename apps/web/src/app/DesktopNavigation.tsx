@@ -31,10 +31,12 @@ export function DesktopNavigation({ groups, currentPath, grouped }: {
       const expanded = open === group.label;
       const active = group.links.some(link => isNavigationActive(currentPath, link.to));
       const id = "private-nav-group-" + index;
-      return <div className="private-nav-group" key={group.label}>
+      return <div className="private-nav-group" key={group.label}
+        onPointerEnter={event => { if (event.pointerType === "mouse") setOpen(group.label); }}
+        onPointerLeave={event => { if (event.pointerType === "mouse") setOpen(current => current === group.label ? null : current); }}>
         <button type="button" className="private-nav-trigger" data-active={active || undefined}
           aria-expanded={expanded} aria-controls={id}
-          onClick={() => setOpen(expanded ? null : group.label)}>
+          onClick={event => setOpen(event.detail > 0 && window.matchMedia("(hover: hover) and (pointer: fine)").matches ? group.label : expanded ? null : group.label)}>
           {group.label}<span className="private-nav-chevron" aria-hidden="true" />
         </button>
         <div id={id} className="private-nav-dropdown" hidden={!expanded}>

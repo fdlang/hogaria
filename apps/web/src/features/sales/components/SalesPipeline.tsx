@@ -648,6 +648,7 @@ function RecentEstimates({
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const filtered = filterEstimates(estimates, query, status);
   return (
     <section className="estimate-list" aria-labelledby="recent-estimates">
@@ -660,7 +661,11 @@ function RecentEstimates({
           {estimates.length}{" "}
           {estimates.length === 1 ? "propuesta" : "propuestas"}
         </p>
+        <Button small variant="ghost" aria-expanded={expanded} aria-controls="recent-estimates-content" onClick={() => setExpanded(value => !value)}>
+          {expanded ? "Ocultar propuestas" : "Mostrar propuestas"}
+        </Button>
       </header>
+      <div id="recent-estimates-content" hidden={!expanded}>
       <EstimateSearch
         query={query}
         status={status}
@@ -717,6 +722,7 @@ function RecentEstimates({
             : "Aún no hay propuestas. Crea una oportunidad para preparar la primera."}
         </p>
       )}
+      </div>
     </section>
   );
 }

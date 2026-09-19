@@ -17,6 +17,7 @@ for (const width of [390, 768, 1024, 1440, 1920]) {
       /Solicitudes/, /Presupuestos/, /Proyectos/, /Jornadas y costes/, /Profesionales/, /Catálogo/, /Usuarios y accesos/, /Registro de actividad/,
     ]);
     const mobile = width <= 720;
+    await page.screenshot({ path: info.outputPath("dashboard.png"), fullPage: true });
     if (mobile) await page.getByRole("button", { name: "Abrir menú" }).click();
     const nav = page.getByRole("navigation", { name: mobile ? "Secciones privadas" : "Navegación privada", exact: true });
     if (mobile) await expect(nav.getByRole("link")).toHaveText(labels);
@@ -27,6 +28,16 @@ for (const width of [390, 768, 1024, 1440, 1920]) {
     await expect(nav.locator('[aria-current="page"]')).toHaveText("Inicio");
     if (!mobile) {
       const trigger = nav.getByRole("button", { name: "Comercial", exact: true });
+      await trigger.hover();
+      await expect(trigger).toHaveAttribute("aria-expanded", "true");
+      await nav.getByRole("link", { name: "Solicitudes" }).hover();
+      await expect(trigger).toHaveAttribute("aria-expanded", "true");
+      await page.mouse.move(0, 850);
+      await expect(trigger).toHaveAttribute("aria-expanded", "false");
+      const grid = page.locator(".admin-home-grid").first();
+      const gridBox = await grid.boundingBox();
+      const lastTile = await grid.locator("a").last().boundingBox();
+      expect(Math.abs(gridBox!.x + gridBox!.width - lastTile!.x - lastTile!.width)).toBeLessThan(2);
       await trigger.focus();
       await page.keyboard.press("Enter");
       await expect(trigger).toHaveAttribute("aria-expanded", "true");

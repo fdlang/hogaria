@@ -79,6 +79,10 @@ async function fixture(page: Page, role: string) {
     return route.fulfill({ json });
   });
   await page.goto(role === "admin" ? "/#/admin/budgets" : "/#/cliente/budgets");
+  if (role === "admin") {
+    await expect(page.getByLabel("Buscar presupuestos")).toBeHidden();
+    await page.getByRole("button", { name: "Mostrar propuestas" }).click();
+  }
   return emails;
 }
 for (const role of ["admin", "cliente"])
@@ -129,4 +133,14 @@ test("budget detail offers download only, never email", async ({ page }) => {
     }),
   ).toHaveCount(0);
   expect(emails).toHaveLength(0);
+});
+
+test("recent estimates collapse without losing search", async ({ page }) => {
+  await fixture(page, "admin");
+  await page.getByLabel("Buscar presupuestos").fill("Pinto");
+  await page.getByRole("button", { name: "Ocultar propuestas" }).click();
+  await expect(page.getByLabel("Buscar presupuestos")).toBeHidden();
+  await page.getByRole("button", { name: "Mostrar propuestas" }).click();
+  await expect(page.getByLabel("Buscar presupuestos")).toHaveValue("Pinto");
+  await expect(page.getByRole("button", { name: "Ver presupuesto" })).toBeVisible();
 });

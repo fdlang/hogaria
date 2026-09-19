@@ -189,7 +189,7 @@ function AdminHomeGroup({ label, hint, children }: { label: string; hint: string
 
 function Tile({ href, title, subtitle }: { href: string; title: string; subtitle: string }) {
   return (
-    <a href={href} style={{ display: "block", padding: 20, background: "rgba(255,250,244,.86)", border: "1px solid var(--line)", borderRadius: 10, textDecoration: "none", boxShadow: "0 8px 24px rgba(72,59,44,.08)" }}>
+    <a href={href} className="admin-home-tile">
       <h3 style={{ color: "#c17248", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>{title}</h3>
       <p style={{ fontSize: 12, color: "#71685e" }}>{subtitle}</p>
     </a>
