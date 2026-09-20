@@ -85,6 +85,11 @@ export function ClientEstimates({
     setAccepted(false);
     canvas.current?.clear();
   };
+  const closeChanges = () => {
+    if (saving) return;
+    setChangeOpen(false);
+    setChangeText("");
+  };
   const replace = (next: EstimateDTO) =>
     setItems((current) =>
       current.map((item) => (item.id === next.id ? next : item)),
@@ -231,7 +236,7 @@ export function ClientEstimates({
         )}
       </section>
       <Modal
-        open={selected !== null}
+        open={selected !== null && !changeOpen}
         onClose={closeProposal}
         title={selected?.titulo ?? "Propuesta"}
         width={760}
@@ -255,14 +260,14 @@ export function ClientEstimates({
           onSignature={setSignature}
           onPassword={setPassword}
           onAccepted={setAccepted}
-          onRequestChanges={() => setChangeOpen(true)}
+          onRequestChanges={() => { setChangeText(""); setChangeOpen(true); }}
           onSign={() => void sign()}
           onClose={closeProposal}
         />
       </Modal>
       <Modal
         open={changeOpen}
-        onClose={() => !saving && setChangeOpen(false)}
+        onClose={closeChanges}
         title="Solicitar cambios"
         width={600}
       >
@@ -294,7 +299,7 @@ export function ClientEstimates({
           <Button
             variant="ghost"
             disabled={saving}
-            onClick={() => setChangeOpen(false)}
+            onClick={closeChanges}
           >
             Cancelar
           </Button>

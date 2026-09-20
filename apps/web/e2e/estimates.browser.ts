@@ -189,3 +189,17 @@ test("search stays visible and opens results independently of recent estimates",
   await expect(page.getByRole("combobox", { name: "Estado", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ver presupuesto" })).toBeHidden();
 });
+
+test("request changes uses one modal, clears cancelled text and preserves the proposal", async ({ page }) => {
+  await fixture(page, "cliente");
+  await page.getByRole("button", { name: /Ver propuesta/ }).click();
+  await page.getByRole("button", { name: "Solicitar cambios" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await page.getByRole("textbox", { name: "Cambios solicitados" }).fill("Cambiar el revestimiento seleccionado");
+  await page.getByRole("button", { name: "Cancelar" }).click();
+  await expect(page.getByRole("button", { name: "Solicitar cambios" })).toBeVisible();
+  await page.getByRole("button", { name: "Solicitar cambios" }).click();
+  await expect(page.getByRole("textbox", { name: "Cambios solicitados" })).toHaveValue("");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Solicitar cambios" })).toBeVisible();
+});
