@@ -58,11 +58,12 @@ test("client explicitly approves a change and sees the updated project amount", 
   await page.setViewportSize({width:390,height:850});
   await authenticated(page,"cliente");
   let approved = false;
-  const project = {id:1,estimateId:1,nombre:"Obra",descripcion:"",clienteId:2,direccion:"Madrid",tipo:"Reforma",estado:"en_curso",progreso:10,presupuesto:100,fechaInicio:"2026-09-01",fechaFinPrevista:"2026-10-01",profesionalesAsignados:[],hitos:[]};
+  const project = {id:1,estimateId:1,nombre:"Obra",descripcion:"",clienteId:2,direccion:"Madrid",tipo:"Reforma",estado:"en_curso",progreso:10,presupuesto:100,fechaInicio:"2026-09-01",fechaFinPrevista:"2026-10-01",profesionalesAsignados:[{userId:9,profesion:"carpintero"}],hitos:[]};
   await page.route("**/api/projects/1",route => route.fulfill({json:{...project,presupuesto:approved?200:100}}));
   await page.route("**/api/projects/1/change-orders",route => route.fulfill({json:[{id:7,numero:"OC-7",estado:approved?"aprobado":"enviado",propuesta:proposal}]}));
   await page.route("**/api/projects/1/change-orders/7/transition",route => {expect(route.request().postDataJSON()).toEqual({estado:"aprobado",password:"Password12345"});approved=true;return route.fulfill({json:{id:7,estado:"aprobado"}});});
   await page.goto("/cliente/projects/1");
+  await expect(page.getByRole("heading", { name: /Equipo/ })).toHaveCount(0);
   await page.getByRole("button",{name:"Revisar decisión"}).click();
   await expect(page.getByRole("button",{name:"Aceptar ampliación"})).toBeDisabled();
   await page.getByLabel("Confirma tu contraseña").fill("Password12345");

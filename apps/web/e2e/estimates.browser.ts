@@ -100,6 +100,17 @@ for (const width of [320, 390, 768, 1440]) {
     ).toBe(true);
   });
 }
+test("client opens an assigned project with an explicit button", async ({ page }) => {
+  await fixture(page, "cliente");
+  await page.route("**/api/projects", route => route.fulfill({
+    json: [{ id: 7, nombre: "Reforma cocina", direccion: "Madrid", progreso: 35 }],
+  }));
+  await page.reload();
+  const openProject = page.getByRole("button", { name: "Ver obra" });
+  await expect(openProject).toBeVisible();
+  await openProject.click();
+  await expect(page).toHaveURL(/\/cliente\/projects\/7$/);
+});
 for (const state of ["borrador", "en_revision", "rechazado"]) {
   test(`admin resumes ${state} and saves the same estimate`, async ({ page }) => {
     await fixture(page, "admin");

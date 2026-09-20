@@ -133,7 +133,8 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const canEditMilestones = can("project.update.milestones", { project: p as never });
   const canManageProject  = can("project.update");
   const canUploadFiles    = can("project.read", { project: p as never });
-  const assignableProfessionals = (professionals.data ?? []).filter(item => item.activo && item.profesion && !p.profesionalesAsignados.some(assignment => assignment.userId === item.id));
+  const projectAssignments = p.profesionalesAsignados ?? [];
+  const assignableProfessionals = (professionals.data ?? []).filter(item => item.activo && item.profesion && !projectAssignments.some(assignment => assignment.userId === item.id));
   const nextStates: Record<ProjectDTO["estado"], ProjectDTO["estado"][]> = { planificacion: ["en_curso"], en_curso: ["pausado", "finalizado"], pausado: ["en_curso", "finalizado"], finalizado: [] };
 
   return (
@@ -255,11 +256,11 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
             </dl>
           </div>
 
-          {(p.profesionalesAsignados.length > 0 || canManageProject) && (
+          {canManageProject && (
             <div className="project-detail__aside-card" style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10 }}>
-              <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Equipo ({p.profesionalesAsignados.length})</h3>
+              <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Equipo ({projectAssignments.length})</h3>
               <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
-                {p.profesionalesAsignados.map(a => (
+                {projectAssignments.map(a => (
                   <li key={a.userId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#302d29" }}>
                     <ProfesionBadge profesion={a.profesion as Profesion} />
                     {canManageProject && <Button small variant="ghost" onClick={() => handleUnassignProfessional(a.userId)}>Quitar</Button>}

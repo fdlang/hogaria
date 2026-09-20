@@ -214,6 +214,21 @@ describe("Security and integrity regressions", () => {
     expect((response.body as Array<Record<string, unknown>>)[0]).not.toHaveProperty("estimateId");
     expect((response.body as Array<Record<string, unknown>>)[0]).not.toHaveProperty("clienteId");
   });
+  it("never exposes professional assignments in a client project response", async () => {
+    const { users } = await setup();
+    const client = await users.save({ id: 0, email: Email.of("project-owner@test.es"), nombre: "Owner", rol: "cliente", activo: true, createdAt: new Date() });
+    const project = {
+      id: 8, revision: 1, estimateId: 92, nombre: "Obra cliente", descripcion: "", clienteId: client.id,
+      direccion: "Madrid", tipo: "Reforma", estado: "en_curso", progreso: { value: 30 }, presupuesto: { amount: 48500 },
+      fechaInicio: new Date(), fechaFinPrevista: new Date(),
+      profesionalesAsignados: [{ userId: 41, profesion: "carpintero" }], hitos: [], createdAt: new Date(),
+    } as never;
+    const controller = projectController({ users, list: { execute: vi.fn(async () => [project]) } } as never);
+    const response = await controller.list({ actorId: client.id } as never);
+    expect(response.status).toBe(200);
+    expect((response.body as Array<Record<string, unknown>>)[0]).not.toHaveProperty("profesionalesAsignados");
+    expect((response.body as Array<Record<string, unknown>>)[0]).toMatchObject({ presupuesto: 48500, clienteId: client.id });
+  });
   it("never exposes invoices, contracts or reserved files to an assigned professional", async () => {
     const { users } = await setup();
     const professional = await users.save({ id: 0, email: Email.of("worker@test.es"), nombre: "Worker", rol: "profesional", profesion: "reformista", activo: true, createdAt: new Date() });

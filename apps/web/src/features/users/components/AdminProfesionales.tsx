@@ -21,14 +21,14 @@ export function AdminProfesionales({ apis }: Props) {
   const [documentsFor, setDocumentsFor] = useState<UserDTO | null>(null);
   const assignments = useMemo(() => {
     const map = new Map<number, number>();
-    (projects.data ?? []).forEach(project => project.profesionalesAsignados.forEach(assignment => map.set(assignment.userId, (map.get(assignment.userId) ?? 0) + 1)));
+    (projects.data ?? []).forEach(project => (project.profesionalesAsignados ?? []).forEach(assignment => map.set(assignment.userId, (map.get(assignment.userId) ?? 0) + 1)));
     return map;
   }, [projects.data]);
 
   if (users.loading || projects.loading) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>;
   if (users.error || projects.error) return <div role="alert" style={{ color: "#b5483f", padding: 20 }}>{users.error ?? projects.error}</div>;
   const userList = (users.data ?? []).filter(user => accountStatusOf(user) !== "archived");
-  const totalAssignments = (projects.data ?? []).reduce((total, project) => total + project.profesionalesAsignados.length, 0);
+  const totalAssignments = (projects.data ?? []).reduce((total, project) => total + (project.profesionalesAsignados ?? []).length, 0);
 
   return <section>
     <PageHeader title="Profesionales" subtitle={`${userList.length} profesionales · ${userList.filter(user => user.activo).length} activos · ${totalAssignments} asignaciones totales`} />

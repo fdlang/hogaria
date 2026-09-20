@@ -256,12 +256,13 @@ export function ClientEstimates({
                 </div>
                 <small>{project.progreso}% completado</small>
               </div>
-              <a
-                className="ui-button ui-button--ghost"
-                href={`#/cliente/projects/${project.id}`}
+              <Button
+                small
+                variant="ghost"
+                onClick={() => { window.location.hash = `#/cliente/projects/${project.id}`; }}
               >
                 Ver obra
-              </a>
+              </Button>
             </article>
           ))
         ) : (

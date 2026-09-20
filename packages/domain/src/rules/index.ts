@@ -52,6 +52,12 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/professional-document.use-cases.ts"], tests: ["apps/api/src/application/use-cases/professional-document.use-cases.test.ts"],
   },
   {
+    id: "HOG-SEC-006", description: "Las asignaciones de profesionales son operativa interna y nunca se exponen al cliente.", origin: "security", owner: "operaciones",
+    assumption: "El cliente necesita conocer el avance y los responsables comunicados, no la planificación interna de personal.", validScale: "Una empresa con equipos propios y autónomos asignados individualmente.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
+    metrics: [metric("client_assignment_exposure_incidents", "Respuestas a clientes que contienen asignaciones internas"), metric("assignment_visibility_denial_rate", "Accesos bloqueados a datos internos de asignación", "audit_log")],
+    implementation: ["apps/api/src/interfaces/http/projectController.ts", "apps/web/src/features/projects/components/ProjectDetail.tsx"], tests: ["apps/api/src/application/use-cases/security-regressions.test.ts", "apps/web/e2e/commercial-workflow.browser.ts"],
+  },
+  {
     id: "HOG-USR-001", description: "Siempre debe permanecer al menos un administrador activo.", origin: "security", owner: "direccion",
     assumption: "La continuidad operativa depende de administradores internos sin autoservicio de recuperación privilegiada.", validScale: "Una empresa con uno o varios administradores.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("last_admin_block_count", "Intentos bloqueados de desactivar al último administrador", "audit_log"), metric("active_admin_count", "Administradores activos", "database")],

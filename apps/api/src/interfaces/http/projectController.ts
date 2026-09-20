@@ -11,26 +11,28 @@ import { ForbiddenError, ValidationError } from "@reformapro/domain/errors";
 import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
 
-export function toProjectDTO(p: Project, audience: "full" | "professional" = "full") {
-  const operational = {
+export function toProjectDTO(p: Project, audience: "full" | "professional" | "client" = "full") {
+  const shared = {
     id: p.id, revision: p.revision ?? 0, nombre: p.nombre, descripcion: p.descripcion,
     direccion: p.direccion, tipo: p.tipo,
     estado: p.estado,
     progreso: p.progreso.value,
     fechaInicio:      p.fechaInicio.toISOString(),
     fechaFinPrevista: p.fechaFinPrevista.toISOString(),
-    profesionalesAsignados: p.profesionalesAsignados,
     hitos: p.hitos.map(h => ({
       id: h.id, nombre: h.nombre, completado: h.completado,
       fecha: h.fecha.toISOString(),
     })),
   };
-  return audience === "professional" ? operational : {
-    ...operational,
+  const operational = { ...shared, profesionalesAsignados: p.profesionalesAsignados };
+  if (audience === "professional") return operational;
+  const commercial = {
+    ...(audience === "client" ? shared : operational),
     estimateId: p.estimateId,
     clienteId: p.clienteId,
     presupuesto: p.presupuesto.amount,
   };
+  return commercial;
 }
 
 export function projectController(deps: {
@@ -50,7 +52,7 @@ export function projectController(deps: {
   const dtoFor = async (actorId: number, project: Project) => {
     const actor = await deps.users.findById(actorId);
     if (!actor?.activo) throw new ForbiddenError();
-    return toProjectDTO(project, actor?.rol === "profesional" ? "professional" : "full");
+    return toProjectDTO(project, actor.rol === "profesional" ? "professional" : actor.rol === "cliente" ? "client" : "full");
   };
 
   return {

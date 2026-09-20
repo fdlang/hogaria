@@ -263,7 +263,6 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--marble-light);
-  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
 }
 .client-estimates .client-row::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--copper); }
 .client-estimates .client-row > div:first-child { display: grid; gap: 7px; min-width: 0; }
@@ -332,9 +331,6 @@
 .app-shell--cliente .project-detail__aside-card dd { color: var(--ink) !important; }
 .app-shell--cliente .project-detail__aside-card dt { color: var(--muted) !important; }
 .app-shell--cliente .project-detail__aside-card dl > div { border-color: rgba(153, 86, 55, .15) !important; }
-@media (hover: hover) and (pointer: fine) {
-  .client-estimates .client-row:hover { transform: translateY(-2px); border-color: rgba(193, 113, 72, .62); box-shadow: 0 12px 24px rgba(72, 59, 44, .1); }
-}
 @media (max-width: 600px) {
   .client-estimates { gap: 20px; }
   .client-estimates__hero { grid-template-columns: 1fr; gap: 28px; padding: 30px 22px; border-radius: 11px; }
@@ -418,8 +414,4 @@
     height: 58svh;
     min-height: 420px;
   }
-}
-@media (prefers-reduced-motion: reduce) {
-  .client-estimates .client-row { transition: none; }
-  .client-estimates .client-row:hover { transform: none; }
 }

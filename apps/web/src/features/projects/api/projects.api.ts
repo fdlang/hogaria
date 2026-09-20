@@ -12,7 +12,7 @@ export interface ProjectDTO {
   estado: "planificacion" | "en_curso" | "pausado" | "finalizado";
   progreso: number; presupuesto?: number;
   fechaInicio: string; fechaFinPrevista: string;
-  profesionalesAsignados: Array<{ userId: number; profesion: string }>;
+  profesionalesAsignados?: Array<{ userId: number; profesion: string }>;
   hitos: Array<{ id: string | number; nombre: string; completado: boolean; fecha: string }>;
 }
 
