@@ -46,10 +46,6 @@ const MAX_FILE_BYTES = 3 * 1024 * 1024;
 const ALLOWED_MIMES = new Set([
   "image/jpeg", "image/png", "image/webp", "image/gif",
   "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
 
 export class UploadFileUseCase {
@@ -67,7 +63,7 @@ export class UploadFileUseCase {
     sensitive: boolean; contenidoBase64: string; classification?: string; ctx: ClientContext;
   }): Promise<ProjectFile> {
     const actor   = await this.users.findById(cmd.actorId);
-    if (!actor) throw new ForbiddenError();
+    if (!actor?.activo) throw new ForbiddenError();
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
     if(typeof cmd.sensitive!=="boolean")throw new ValidationError("Indica la privacidad del documento");
@@ -150,19 +146,21 @@ export class DeleteFileUseCase {
 
   async execute(cmd: { actorId: number; fileId: number }): Promise<void> {
     const actor = await this.users.findById(cmd.actorId);
-    if (!actor) throw new ForbiddenError();
+    if (!actor?.activo) throw new ForbiddenError();
     const file  = await this.files.findById(cmd.fileId);
     if (!file) throw new NotFoundError("Archivo");
 
     // Only admin can delete sensitive files; users can delete their own uploads
     const project = await this.projects.findById(file.projectId);
     if (!project) throw new NotFoundError("Proyecto");
-    PermissionPolicy.authorize(actor, "project.read", { project });
+    if (!PermissionPolicy.can(actor, "project.read", { project })) throw new NotFoundError("Proyecto");
     if (file.sensitive && actor.rol !== "admin") throw new ForbiddenError();
     if (!file.sensitive && actor.rol !== "admin" && file.uploadedBy !== actor.id) throw new ForbiddenError();
 
-    await this.storage.delete(file.storageKey);
+    // Remove the database reference first: a storage outage may leave a private,
+    // unreachable blob for later cleanup, but never a visible broken download.
     await this.files.delete(file.id);
+    await this.storage.delete(file.storageKey);
   }
 }
 
@@ -174,12 +172,12 @@ export class ListFilesUseCase {
   ) {}
   async execute(cmd: { actorId: number; projectId: number }): Promise<ProjectFile[]> {
     const actor   = await this.users.findById(cmd.actorId);
-    if (!actor) throw new ForbiddenError();
+    if (!actor?.activo) throw new ForbiddenError();
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
 
     // Enforce project read permission first
-    PermissionPolicy.authorize(actor, "project.read", { project });
+    if (!PermissionPolicy.can(actor, "project.read", { project })) throw new NotFoundError("Proyecto");
 
     const all = await this.files.findByProject(cmd.projectId);
 
@@ -196,13 +194,13 @@ export class DownloadFileUseCase {
   ) {}
   async execute(cmd: { actorId: number; fileId: number }): Promise<{ file: ProjectFile; bytes: Uint8Array }> {
     const actor = await this.users.findById(cmd.actorId);
-    if (!actor) throw new ForbiddenError();
+    if (!actor?.activo) throw new ForbiddenError();
     const file = await this.files.findById(cmd.fileId);
     if (!file) throw new NotFoundError("Archivo");
     const project = await this.projects.findById(file.projectId);
     if (!project) throw new NotFoundError("Proyecto");
-    PermissionPolicy.authorize(actor, "project.read", { project });
-    if (!canReadFile(file,actor.rol)) throw new ForbiddenError();
+    if (!PermissionPolicy.can(actor, "project.read", { project })) throw new NotFoundError("Archivo");
+    if (!canReadFile(file,actor.rol)) throw new NotFoundError("Archivo");
     return { file, bytes: await this.storage.get(file.storageKey) };
   }
 }
@@ -226,6 +224,15 @@ function startsWith(bytes: Uint8Array, signature: number[]) {
   return bytes.length >= signature.length && signature.every((byte, index) => bytes[index] === byte);
 }
 
+function containsAscii(bytes: Uint8Array, value: string) {
+  const pattern = new TextEncoder().encode(value);
+  outer: for (let i = 0; i <= bytes.length - pattern.length; i += 1) {
+    for (let j = 0; j < pattern.length; j += 1) if (bytes[i + j] !== pattern[j]) continue outer;
+    return true;
+  }
+  return false;
+}
+
 /** MIME is client-controlled, so verify the bytes before storage. */
 function assertFileSignature(bytes: Uint8Array, mime: string) {
   const valid = (() => {
@@ -234,11 +241,8 @@ function assertFileSignature(bytes: Uint8Array, mime: string) {
       case "image/png": return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
       case "image/gif": return startsWith(bytes, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) || startsWith(bytes, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
       case "image/webp": return startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
-      case "application/pdf": return startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d]);
-      case "application/msword":
-      case "application/vnd.ms-excel": return startsWith(bytes, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
-      case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-      case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": return startsWith(bytes, [0x50, 0x4b, 0x03, 0x04]);
+      case "application/pdf": return startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d]) &&
+        !["/JavaScript", "/JS", "/OpenAction", "/Launch", "/EmbeddedFile", "/RichMedia"].some(marker => containsAscii(bytes, marker));
       default: return false;
     }
   })();

@@ -238,6 +238,9 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .contact h2 { font-size: clamp(36px, 10.75vw, 42px); }
   .portfolio footer { flex-wrap: wrap; padding: 30px 24px; }.portfolio footer .footer-brand { min-width: 0; }.portfolio footer div { width: 100%; margin-left: 0; }.portfolio footer .footer-links { margin-left: 0; }
 }
+@media (max-width: 380px) {
+  .project-showcase__title-line, .contact-title__project { white-space: normal; }
+}
 
 /* Private area: tablet-first structure. Inline layout values are intentionally
    overridden here so screens with a keyboard-width viewport never compress. */
@@ -431,10 +434,15 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .catalog-manager__table td:last-child { margin-top: 12px; }
   .catalog-manager__table td:last-child > div { flex-wrap: wrap; }
 
-  .private-action-card { gap: 12px !important; }
+  .private-action-card { grid-template-columns: minmax(0, 1fr) !important; gap: 12px !important; }
   .private-action-card > div:first-child > div:first-child { flex-wrap: wrap; }
   .private-action-card > div:last-child { width: 100%; }
   .private-action-card > div:last-child .ui-button { flex: 1 1 auto; min-height: 44px; }
+  .private-action-card__actions { flex-wrap: wrap; }
+  .professional-card__main { align-items: flex-start !important; }
+  .professional-card__heading { align-items: flex-start !important; flex-wrap: wrap; }
+  .professional-card__meta, .audit-entry-details { overflow-wrap: anywhere; }
+  .solicitud-meta-row { align-items: flex-start !important; flex-direction: column; gap: 4px; }
   .project-documents-header { align-items: flex-start !important; }
   .file-upload-controls { width: 100%; flex-wrap: wrap; }
   .private-filter-bar { flex-direction: column; }

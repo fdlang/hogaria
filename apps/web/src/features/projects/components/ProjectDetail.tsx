@@ -61,7 +61,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
       setAssigning(true);
       const professional = (professionals.data ?? []).find(item => item.id === Number(selectedProfessional));
       if (!professional?.profesion) throw new Error("Selecciona un profesional con oficio configurado");
-      await apis.projects.assign(projectId, professional.id, professional.profesion);
+      await apis.projects.assign(projectId, professional.id);
       setSelectedProfessional("");
       await project.refresh();
       push("Profesional asignado", "success");
@@ -107,7 +107,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
 
   if (project.loading) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>;
   if (project.error || !project.data) {
-    return <div role="alert" style={{ color: "#f87171", padding: 20 }}>{project.error ?? "Proyecto no encontrado"}</div>;
+    return <div role="alert" style={{ color: "#b5483f", padding: 20 }}>{project.error ?? "Proyecto no encontrado"}</div>;
   }
 
   const p = project.data;
@@ -187,7 +187,11 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
               <h2 style={sectionTitle}>Documentos ({files.data.length})</h2>
               {canUploadFiles && <FileUploadButton onUpload={handleFileUpload} canMarkSensitive={canManageProject} />}
             </div>
-            {files.data.length === 0
+            {files.loading
+              ? <div style={{ display: "flex", justifyContent: "center", padding: 24 }}><Spinner /></div>
+              : files.error
+                ? <div role="alert" style={{ color: "#b5483f" }}><p>{files.error}</p><Button small variant="ghost" onClick={() => void files.refresh()}>Reintentar</Button></div>
+              : files.data.length === 0
               ? <EmptyState icon="📄" title="Sin documentos" hint={isAdmin ? "Sube planos, fotos, contratos o facturas" : isCliente ? "Comparte fotos o documentos generales" : "Sube fotos o documentación técnica"} />
               : <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
                   {files.data.map(f => (
@@ -199,7 +203,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                           <p style={{ fontSize: 13, color: "#302d29", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.nombre}</p>
                           <p style={{ fontSize: 12, color: "#71685e" }}>{formatBytes(f.tamaño)} · {formatDate(f.uploadedAt)}</p>
                         </button>
-                        {f.sensitive && <Badge color="#f87171">SENSIBLE</Badge>}
+                        {f.sensitive && <Badge color="#b5483f">SENSIBLE</Badge>}
                       </div>
                       {canManageProject && <Button small variant="danger" onClick={() => handleFileDelete(f.id, f.nombre, f.sensitive)}>✕</Button>}
                     </li>

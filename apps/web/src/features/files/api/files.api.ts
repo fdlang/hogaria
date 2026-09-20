@@ -16,8 +16,6 @@ const MAX_FILE_BYTES = 3 * 1024 * 1024;
 const ALLOWED_MIMES = [
   "image/jpeg", "image/png", "image/webp", "image/gif",
   "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 
 export class FilesApi {

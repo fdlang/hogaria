@@ -56,7 +56,7 @@ export function useNotifications(): Ctx {
 }
 
 function NotificationStack({ items, onDismiss }: { items: Notif[]; onDismiss: (id: string) => void }) {
-  const colorFor: Record<NotifType, string> = { info: "#60a5fa", success: "#34d399", warn: "#fbbf24", error: "#f87171" };
+  const colorFor: Record<NotifType, string> = { info: "#2563a8", success: "#247a55", warn: "#996515", error: "#b5483f" };
   return (
     <div className="notification-stack" role="region" aria-live="polite" aria-label="Notificaciones"
       style={{ position: "fixed", top: 20, right: 20, display: "flex", flexDirection: "column", gap: 8, zIndex: 3000, maxWidth: 360 }}>

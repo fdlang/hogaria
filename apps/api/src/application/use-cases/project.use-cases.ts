@@ -1,6 +1,7 @@
 /**
  * Project use cases.
- * Admin creates/edits/deletes; profesionales can only update progreso/hitos.
+ * Projects originate from signed estimates and retain their commercial history.
+ * Admin edits them; profesionales can only update progreso/hitos.
  */
 
 import { IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
@@ -27,7 +28,7 @@ export class UpdateProjectUseCase {
     ctx: ClientContext;
   }): Promise<Project> {
     const actor   = await this.users.findById(cmd.actorId);
-    if (!actor) throw new ForbiddenError();
+    if (!actor?.activo) throw new ForbiddenError();
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
 
@@ -55,6 +56,10 @@ export class UpdateProjectUseCase {
       }
       if (changes.hitos !== undefined) {
         PermissionPolicy.authorize(actor, "project.update.milestones", { project });
+        if (changes.hitos.length !== project.hitos.length || changes.hitos.some((h, index) => {
+          const current = project.hitos[index];
+          return !current || h.id !== current.id || h.nombre !== current.nombre || h.fecha.getTime() !== current.fecha.getTime();
+        })) throw new ForbiddenError("Solo puedes marcar como completados los hitos existentes");
         built.hitos = changes.hitos;
       }
     } else {
@@ -62,6 +67,14 @@ export class UpdateProjectUseCase {
     }
 
     const allowedChanges = built as Partial<Project>;
+    if (allowedChanges.estado && allowedChanges.estado !== project.estado) {
+      const transitions: Record<Project["estado"], Project["estado"][]> = {
+        planificacion: ["en_curso"], en_curso: ["pausado", "finalizado"],
+        pausado: ["en_curso", "finalizado"], finalizado: [],
+      };
+      if (!transitions[project.estado].includes(allowedChanges.estado)) throw new ConflictError("Transición de estado no permitida");
+    }
+    if (allowedChanges.estado === "finalizado" && (allowedChanges.progreso ?? project.progreso).value !== 100) throw new ValidationError("Para finalizar la obra, el progreso debe ser del 100 %");
     if((allowedChanges.fechaFinPrevista??project.fechaFinPrevista)<(allowedChanges.fechaInicio??project.fechaInicio))throw new ValidationError("La fecha final no puede ser anterior al inicio");
     // Capture old values before repositories that mutate in place run.
     const previousState = project.estado;
@@ -89,32 +102,15 @@ export class UpdateProjectUseCase {
   }
 }
 
-export class DeleteProjectUseCase {
-  constructor(
-    private readonly users: IUserRepository,
-    private readonly projects: IProjectRepository,
-    private readonly hasWorkHistory?: (projectId: number) => Promise<boolean>,
-    private readonly hasCommercialHistory?: (projectId: number) => Promise<boolean>,
-  ) {}
-  async execute(cmd: { actorId: number; projectId: number }): Promise<void> {
-    const actor = await this.users.findById(cmd.actorId);
-    if (!actor || actor.rol !== "admin") throw new ForbiddenError();
-    const project = await this.projects.findById(cmd.projectId);
-    if (!project) throw new NotFoundError("Proyecto");
-    if (await this.hasWorkHistory?.(project.id)) throw new ConflictError("La obra tiene registros o previsiones de trabajo. Conserva el histórico y marca la obra como finalizada");
-    if (await this.hasCommercialHistory?.(project.id)) throw new ConflictError("La obra tiene órdenes de cambio publicadas. Conserva su histórico y marca la obra como finalizada");
-    await this.projects.delete(cmd.projectId);
-  }
-}
-
 export class GetProjectUseCase {
   constructor(private readonly users: IUserRepository, private readonly projects: IProjectRepository) {}
   async execute(cmd: { actorId: number; projectId: number }): Promise<Project> {
     const actor = await this.users.findById(cmd.actorId);
-    if (!actor) throw new ForbiddenError();
+    if (!actor?.activo) throw new ForbiddenError();
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
-    PermissionPolicy.authorize(actor, "project.read", { project });
+    // Do not reveal whether another client's or professional's project exists.
+    if (!PermissionPolicy.can(actor, "project.read", { project })) throw new NotFoundError("Proyecto");
     return project;
   }
 }
@@ -161,7 +157,7 @@ export class ListProjectsUseCase {
   ) {}
   async execute(cmd: { actorId: number }): Promise<Project[]> {
     const actor = await this.users.findById(cmd.actorId);
-    if (!actor) throw new ForbiddenError();
+    if (!actor?.activo) throw new ForbiddenError();
     if (actor.rol === "admin")        return this.projects.findAll();
     if (actor.rol === "cliente")      return this.projects.findByClient(actor.id);
     if (actor.rol === "profesional")  return this.projects.findByProfesional(actor.id);

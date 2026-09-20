@@ -125,11 +125,6 @@ export class InMemoryProjectRepository implements IProjectRepository {
     this.projects[idx] = merged;
     return merged;
   }
-  async delete(id: number): Promise<void> {
-    const idx = this.projects.findIndex(p => p.id === id);
-    if (idx === -1) throw new NotFoundError("Proyecto");
-    this.projects.splice(idx, 1);
-  }
 }
 
 export class InMemoryOpportunityRepository implements IOpportunityRepository {
@@ -171,7 +166,6 @@ export class InMemoryEstimateRepository implements IEstimateRepository {
   private readonly items: Estimate[] = []; private readonly versions: EstimateVersion[] = []; private nextId = 1; private nextVersionId = 1;
   async findById(id: number) { return this.items.find(item => item.id === id) ?? null; }
   async findAll() { return [...this.items].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); }
-  async findByOpportunity(opportunityId: number) { return this.items.filter(item => item.oportunidadId === opportunityId); }
   async save(item: Omit<Estimate, "id" | "createdAt" | "updatedAt">) { const now = new Date(); const saved: Estimate = { ...item, id: this.nextId++, createdAt: now, updatedAt: now }; this.items.push(saved); return saved; }
   async update(id: number, changes: Partial<Pick<Estimate, "titulo" | "estado" | "versionActual" | "borrador" | "motivoRechazo">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Presupuesto"); const next = { ...old, ...changes, updatedAt: new Date() }; this.items[this.items.indexOf(old)] = next; return next; }
   async saveVersion(item: Omit<EstimateVersion, "id" | "createdAt">) { const saved: EstimateVersion = { ...item, id: this.nextVersionId++, createdAt: new Date() }; this.versions.push(saved); return saved; }

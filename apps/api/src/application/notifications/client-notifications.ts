@@ -84,7 +84,7 @@ export class ClientNotifications {
       resourceId = kind === "document" ? Number(data.fileId) : project.id;
       if (kind === "document") {
         const file = await this.files.findById(resourceId);
-        if (!file || file.projectId !== project.id) return;
+        if (!file || file.projectId !== project.id || file.classification === "reservado") return;
       }
     }
     // Do not email clients about their own uploads or actions.
@@ -112,7 +112,7 @@ export class ClientNotifications {
         notice.kind === "document"
           ? await this.files.findById(notice.resourceId)
           : null;
-      if (notice.kind === "document" && !file) return null;
+      if (notice.kind === "document" && (!file || file.classification === "reservado")) return null;
       const project = await this.projects.findById(
         file ? file.projectId : notice.resourceId,
       );

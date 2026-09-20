@@ -44,7 +44,7 @@ export function AdminProfesionales({ apis }: Props) {
   }, [projects.data]);
 
   if (users.loading || projects.loading) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>;
-  if (users.error || projects.error)     return <div role="alert" style={{ color: "#f87171", padding: 20 }}>{users.error ?? projects.error}</div>;
+  if (users.error || projects.error)     return <div role="alert" style={{ color: "#b5483f", padding: 20 }}>{users.error ?? projects.error}</div>;
 
   const userList = users.data ?? [];
   const totalAssignments = (projects.data ?? []).reduce((n, p) => n + p.profesionalesAsignados.length, 0);
@@ -74,18 +74,18 @@ export function AdminProfesionales({ apis }: Props) {
               const perms = u.profesion ? PermissionPolicy.PROFESSIONAL_ACCESS[u.profesion as Profesion] : null;
               const assigned = assignments.get(u.id) ?? 0;
               return (
-                <article key={u.id} role="listitem"
+                <article key={u.id} role="listitem" className="professional-card"
                   style={{ padding: 16, background: u.activo ? "#fffaf4" : "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, opacity: u.activo ? 1 : 0.55 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div className="professional-card__main" style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     {prof && <div style={{ width: 42, height: 42, borderRadius: "50%", background: `${prof.color}18`, color: prof.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{prof.icon}</div>}
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="professional-card__heading" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
                         <h3 style={{ fontSize: 14, fontWeight: 600, color: "#302d29" }}>{u.nombre}</h3>
                         {u.profesion && <ProfesionBadge profesion={u.profesion as Profesion} />}
                         <Badge color="#60a5fa">{assigned} proyectos</Badge>
                         {!u.activo && <code style={{ fontSize: 12, color: "#c17248", background: "#c1724818", padding: "1px 5px", borderRadius: 3 }}>INACTIVO</code>}
                       </div>
-                      <p style={{ fontSize: 12, color: "#71685e" }}>{u.email}{u.telefono && ` · ${u.telefono}`} · desde {formatDate(u.createdAt)}</p>
+                      <p className="professional-card__meta" style={{ fontSize: 12, color: "#71685e" }}>{u.email}{u.telefono && ` · ${u.telefono}`} · desde {formatDate(u.createdAt)}</p>
                       <div style={{ marginTop: 8 }}>
                         <Button small variant="ghost" onClick={() => sendAccess(u.id)} disabled={sendingId === u.id}>
                           {sendingId === u.id ? "Enviando…" : "Enviar acceso"}

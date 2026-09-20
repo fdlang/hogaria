@@ -71,7 +71,7 @@ function getRuntime(): Promise<Runtime> {
     const projects = projectController({
       users: app.users,
       update: app.useCases.updateProject,
-      delete: app.useCases.deleteProject, list: app.useCases.listProjects,
+      list: app.useCases.listProjects,
       get: app.useCases.getProject,
       assign: app.useCases.assignProjectProfessional,
       unassign: app.useCases.unassignProjectProfessional,
@@ -102,7 +102,6 @@ function getRuntime(): Promise<Runtime> {
   // Auth (public)
   route("POST", "/auth/login",  async req => auth.login(req)),
   route("GET",  "/auth/me",     async req => auth.me(req)),
-  route("POST", "/auth/logout", async ()  => auth.logout()),
   route("POST", "/auth/activate", async req => users.activate(req)),
 
   // Commercial pipeline: opportunity -> versioned estimate -> project.
@@ -144,7 +143,6 @@ function getRuntime(): Promise<Runtime> {
   route("GET",    "/projects",          req => projects.list(req   as never), { protected: true }),
   route("GET",    "/projects/:id",      req => projects.get(req    as never), { protected: true }),
   route("PATCH",  "/projects/:id",      req => projects.update(req as never), { protected: true }),
-  route("DELETE", "/projects/:id",      req => projects.delete(req as never), { protected: true }),
   route("POST",   "/projects/:id/professionals", req => projects.assign(req as never), { protected: true }),
   route("DELETE", "/projects/:id/professionals/:userId", req => projects.unassign(req as never), { protected: true }),
 
@@ -227,6 +225,8 @@ export async function apiHandler(req: IncomingMessage, res: ServerResponse): Pro
       }
       httpReq.actorId = authResult.actorId;
     }
+
+    if (match.protected || pathname.startsWith("/auth/")) res.setHeader("Cache-Control", "private, no-store");
 
     const result = await requestAudit.run({ actorId: httpReq.actorId ?? 0, ip: httpReq.ip, userAgent: String(httpReq.headers["user-agent"] ?? "unknown") }, () => match.handler(httpReq));
     const headers = result.headers ?? {};

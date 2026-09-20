@@ -3,7 +3,7 @@ import { validateDraft } from "./estimate-validation.js";
 import { projectChanges } from "./project-validation.js";
 import { projectController } from "../../interfaces/http/projectController.js";
 import { fileController } from "../../interfaces/http/otherControllers.js";
-import { ForbiddenError } from "@reformapro/domain/errors";
+import { ForbiddenError, NotFoundError } from "@reformapro/domain/errors";
 import { ListFilesUseCase, DownloadFileUseCase } from "./file.use-cases.js";
 import type { Project, User } from "@reformapro/domain/entities";
 import { Email } from "@reformapro/domain/value-objects";
@@ -197,7 +197,7 @@ describe("Audit: document classification", () => {
     for (const fileId of [1, 2, 3])
       await expect(
         download.execute({ actorId: pro.id, fileId }),
-      ).rejects.toBeInstanceOf(ForbiddenError);
+      ).rejects.toBeInstanceOf(NotFoundError);
     expect(storage.get).toHaveBeenCalledTimes(1);
   });
 });

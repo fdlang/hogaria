@@ -26,7 +26,7 @@ async function setup() {
   const estimateA = await estimates.save({ oportunidadId: opportunityA.id, clienteId: clientA.id, numero: "HOG-A", titulo: draft.titulo, estado: "enviado", versionActual: 1, borrador: draft });
   const estimateB = await estimates.save({ oportunidadId: opportunityB.id, clienteId: clientB.id, numero: "HOG-B", titulo: draft.titulo, estado: "enviado", versionActual: 1, borrador: draft });
   for (const estimate of [estimateA, estimateB]) await estimates.saveVersion({ estimateId: estimate.id, version: 1, snapshot: { ...draft, notasInternas: "", partidas: draft.partidas.map(({ costeUnitario: _, notaInterna: __, ...line }) => ({ ...line, costeUnitario: null })) }, enviadoAt: new Date(), firmadoAt: null, firma: null });
-  return { users, clientA, clientB, estimateA, estimateB, estimates, estimateUseCases };
+  return { users, clientA, clientB, opportunityA, opportunityB, estimateA, estimateB, estimates, estimateUseCases, opportunities };
 }
 
 describe("EstimateUseCases — client privacy and authorization", () => {
@@ -68,6 +68,20 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     expect(results[0]?.id).not.toBe(estimateB.id);
   });
 
+  it("hides another client's proposal behind a not-found response", async () => {
+    const { clientA, estimateB, estimateUseCases } = await setup();
+    await expect(estimateUseCases.get(clientA.id, estimateB.id)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("rejects a published signature whose server seal cannot be verified", async () => {
+    const { users, clientA, estimateA, estimates, opportunities } = await setup();
+    const signedAt = new Date("2026-09-20T10:00:00.000Z");
+    await estimates.signVersion(estimateA.id, 1, { token: "tampered", fechaFirma: signedAt.toISOString(), hash: "sha256:test" }, signedAt);
+    const invalidCrypto = { ...cryptoPort, verifySignatureToken: async () => false };
+    const service = new EstimateUseCases(users, opportunities, estimates, new InMemoryProjectRepository(), new InMemoryEventEmitter(), invalidCrypto);
+    await expect(service.publicGet(clientA.id, estimateA.id)).rejects.toThrow("integridad");
+  });
+
   it.each(["borrador", "en_revision"] as const)("never lists an internal draft (%s) in the client portal", async (estado) => {
     const { clientA, estimates, estimateUseCases } = await setup();
     const internalDraft = await estimates.save({ oportunidadId: 1, clienteId: clientA.id, numero: "HOG-DRAFT", titulo: "Borrador interno", estado, versionActual: 1, borrador: draft, motivoRechazo: null });
@@ -90,7 +104,7 @@ describe("EstimateUseCases — client privacy and authorization", () => {
 
   it("prevents one client from reading or signing another client's proposal", async () => {
     const { clientA, estimateB, estimateUseCases } = await setup();
-    await expect(estimateUseCases.get(clientA.id, estimateB.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(estimateUseCases.get(clientA.id, estimateB.id)).rejects.toBeInstanceOf(NotFoundError);
     await expect(estimateUseCases.sign(clientA.id, estimateB.id, { password: "any", canvasSignature: "data:image/png;base64,x", consentimiento: "Acepto" }, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -109,7 +123,7 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     // The repository setup has a current version; replace it with a one-day validity proposal sent two days ago.
     await estimates.saveVersion({ estimateId: estimateA.id, version: 2, snapshot: { ...draft, validezDias: 1 }, enviadoAt: new Date(Date.now() - 2 * 86_400_000), firmadoAt: null, firma: null });
     await estimates.update(estimateA.id, { versionActual: 2 });
-    await expect(estimateUseCases.sign(clientA.id, estimateA.id, { version: 2, password: "hash", canvasSignature: "data:image/png;base64,aGVsbG8=", consentimiento: "Acepto" }, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("validez");
+    await expect(estimateUseCases.sign(clientA.id, estimateA.id, { version: 2, password: "hash", canvasSignature: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAoAAAAAAAAAAAA", consentimiento: "Acepto" }, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("validez");
     expect((await estimateUseCases.publicGet(clientA.id, estimateA.id)).estado).toBe("caducado");
   });
 
@@ -140,6 +154,6 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     expect(JSON.stringify(ownOrders)).not.toContain("Margen reservado");
     expect(JSON.stringify(ownOrders)).not.toContain("Proveedor preferente");
     expect(JSON.stringify(ownOrders)).not.toContain("costeUnitario");
-    await expect(useCases.list(clientB.id, project.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(useCases.list(clientB.id, project.id)).rejects.toBeInstanceOf(NotFoundError);
   });
 });

@@ -15,16 +15,16 @@ const ACTION_COLORS: Record<string, string> = {
   PRESUPUESTO_CREADO:          "#60a5fa",
   PRESUPUESTO_ENVIADO:         "#60a5fa",
   FIRMA_CHALLENGE_SOLICITADO:  "#fbbf24",
-  FIRMA_INTENTO_INVALIDO:      "#f87171",
-  FIRMA_PASSWORD_INCORRECTO:   "#f87171",
+  FIRMA_INTENTO_INVALIDO:      "#b5483f",
+  FIRMA_PASSWORD_INCORRECTO:   "#b5483f",
   USUARIO_CREADO:              "#c17248",
-  USUARIO_DESACTIVADO:         "#f87171",
+  USUARIO_DESACTIVADO:         "#b5483f",
   CONTRASENA_RESETEADA:        "#fbbf24",
   PROYECTO_CREADO:             "#34d399",
   PROYECTO_FINALIZADO:         "#c17248",
   ARCHIVO_SUBIDO:              "#60a5fa",
   PROFESIONAL_ASIGNADO:        "#60a5fa",
-  PROFESIONAL_DESASIGNADO:     "#f87171",
+  PROFESIONAL_DESASIGNADO:     "#b5483f",
 };
 
 const ACTION_OPTIONS = Object.keys(ACTION_COLORS);
@@ -67,7 +67,7 @@ export function AdminActivity({ api }: Props) {
       {log.loading ? (
         <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>
       ) : log.error ? (
-        <div role="alert" style={{ color: "#f87171", padding: 20 }}>{log.error}</div>
+        <div role="alert" style={{ color: "#b5483f", padding: 20 }}>{log.error}</div>
       ) : !log.page || log.page.items.length === 0 ? (
         <EmptyState icon="◎" title="Sin eventos" hint="Prueba a cambiar los filtros" />
       ) : (
@@ -88,9 +88,9 @@ export function AdminActivity({ api }: Props) {
                     <span style={{ fontSize: 12, color: "#85786b" }}>{formatDateTime(entry.timestamp)}</span>
                     <span style={{ fontSize: 12, color: "#545048" }}>IP: {entry.ip}</span>
                   </div>
-                  <p style={{ fontSize: 12, color: "#71685e" }}>
+                  <p className="audit-entry-details" style={{ fontSize: 12, color: "#71685e" }}>
                     Usuario: <strong style={{ color: "#302d29" }}>{entry.userName}</strong>
-                    {" "}<span style={{ fontFamily: "monospace", fontSize: 12, color: "#85786b" }}>
+                    {" "}<span style={{ fontFamily: "monospace", fontSize: 12, color: "#85786b", overflowWrap: "anywhere" }}>
                       · {JSON.stringify(entry.details)}
                     </span>
                   </p>

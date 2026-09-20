@@ -16,10 +16,6 @@ import { AuditEntry } from "@reformapro/domain/entities";
 // Map domain event types to audit action codes. Keeps the audit log stable
 // even if we rename events in the domain layer.
 const ACTION_CODES: Record<DomainEvent["type"], string> = {
-  BudgetCreated:               "PRESUPUESTO_CREADO",
-  BudgetSent:                  "PRESUPUESTO_ENVIADO",
-  BudgetSigned:                "DOCUMENTO_FIRMADO",
-  BudgetExpired:               "PRESUPUESTO_EXPIRADO",
   LoginSuccess:                "ACCESO_CORRECTO",
   UserCreated:                 "USUARIO_CREADO",
   UserDeactivated:             "USUARIO_DESACTIVADO",
@@ -27,8 +23,6 @@ const ACTION_CODES: Record<DomainEvent["type"], string> = {
   ProjectCreated:              "PROYECTO_CREADO",
   ProjectCompleted:            "PROYECTO_FINALIZADO",
   ProjectUpdated:              "PROYECTO_ACTUALIZADO",
-  SignatureChallengeRequested: "FIRMA_CHALLENGE_SOLICITADO",
-  SignatureRejected:           "FIRMA_INTENTO_INVALIDO",
   FileUploaded:                "ARCHIVO_SUBIDO",
   OpportunityCreated:          "OPORTUNIDAD_CREADA",
   EstimateCreated:             "PRESUPUESTO_CREADO",

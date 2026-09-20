@@ -82,7 +82,7 @@ export function AdminUsers({ api }: Props) {
     { key: "activo",    header: "Estado",    sortBy: u => (u.activo ? 1 : 0),
       render: u => u.activo
         ? <span style={{ fontSize: 12, color: "#34d399" }}>● Activo</span>
-        : <span style={{ fontSize: 12, color: "#f87171" }}>● Inactivo</span> },
+        : <span style={{ fontSize: 12, color: "#b5483f" }}>● Inactivo</span> },
     { key: "desde", header: "Desde", sortBy: u => u.createdAt, align: "right",
       render: u => formatDate(u.createdAt) },
   ];
@@ -194,6 +194,7 @@ function UserFormView({ api, initialUser, onSaved, onCancel }: {
 
       {form.state.rol === "profesional" && (
         <Select label="Profesión" required
+          error={form.errors.profesion}
           value={form.state.profesion ?? ""}
           onChange={e => form.setField("profesion", e.target.value as Profesion)}>
           <option value="">— Selecciona —</option>

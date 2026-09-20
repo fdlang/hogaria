@@ -1,13 +1,13 @@
 /**
  * Project HTTP controller.
- * Permissions (admin-only for delete; profesional restricted to progreso/hitos)
+ * Permissions (profesional restricted to progreso/hitos)
  * are enforced inside the use cases via PermissionPolicy.
  */
 
-import { AssignProjectProfessionalUseCase, DeleteProjectUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "../../application/use-cases/project.use-cases.js";
+import { AssignProjectProfessionalUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "../../application/use-cases/project.use-cases.js";
 import { Project } from "@reformapro/domain/entities";
 import type { IUserRepository } from "@reformapro/domain/repositories";
-import { ForbiddenError } from "@reformapro/domain/errors";
+import { ForbiddenError, ValidationError } from "@reformapro/domain/errors";
 import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
 
@@ -36,12 +36,16 @@ export function toProjectDTO(p: Project, audience: "full" | "professional" = "fu
 export function projectController(deps: {
   users: IUserRepository;
   update: UpdateProjectUseCase;
-  delete: DeleteProjectUseCase;
   list:   ListProjectsUseCase;
   get: GetProjectUseCase;
   assign: AssignProjectProfessionalUseCase;
   unassign: UnassignProjectProfessionalUseCase;
 }) {
+  const positiveId = (value: unknown, field = "id") => {
+    const id = typeof value === "number" ? value : Number(value);
+    if (!Number.isSafeInteger(id) || id <= 0) throw new ValidationError("Identificador no válido", field);
+    return id;
+  };
   const ctxOf = (req: HttpRequest) => ({ ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" });
   const dtoFor = async (actorId: number, project: Project) => {
     const actor = await deps.users.findById(actorId);
@@ -55,7 +59,7 @@ export function projectController(deps: {
       try {
         const project = await deps.update.execute({
           actorId: req.actorId,
-          projectId: parseInt(req.params.id, 10),
+          projectId: positiveId(req.params.id),
           ctx: ctxOf(req),
           changes: req.body as never,
         });
@@ -63,18 +67,10 @@ export function projectController(deps: {
       } catch (e) { return toHttpError(e); }
     },
 
-    // DELETE /projects/:id
-    async delete(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
-      try {
-        await deps.delete.execute({ actorId: req.actorId, projectId: parseInt(req.params.id, 10) });
-        return { status: 204, body: null };
-      } catch (e) { return toHttpError(e); }
-    },
-
     // GET /projects/:id
     async get(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {
-        const project = await deps.get.execute({ actorId: req.actorId, projectId: parseInt(req.params.id, 10) });
+        const project = await deps.get.execute({ actorId: req.actorId, projectId: positiveId(req.params.id) });
         return { status: 200, body: await dtoFor(req.actorId, project) };
       } catch (e) { return toHttpError(e); }
     },
@@ -83,7 +79,7 @@ export function projectController(deps: {
     async assign(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {
         const body = (req.body ?? {}) as { userId?: number };
-        const project = await deps.assign.execute({ actorId: req.actorId, projectId: Number(req.params.id), userId: body.userId! });
+        const project = await deps.assign.execute({ actorId: req.actorId, projectId: positiveId(req.params.id), userId: positiveId(body.userId, "userId") });
         return { status: 200, body: await dtoFor(req.actorId, project) };
       } catch (e) { return toHttpError(e); }
     },
@@ -91,7 +87,7 @@ export function projectController(deps: {
     // DELETE /projects/:id/professionals/:userId
     async unassign(req: HttpRequest & { actorId: number; params: { id: string; userId: string } }): Promise<HttpResponse> {
       try {
-        const project = await deps.unassign.execute({ actorId: req.actorId, projectId: parseInt(req.params.id, 10), userId: parseInt(req.params.userId, 10) });
+        const project = await deps.unassign.execute({ actorId: req.actorId, projectId: positiveId(req.params.id), userId: positiveId(req.params.userId, "userId") });
         return { status: 200, body: await dtoFor(req.actorId, project) };
       } catch (e) { return toHttpError(e); }
     },

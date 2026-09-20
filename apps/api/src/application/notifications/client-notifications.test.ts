@@ -26,7 +26,7 @@ function fixture() {
   const estimates = {
     findById: vi.fn(async () => ({ id: 20, clienteId: 1, estado: "enviado" })),
   };
-  const files = { findById: vi.fn(async () => ({ id: 30, projectId: 10 })) };
+  const files = { findById: vi.fn(async () => ({ id: 30, projectId: 10, classification: "publico" })) };
   const mail = { configured: () => true, send: vi.fn(async () => "receipt") },
     store = new MemoryNoticeStore(),
     report = vi.fn();
@@ -98,6 +98,12 @@ describe("Client notification privacy and delivery", () => {
     await Promise.all([f.service.receive(e), f.service.receive(e)]);
     await f.service.receive(e);
     expect(f.mail.send).toHaveBeenCalledTimes(1);
+  });
+  it("never notifies a client about a reserved document", async () => {
+    const f = fixture();
+    f.files.findById.mockResolvedValue({ id: 30, projectId: 10, classification: "reservado" });
+    await f.service.receive(event("FileUploaded"));
+    expect(f.mail.send).not.toHaveBeenCalled();
   });
   it("persists a failed delivery, waits before retry and rechecks ownership", async () => {
     vi.useFakeTimers();

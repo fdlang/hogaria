@@ -25,7 +25,7 @@ import {
   CreateUserUseCase, UpdateUserUseCase, DeleteUserUseCase, ListUsersUseCase,
 } from "./application/use-cases/user.use-cases.js";
 import {
-  AssignProjectProfessionalUseCase, DeleteProjectUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase,
+  AssignProjectProfessionalUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase,
 } from "./application/use-cases/project.use-cases.js";
 import { QueryAuditLogUseCase } from "./application/use-cases/audit.use-cases.js";
 import {
@@ -125,7 +125,6 @@ export interface AppDependencies {
     deleteUser:                DeleteUserUseCase;
     listUsers:                 ListUsersUseCase;
     updateProject:             UpdateProjectUseCase;
-    deleteProject:             DeleteProjectUseCase;
     listProjects:              ListProjectsUseCase;
     getProject:                GetProjectUseCase;
     assignProjectProfessional: AssignProjectProfessionalUseCase;
@@ -214,7 +213,6 @@ export async function buildApp(): Promise<AppDependencies> {
     deleteUser:                 new DeleteUserUseCase(users, events),
     listUsers:                  new ListUsersUseCase(users),
     updateProject:              new UpdateProjectUseCase(users, projects, events),
-    deleteProject:              new DeleteProjectUseCase(users, projects, async id => (await workStore.list({projectId:id})).total > 0 || !!await workStore.budget(id), async id => (await changes.findByProject(id)).some(order => order.estado !== "borrador")),
     listProjects:               new ListProjectsUseCase(users, projects),
     getProject:                 new GetProjectUseCase(users, projects),
     assignProjectProfessional:  new AssignProjectProfessionalUseCase(users, projects),

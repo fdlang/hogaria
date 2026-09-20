@@ -7,10 +7,7 @@
 
 import { useState, useMemo } from "react";
 import { ProjectsApi, ProjectDTO } from "../api/projects.api";
-import { useProjects, useProjectMutations } from "../hooks/useProjects";
-import { usePermissions } from "@/shared/hooks/usePermissions";
-import { useNotifications } from "@/shared/ui/notifications";
-import { useConfirm } from "@/shared/ui/confirm";
+import { useProjects } from "../hooks/useProjects";
 import { Button, Input } from "@/shared/ui";
 import { PageHeader } from "@/shared/ui/page-header";
 import { DataTable, ColumnDef } from "@/shared/ui/data-table";
@@ -24,10 +21,6 @@ interface Props {
 
 export function AdminProjects({ api, onOpenProject }: Props) {
   const projects = useProjects(api);
-  const mutations = useProjectMutations(api);
-  const { can } = usePermissions();
-  const { push } = useNotifications();
-  const confirm = useConfirm();
 
   const [searchTerm, setSearchTerm]     = useState("");
   const [statusFilter, setStatusFilter] = useState<ProjectDTO["estado"] | "all">("all");
@@ -40,21 +33,6 @@ export function AdminProjects({ api, onOpenProject }: Props) {
       return true;
     });
   }, [projects.data, searchTerm, statusFilter]);
-
-  const handleDelete = async (project: ProjectDTO) => {
-    const ok = await confirm({
-      title: "Eliminar proyecto",
-      message: <>¿Eliminar <strong>{project.nombre}</strong>? Esta acción no se puede deshacer.</>,
-      variant: "danger",
-      confirmLabel: "Eliminar",
-    });
-    if (!ok) return;
-    try {
-      await mutations.remove.mutate(project.id);
-      push("Proyecto eliminado", "success");
-      projects.refresh();
-    } catch (e) { push((e as { message?: string }).message ?? "Error al eliminar", "error"); }
-  };
 
   const columns: ColumnDef<ProjectDTO>[] = [
     { key: "nombre",      header: "Proyecto", sortBy: p => p.nombre,
@@ -116,9 +94,6 @@ export function AdminProjects({ api, onOpenProject }: Props) {
         loading={projects.loading}
         error={projects.error}
         emptyMessage="No hay proyectos que coincidan con los filtros"
-        actions={p => can("project.update") ? (
-          <Button small variant="danger" onClick={() => handleDelete(p)}>✕</Button>
-        ) : null}
       />
     </section>
   );

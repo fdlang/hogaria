@@ -33,9 +33,20 @@ export function Modal({ open, onClose, title, children, width = 520, unclosable 
     if (!open) return;
     const handle = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !unclosable && onClose) onClose();
+      if (e.key === "Tab") {
+        const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])'
+        ) ?? []);
+        if (!focusable.length) { e.preventDefault(); dialogRef.current?.focus(); return; }
+        const first = focusable[0]!, last = focusable[focusable.length - 1]!;
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
     };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     document.addEventListener("keydown", handle);
-    return () => document.removeEventListener("keydown", handle);
+    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener("keydown", handle); };
   }, [open, unclosable, onClose]);
 
   useEffect(() => {
@@ -55,7 +66,7 @@ export function Modal({ open, onClose, title, children, width = 520, unclosable 
   return (
     <div className="ui-modal-backdrop" role="presentation" onClick={onBackdrop}
       style={{ position: "fixed", inset: 0, background: "rgba(48,45,41,.52)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: 20 }}>
-      <div className={`ui-modal ${className}`} ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
+      <div className={`ui-modal ${className}`} ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
         onClick={e => e.stopPropagation()}
         style={{ background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 16, width: "100%", maxWidth: width, maxHeight: "90vh", overflow: "auto" }}>
         <header className="ui-modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 24px", borderBottom: "1px solid #d8c4ad", position: "sticky", top: 0, background: "#fffaf4" }}>
@@ -86,7 +97,7 @@ export function Button({ variant = "primary", loading, small, children, disabled
   const colors: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
     primary: { bg: "#995637", fg: "#fffaf4", border: "#995637" },
     ghost:   { bg: "transparent", fg: "#545048", border: "#a8947e" },
-    danger:  { bg: "#f87171",  fg: "#302d29", border: "#f87171" },
+    danger:  { bg: "#b5483f",  fg: "#ffffff", border: "#b5483f" },
   };
   const c = colors[variant];
   return (
@@ -119,14 +130,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ l
   const errId       = `${inputId}-err`;
   return (
     <div style={{ marginBottom: 14 }}>
-      {label && <label htmlFor={inputId} style={{ display: "block", fontSize: 12, fontWeight: 600, color: error ? "#f87171" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
+      {label && <label htmlFor={inputId} style={{ display: "block", fontSize: 12, fontWeight: 600, color: error ? "#b5483f" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
       <input
         {...props} id={inputId} ref={ref}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errId : undefined}
-        style={{ width: "100%", background: "#fffaf4", border: `1px solid ${error ? "#f87171" : "#cdb69d"}`, borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", ...props.style }}
+        style={{ width: "100%", background: "#fffaf4", border: `1px solid ${error ? "#b5483f" : "#cdb69d"}`, borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", ...props.style }}
       />
-      {error && <p id={errId} role="alert" style={{ fontSize: 12, color: "#f87171", marginTop: 3 }}>{error}</p>}
+      {error && <p id={errId} role="alert" style={{ fontSize: 12, color: "#b5483f", marginTop: 3 }}>{error}</p>}
     </div>
   );
 });
@@ -151,15 +162,17 @@ export function Textarea({ label, error, id: explicitId, ...props }: TextareaPro
   );
 }
 
-interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> { label?: string; children: ReactNode }
-export function Select({ label, children, id: explicitId, ...props }: SelectProps) {
+interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> { label?: string; error?: string; children: ReactNode }
+export function Select({ label, error, children, id: explicitId, ...props }: SelectProps) {
   const generatedId = useId();
   const selId = explicitId ?? generatedId;
+  const errId = `${selId}-err`;
   return (
     <div style={{ marginBottom: 14 }}>
-      {label && <label htmlFor={selId} style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
-      <select {...props} id={selId}
-        style={{ width: "100%", background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", cursor: "pointer", ...props.style }}>{children}</select>
+      {label && <label htmlFor={selId} style={{ display: "block", fontSize: 12, fontWeight: 600, color: error ? "#b5483f" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
+      <select {...props} id={selId} aria-invalid={error ? true : undefined} aria-describedby={error ? errId : undefined}
+        style={{ width: "100%", background: "#fffaf4", border: `1px solid ${error ? "#b5483f" : "#cdb69d"}`, borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", cursor: "pointer", ...props.style }}>{children}</select>
+      {error && <p id={errId} role="alert" style={{ fontSize: 12, color: "#b5483f", marginTop: 3 }}>{error}</p>}
     </div>
   );
 }

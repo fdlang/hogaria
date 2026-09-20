@@ -7,6 +7,7 @@ import { CreateUserUseCase, UpdateUserUseCase, DeleteUserUseCase, ListUsersUseCa
 import { AccountActivationUseCases } from "../../application/use-cases/account-activation.use-cases.js";
 import { UserRole } from "@reformapro/domain/entities";
 import { toHttpError } from "./errorMiddleware.js";
+import { ValidationError } from "@reformapro/domain/errors";
 import { HttpRequest, HttpResponse } from "./authController.js";
 
 import { toUserDTO } from "./userDTO.js";
@@ -19,23 +20,27 @@ export function userController(deps: {
   activation: AccountActivationUseCases;
 }) {
   const ctxOf = (req: HttpRequest) => ({ ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" });
+  const idOf = (value: string) => { const id = Number(value); if (!Number.isSafeInteger(id) || id < 1) throw new ValidationError("Identificador no válido"); return id; };
 
   return {
     // POST /users
     async create(req: HttpRequest & { actorId: number }): Promise<HttpResponse> {
       try {
-        const body = req.body as { email: string; nombre: string; rol: UserRole; profesion?: string; telefono?: string };
+        const body = req.body as { email?: unknown; nombre?: unknown; rol?: unknown; profesion?: unknown; telefono?: unknown };
+        if (typeof body?.email !== "string" || typeof body.nombre !== "string" || !["admin","cliente","profesional"].includes(String(body.rol))) throw new ValidationError("Datos de usuario no válidos");
+        if (body.telefono !== undefined && typeof body.telefono !== "string") throw new ValidationError("Teléfono no válido", "telefono");
+        if (body.profesion !== undefined && typeof body.profesion !== "string") throw new ValidationError("Profesión no válida", "profesion");
         const { user, invitationSent } = await deps.create.execute({
           actorId: req.actorId, ctx: ctxOf(req),
-          email: body.email, nombre: body.nombre, rol: body.rol,
-          profesion: body.profesion as never, telefono: body.telefono,
+          email: body.email, nombre: body.nombre, rol: body.rol as UserRole,
+          profesion: body.profesion as never, telefono: body.telefono as string | undefined,
         });
         return { status: 201, body: { user: toUserDTO(user), invitationSent } };
       } catch (e) { return toHttpError(e); }
     },
 
     async resendInvitation(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
-      try { const result = await deps.activation.invite(req.actorId, parseInt(req.params.id, 10), ctxOf(req)); return { status: 202, body: { email: result.email, expiresAt: result.expiresAt.toISOString() } }; } catch (e) { return toHttpError(e); }
+      try { const result = await deps.activation.invite(req.actorId, idOf(req.params.id), ctxOf(req)); return { status: 202, body: { email: result.email, expiresAt: result.expiresAt.toISOString() } }; } catch (e) { return toHttpError(e); }
     },
 
     async activate(req: HttpRequest): Promise<HttpResponse> {
@@ -47,7 +52,7 @@ export function userController(deps: {
       try {
         const body = req.body as { nombre?: string; telefono?: string; profesion?: string; activo?: boolean; newPassword?: string };
         const user = await deps.update.execute({
-          actorId: req.actorId, userId: parseInt(req.params.id, 10),
+          actorId: req.actorId, userId: idOf(req.params.id),
           ctx: ctxOf(req),
           changes: body as never,
         });
@@ -59,7 +64,7 @@ export function userController(deps: {
     async delete(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {
         await deps.delete.execute({
-          actorId: req.actorId, userId: parseInt(req.params.id, 10),
+          actorId: req.actorId, userId: idOf(req.params.id),
           ctx: ctxOf(req),
         });
         return { status: 204, body: null };
@@ -70,7 +75,7 @@ export function userController(deps: {
     async list(req: HttpRequest & { actorId: number; query: { role?: string } }): Promise<HttpResponse> {
       try {
         const cmd: { actorId: number; role?: UserRole } = { actorId: req.actorId };
-        if (req.query.role) cmd.role = req.query.role as UserRole;
+        if (req.query.role) { if (!["admin","cliente","profesional"].includes(req.query.role)) throw new ValidationError("Rol no válido", "role"); cmd.role = req.query.role as UserRole; }
         const users = await deps.list.execute(cmd);
         return { status: 200, body: users.map(toUserDTO) };
       } catch (e) { return toHttpError(e); }

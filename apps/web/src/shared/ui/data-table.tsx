@@ -53,7 +53,7 @@ export function DataTable<T>({ data, columns, rowKey, onRowClick, loading, error
   );
 
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner size={28} /></div>;
-  if (error)   return <div role="alert" style={{ padding: 20, color: "#f87171" }}>{error}</div>;
+  if (error)   return <div role="alert" style={{ padding: 20, color: "#b5483f" }}>{error}</div>;
   if (data.length === 0) return <EmptyState title={emptyMessage ?? "Sin datos"} />;
 
   return (
@@ -64,18 +64,15 @@ export function DataTable<T>({ data, columns, rowKey, onRowClick, loading, error
             {columns.map(c => (
               <th key={c.key}
                 scope="col"
-                onClick={c.sortBy ? () => toggleSort(c.key) : undefined}
                 aria-sort={sort?.key === c.key ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}
                 style={{
                   padding: "12px 14px", textAlign: c.align ?? "left",
                   fontSize: 12, fontWeight: 700, color: "#71685e",
                   textTransform: "uppercase", letterSpacing: ".07em",
                   width: c.width,
-                  cursor: c.sortBy ? "pointer" : "default",
                   userSelect: "none",
                 }}>
-                {c.header}
-                {c.sortBy && sort?.key === c.key && (sort.dir === "asc" ? " ↑" : " ↓")}
+                {c.sortBy ? <button type="button" onClick={() => toggleSort(c.key)} style={{ border: 0, padding: 0, background: "transparent", color: "inherit", font: "inherit", letterSpacing: "inherit", textTransform: "inherit", cursor: "pointer" }}>{c.header}{sort?.key === c.key && (sort.dir === "asc" ? " ↑" : " ↓")}</button> : c.header}
               </th>
             ))}
             {actions && <th scope="col" style={{ padding: "12px 14px", width: 1 }} />}
@@ -85,6 +82,9 @@ export function DataTable<T>({ data, columns, rowKey, onRowClick, loading, error
           {sorted.map(row => (
             <tr key={rowKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onKeyDown={onRowClick ? event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onRowClick(row); } } : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              aria-label={onRowClick ? "Abrir detalle" : undefined}
               style={{ borderBottom: "1px solid #decdb8", cursor: onRowClick ? "pointer" : "default" }}
               onMouseEnter={e => onRowClick && (e.currentTarget.style.background = "#fffaf4")}
               onMouseLeave={e => onRowClick && (e.currentTarget.style.background = "transparent")}>

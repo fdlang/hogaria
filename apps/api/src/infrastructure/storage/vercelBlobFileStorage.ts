@@ -10,7 +10,7 @@ export class VercelBlobFileStorage implements IFileStorage {
     if (!this.token) throw new ValidationError("El almacenamiento de documentos no está configurado");
     const filename = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const pathname = `projects/${input.projectId}/${crypto.randomUUID()}-${filename}`;
-    const result = await put(pathname, input.bytes, {
+    const result = await put(pathname, Buffer.from(input.bytes), {
       access: "private",
       addRandomSuffix: false,
       contentType: input.contentType,

@@ -4,7 +4,7 @@ import { InMemoryUserRepository, InMemoryProjectRepository, InMemoryOpportunityR
 import { InMemoryActivationTokenRepository } from "../../infrastructure/database/activationTokenRepositories.js";
 import { InMemoryEventEmitter } from "../../infrastructure/events/inMemoryEventEmitter.js";
 import { UpdateUserUseCase, DeleteUserUseCase } from "./user.use-cases.js";
-import { DeleteFileUseCase, DownloadFileUseCase, ListFilesUseCase } from "./file.use-cases.js";
+import { DeleteFileUseCase, DownloadFileUseCase, ListFilesUseCase, UploadFileUseCase } from "./file.use-cases.js";
 import { OpportunityUseCases } from "./sales.use-cases.js";
 import { EstimateUseCases } from "./sales.use-cases.js";
 import { InMemoryEstimateRepository } from "../../infrastructure/database/inMemoryRepositories.js";
@@ -75,6 +75,25 @@ describe("Security and integrity regressions", () => {
     await expect(service.execute({ actorId: client.id, fileId: 1 })).rejects.toThrow();
     expect(removeBlob).not.toHaveBeenCalled();
     expect(removeFile).not.toHaveBeenCalled();
+  });
+  it("rejects active-content office documents before writing to storage", async () => {
+    const { users, admin, events } = await setup();
+    const projects = new InMemoryProjectRepository();
+    const project = await projects.save({ id: 0, estimateId: 1, nombre: "Obra", descripcion: "", clienteId: 2, direccion: "Madrid", tipo: "Reforma", estado: "en_curso", progreso: { value: 0 }, presupuesto: { amount: 0 }, fechaInicio: new Date(), fechaFinPrevista: new Date(), profesionalesAsignados: [], hitos: [], createdAt: new Date() } as never);
+    const storage = { put: vi.fn(), delete: vi.fn() };
+    const service = new UploadFileUseCase(users, projects, { save: vi.fn() } as never, storage as never, events);
+    await expect(service.execute({ actorId: admin.id, projectId: project.id, nombre: "documento.docx", tipo: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", tamaño: 4, sensitive: false, classification: "publico", contenidoBase64: "UEsDBA==", ctx })).rejects.toThrow("no permitido");
+    expect(storage.put).not.toHaveBeenCalled();
+  });
+  it("rejects PDFs containing active-content actions", async () => {
+    const { users, admin, events } = await setup();
+    const projects = new InMemoryProjectRepository();
+    const project = await projects.save({ id: 0, estimateId: 1, nombre: "Obra", descripcion: "", clienteId: 2, direccion: "Madrid", tipo: "Reforma", estado: "en_curso", progreso: { value: 0 }, presupuesto: { amount: 0 }, fechaInicio: new Date(), fechaFinPrevista: new Date(), profesionalesAsignados: [], hitos: [], createdAt: new Date() } as never);
+    const storage = { put: vi.fn(), delete: vi.fn() };
+    const service = new UploadFileUseCase(users, projects, { save: vi.fn() } as never, storage as never, events);
+    const payload = btoa("%PDF-1.7\n1 0 obj <</OpenAction 2 0 R /JavaScript (alert)>>");
+    await expect(service.execute({ actorId: admin.id, projectId: project.id, nombre: "activo.pdf", tipo: "application/pdf", tamaño: payload.length, sensitive: false, classification: "publico", contenidoBase64: payload, ctx })).rejects.toThrow("no coincide");
+    expect(storage.put).not.toHaveBeenCalled();
   });
   it("removes commercial fields from every professional project response", async () => {
     const project = {

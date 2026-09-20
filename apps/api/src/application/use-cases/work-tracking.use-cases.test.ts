@@ -7,7 +7,6 @@ import {
 } from "../../infrastructure/database/inMemoryRepositories.js";
 import { MemoryWorkStore } from "../../infrastructure/database/memoryWorkStore.js";
 import { WorkTrackingUseCases } from "./work-tracking.use-cases.js";
-import { DeleteProjectUseCase } from "./project.use-cases.js";
 
 async function setup() {
   const users = new InMemoryUserRepository({
@@ -294,19 +293,6 @@ describe("work tracking isolation and lifecycle", () => {
     await expect(
       s.work.start(2, { projectId: 1, operationId: "not-uuid" }),
     ).rejects.toThrow();
-  });
-  it("preserves project history when an administrator attempts deletion", async () => {
-    const s = await setup();
-    await s.start();
-    const remove = new DeleteProjectUseCase(
-      s.users,
-      s.projects,
-      async (id) => (await s.store.list({ projectId: id })).total > 0,
-    );
-    await expect(remove.execute({ actorId: 1, projectId: 1 })).rejects.toThrow(
-      "histórico",
-    );
-    expect(await s.projects.findById(1)).not.toBeNull();
   });
   it("allows finishing after unassignment but prevents another entry", async () => {
     const s = await setup(),

@@ -60,7 +60,7 @@ export function AdminSolicitudes({ api }: Props) {
   };
 
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>;
-  if (error)   return <div role="alert" style={{ color: "#f87171", padding: 20 }}>{error}</div>;
+  if (error)   return <div role="alert" style={{ color: "#b5483f", padding: 20 }}>{error}</div>;
 
   const pending = items.filter(i => i.estado === "pendiente");
 
@@ -85,14 +85,14 @@ export function AdminSolicitudes({ api }: Props) {
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
                     <h3 style={{ fontSize: 14, fontWeight: 600, color: "#302d29" }}>{s.nombre}</h3>
-                    <Badge color={s.estado === "pendiente" ? "#fbbf24" : s.estado === "contactado" ? "#34d399" : "#f87171"}>{s.estado}</Badge>
+                    <Badge color={s.estado === "pendiente" ? "#996515" : s.estado === "contactado" ? "#247a55" : "#b5483f"}>{s.estado}</Badge>
                     <Badge color="#60a5fa">{s.tipo}</Badge>
                   </div>
                   <p style={{ fontSize: 12, color: "#71685e" }}>
                     {s.email} {s.telefono && `· ${s.telefono}`} · {formatDateTime(s.fecha)}
                   </p>
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
+                <div className="private-action-card__actions" style={{ display: "flex", gap: 6 }}>
                   <Button small variant="ghost" onClick={() => setDetail(s)}>Ver</Button>
                   {s.estado === "pendiente" && (
                     <>
@@ -141,9 +141,9 @@ export function AdminSolicitudes({ api }: Props) {
 
 function MetaRow({ k, v, copyable }: { k: string; v: string; copyable?: boolean }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 6, borderBottom: "1px solid #decdb8" }}>
+    <div className="solicitud-meta-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 6, borderBottom: "1px solid #decdb8" }}>
       <dt style={{ color: "#71685e" }}>{k}</dt>
-      <dd style={{ color: "#302d29", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+      <dd style={{ color: "#302d29", fontWeight: 600, display: "flex", alignItems: "center", gap: 6, minWidth: 0, overflowWrap: "anywhere" }}>
         {v}
         {copyable && <button onClick={() => navigator.clipboard.writeText(v)} style={{ background: "none", border: "none", color: "#c17248", cursor: "pointer", fontSize: 12 }}>📋</button>}
       </dd>

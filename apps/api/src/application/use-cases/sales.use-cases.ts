@@ -145,10 +145,15 @@ function isExpired(
   );
 }
 function validSignatureImage(value: string) {
-  return (
-    /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(value) &&
-    value.length <= 700_000
-  );
+  if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(value) || value.length > 700_000) return false;
+  try {
+    const bytes = Uint8Array.from(atob(value.slice(value.indexOf(",") + 1)), char => char.charCodeAt(0));
+    const png = [0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((byte,index) => bytes[index] === byte);
+    if (!png || bytes.length < 33 || String.fromCharCode(...bytes.slice(12,16)) !== "IHDR") return false;
+    const dimension = (offset: number) => ((bytes[offset]! << 24) | (bytes[offset+1]! << 16) | (bytes[offset+2]! << 8) | bytes[offset+3]!) >>> 0;
+    const width = dimension(16), height = dimension(20);
+    return width >= 100 && height >= 40 && width <= 4000 && height <= 2000;
+  } catch { return false; }
 }
 function isClientVisibleChangeStatus(
   status: ChangeOrder["estado"],
@@ -285,7 +290,7 @@ export class EstimateUseCases {
   }
   async publicList(actorId: number, query: { page?: number; search?: string; status?: string } = {}) {
     const actor = await this.users.findById(actorId);
-    if (!actor) throw new ForbiddenError();
+    if (!actor?.activo) throw new ForbiddenError();
     if (!["admin", "cliente"].includes(actor.rol)) throw new ForbiddenError();
     const page = query.page ?? 0;
     if (!Number.isSafeInteger(page) || page < 0 || page > 100000) throw new ValidationError("Página no válida");
@@ -304,7 +309,7 @@ export class EstimateUseCases {
   }
   async publicGet(actorId: number, id: number) {
     const actor = await this.users.findById(actorId);
-    if (!actor) throw new ForbiddenError();
+    if (!actor?.activo) throw new ForbiddenError();
     const estimate = await this.get(actorId, id);
     // Do not turn a known numeric identifier into a way of inspecting a
     // proposal that has not been shared with its owner yet.
@@ -322,10 +327,10 @@ export class EstimateUseCases {
   }
   async get(actorId: number, id: number) {
     const actor = await this.users.findById(actorId);
-    if (!actor) throw new ForbiddenError();
+    if (!actor?.activo) throw new ForbiddenError();
     const estimate = await this.require(id);
     if (actor.rol !== "admin" && estimate.clienteId !== actor.id)
-      throw new ForbiddenError();
+      throw new NotFoundError("Presupuesto");
     return estimate;
   }
   async adminDraft(actorId: number, id: number) {
@@ -664,6 +669,11 @@ export class EstimateUseCases {
       estimateId: id,
       projectId: saved.id,
     });
+    await this.events.emit({
+      type: "ProjectCreated", eventId: crypto.randomUUID(), occurredAt: new Date(),
+      actorId: actor.id, actorName: actor.nombre, ip: ctx.ip, userAgent: ctx.userAgent,
+      projectId: saved.id, estimateId: id,
+    });
     return saved;
   }
   private async require(id: number) {
@@ -676,6 +686,13 @@ export class EstimateUseCases {
       (await this.estimates.findVersions(estimate.id)).find(
         (v) => v.version === estimate.versionActual,
       ) ?? null;
+    if (version?.firma) {
+      const token = typeof version.firma.token === "string" ? version.firma.token : "";
+      const signedAt = typeof version.firma.fechaFirma === "string" ? Date.parse(version.firma.fechaFirma) : NaN;
+      if (!token || !Number.isFinite(signedAt) || !(await this.crypto.verifySignatureToken(token, estimate.id, estimate.clienteId, signedAt))) {
+        throw new ConflictError("No se ha podido verificar la integridad de la firma");
+      }
+    }
     const snapshot = version?.snapshot
       ? publicSnapshot(version.snapshot)
       : null;
@@ -779,10 +796,10 @@ export class ChangeOrderUseCases {
     projectId: number,
   ): Promise<Array<ChangeOrder | PublicChangeOrder>> {
     const actor = await this.users.findById(actorId);
-    if (!actor) throw new ForbiddenError();
+    if (!actor?.activo) throw new ForbiddenError();
     const project = await this.projects.findById(projectId);
     if (!project || (actor.rol !== "admin" && project.clienteId !== actor.id))
-      throw new ForbiddenError();
+      throw new NotFoundError("Proyecto");
 
     const orders = await this.changes.findByProject(projectId);
     if (actor.rol === "admin") return orders;

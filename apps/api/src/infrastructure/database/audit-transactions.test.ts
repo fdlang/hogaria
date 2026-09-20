@@ -194,10 +194,11 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     expect((await projects.findById(project.id))?.presupuesto.amount).toBe(200);
     await expect(changes.transition(order.id,project.id,"enviado","aprobado",clientId)).rejects.toThrow();
     expect((await projects.findById(project.id))?.presupuesto.amount).toBe(200);
-    await expect(projects.delete(project.id)).rejects.toThrow("histórico");
+    await expect(query("DELETE FROM projects WHERE id=$1",[project.id])).rejects.toThrow("histórico");
     await expect(query("UPDATE change_orders SET payload=$2 WHERE id=$1",[order.id,{...draft,titulo:"Changed"}])).rejects.toThrow("inmutable");
   });
   it("returns bounded pages filtered by owner", async () => {
+    await users.update(clientId, { activo: true });
     for (let i=0;i<24;i++) await service.create(adminId,(await estimates.findById(estimateId))!.oportunidadId,{...draft,titulo:`Item ${i}`},ctx);
     const first = await service.publicList(adminId);
     const second = await service.publicList(adminId,{page:1});
@@ -264,7 +265,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
         {
           version: 1,
           password: "password",
-          canvasSignature: "data:image/png;base64,aGVsbG8=",
+          canvasSignature: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAoAAAAAAAAAAAA",
           consentimiento: "Acepto",
         },
         ctx,
@@ -286,7 +287,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
         {
           version: 1,
           password: "password",
-          canvasSignature: "data:image/png;base64,aGVsbG8=",
+          canvasSignature: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAoAAAAAAAAAAAA",
           consentimiento: "Acepto",
         },
         ctx,
@@ -407,6 +408,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     expect((await query("SELECT payload->>'kind' AS kind FROM client_email_notifications ORDER BY payload->>'kind'")).rows).toEqual([{ kind: "document" }, { kind: "project-update" }]);
   });
   it("validates persisted drafts before publication and allows a zero total", async () => {
+    await users.update(clientId, { activo: true });
     await estimates.update(estimateId, { borrador: { ...draft, partidas: [{ ...draft.partidas[0]!, descuento: 150 }] } });
     await expect(service.send(adminId, estimateId, ctx)).rejects.toThrow("Propuesta inválida");
     expect(await estimates.findVersions(estimateId)).toHaveLength(0);

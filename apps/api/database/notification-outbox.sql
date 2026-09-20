@@ -14,7 +14,7 @@ BEGIN
   kind:='project-update'; resource_id:=NEW.project_id;
  ELSIF TG_TABLE_NAME='project_files' THEN
   SELECT cliente_id INTO recipient FROM projects WHERE id=NEW.project_id;
-  IF recipient=(NEW.payload->>'uploadedBy')::bigint THEN RETURN NEW; END IF;
+  IF recipient=(NEW.payload->>'uploadedBy')::bigint OR COALESCE(NEW.payload->>'classification','')='reservado' THEN RETURN NEW; END IF;
   kind:='document';
  ELSE
   recipient:=NEW.cliente_id;

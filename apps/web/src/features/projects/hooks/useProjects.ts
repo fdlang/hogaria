@@ -5,7 +5,7 @@
 
 import { useCallback } from "react";
 import { ProjectsApi, ProjectDTO } from "../api/projects.api";
-import { useResource, useMutation, withOptimistic } from "@/shared/hooks/useResource";
+import { useResource, withOptimistic } from "@/shared/hooks/useResource";
 
 export function useProjects(api: ProjectsApi) {
   return useResource<ProjectDTO[]>(() => api.list(), [api]);
@@ -16,16 +16,6 @@ export function useProject(api: ProjectsApi, id: number | null) {
     () => id == null ? Promise.resolve(null) : api.get(id),
     [api, id],
   );
-}
-
-export function useProjectMutations(api: ProjectsApi) {
-  const update   = useMutation((id: number, changes: Partial<ProjectDTO>) => api.update(id, changes));
-  const remove   = useMutation((id: number) => api.delete(id));
-  const assign   = useMutation((projectId: number, userId: number, profesion: string) =>
-    api.assign(projectId, userId, profesion));
-  const unassign = useMutation((projectId: number, userId: number) =>
-    api.unassign(projectId, userId));
-  return { update, remove, assign, unassign };
 }
 
 // Specialised optimistic helpers used by detail views

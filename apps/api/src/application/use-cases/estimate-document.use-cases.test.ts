@@ -184,7 +184,7 @@ describe("Download-only budget PDF", () => {
     const f = await documents();
     await expect(
       f.service.download(f.clientB.id, f.estimateA.id, 1),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    ).rejects.toBeInstanceOf(NotFoundError);
     expect(f.pdf.render).not.toHaveBeenCalled();
   });
   it("never includes internal costs or notes", async () => {

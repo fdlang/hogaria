@@ -20,7 +20,11 @@ const newToken = () => base64Url(crypto.getRandomValues(new Uint8Array(32)));
 export class AccountActivationUseCases {
   constructor(private readonly users: IUserRepository, private readonly tokens: IActivationTokenRepository, private readonly email: ITransactionalEmail, private readonly appUrl: string, private readonly ttlMs = 24 * 60 * 60 * 1000) {}
   ensureConfigured() {
-    const hasPublicUrl = /^https?:\/\/[^\s/$.?#][^\s]*$/i.test(this.appUrl);
+    let hasPublicUrl = false;
+    try {
+      const url = new URL(this.appUrl);
+      hasPublicUrl = url.protocol === "https:" && !url.username && !url.password && !!url.hostname;
+    } catch { hasPublicUrl = false; }
     if (!this.email.isConfigured() || !hasPublicUrl) {
       throw new ConflictError("No se puede enviar la invitación: configura RESEND_API_KEY, EMAIL_FROM y APP_URL en Producción y vuelve a desplegar");
     }

@@ -61,7 +61,6 @@ export class PostgresProjectRepository implements IProjectRepository {
     if(!r.rows[0])throw new ConflictError("La obra ha cambiado. Actualiza los datos antes de guardar.");
     return this.map(r.rows[0]);
   }
-  async delete(id:number){await this.pool.query("DELETE FROM projects WHERE id=$1",[id])}
 }
 
 export class PostgresOpportunityRepository implements IOpportunityRepository {
@@ -123,7 +122,6 @@ export class PostgresEstimateRepository implements IEstimateRepository {
   private mapVersion(r: Row): EstimateVersion { return { id: Number(r.id), estimateId: Number(r.estimate_id), version: Number(r.version), snapshot: r.snapshot as EstimateDraft, enviadoAt: r.enviado_at ? date(r.enviado_at) : null, firmadoAt: r.firmado_at ? date(r.firmado_at) : null, firma: r.firma ?? null, createdAt: date(r.created_at) }; }
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM estimates WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async findAll() { return (await this.pool.query("SELECT * FROM estimates ORDER BY updated_at DESC")).rows.map(row => this.map(row)); }
-  async findByOpportunity(opportunityId: number) { return (await this.pool.query("SELECT * FROM estimates WHERE oportunidad_id=$1 ORDER BY id DESC", [opportunityId])).rows.map(row => this.map(row)); }
   async save(e: Omit<Estimate, "id" | "createdAt" | "updatedAt">) { const r = await this.pool.query("INSERT INTO estimates(oportunidad_id,cliente_id,numero,titulo,estado,version_actual,borrador,motivo_rechazo) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *", [e.oportunidadId,e.clienteId,e.numero,e.titulo,e.estado,e.versionActual,e.borrador,e.motivoRechazo]); return this.map(r.rows[0]); }
   async update(id: number, changes: Partial<Pick<Estimate, "titulo" | "estado" | "versionActual" | "borrador" | "motivoRechazo">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Presupuesto"); const next = { ...old, ...changes }; const r = await this.pool.query("UPDATE estimates SET titulo=$2,estado=$3,version_actual=$4,borrador=$5,motivo_rechazo=$6,updated_at=NOW() WHERE id=$1 RETURNING *", [id,next.titulo,next.estado,next.versionActual,next.borrador,next.motivoRechazo]); return this.map(r.rows[0]); }
   async saveVersion(v: Omit<EstimateVersion, "id" | "createdAt">) { const r = await this.pool.query("INSERT INTO budget_versions(estimate_id,version,snapshot,enviado_at,firmado_at,firma) VALUES($1,$2,$3,$4,$5,$6) RETURNING *", [v.estimateId,v.version,v.snapshot,v.enviadoAt,v.firmadoAt,v.firma]); return this.mapVersion(r.rows[0]); }

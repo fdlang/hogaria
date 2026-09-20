@@ -8,7 +8,7 @@
 import { LoginUseCase } from "../../application/use-cases/auth.use-cases.js";
 import { IUserRepository } from "@reformapro/domain/repositories";
 import { toHttpError } from "./errorMiddleware.js";
-import { UnauthorizedError } from "@reformapro/domain/errors";
+import { UnauthorizedError, ValidationError } from "@reformapro/domain/errors";
 import { toUserDTO } from "./userDTO.js";
 
 export interface HttpRequest {
@@ -31,7 +31,9 @@ export function authController(deps: {
     // POST /auth/login
     async login(req: HttpRequest): Promise<HttpResponse> {
       try {
-        const { email, password } = req.body as { email: string; password: string };
+        const body = req.body as Record<string, unknown> | null;
+        if (!body || typeof body.email !== "string" || typeof body.password !== "string") throw new ValidationError("Email y contraseña obligatorios");
+        const { email, password } = body as { email: string; password: string };
         const ctx = { ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" };
         const { user, token, expiresAt } = await deps.loginUseCase.execute(email, password, ctx);
         return { status: 200, body: { user: toUserDTO(user), token, expiresAt } };
@@ -48,12 +50,6 @@ export function authController(deps: {
         if (!user || !user.activo) throw new UnauthorizedError();
         return { status: 200, body: toUserDTO(user) };
       } catch (e) { const { status, body } = toHttpError(e); return { status, body }; }
-    },
-
-    // POST /auth/logout — token revocation happens client-side since we use short-lived JWTs.
-    // For long-lived tokens, add a revocation list (Redis) and check it in the auth middleware.
-    async logout(): Promise<HttpResponse> {
-      return { status: 204, body: null };
     },
   };
 }
