@@ -370,16 +370,16 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   }
   .portfolio nav button.private-access {
     position: relative;
-    min-height: 36px;
+    min-height: 34px;
     margin-top: 0;
-    padding: 5px 9px;
-    font-size: 11px;
+    padding: 4px 8px;
+    font-size: 10.5px;
     text-align: center;
   }
   .portfolio nav button.private-access::before {
     content: "";
     position: absolute;
-    inset: -4px;
+    inset: -5px;
   }
   .portfolio section { scroll-margin-top: 166px; }
 
