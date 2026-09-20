@@ -157,10 +157,8 @@ export class DeleteFileUseCase {
     if (file.sensitive && actor.rol !== "admin") throw new ForbiddenError();
     if (!file.sensitive && actor.rol !== "admin" && file.uploadedBy !== actor.id) throw new ForbiddenError();
 
-    // Remove the database reference first: a storage outage may leave a private,
-    // unreachable blob for later cleanup, but never a visible broken download.
-    await this.files.delete(file.id);
     await this.storage.delete(file.storageKey);
+    await this.files.delete(file.id);
   }
 }
 

@@ -126,6 +126,20 @@ describe("Security and integrity regressions", () => {
     expect(removeBlob).not.toHaveBeenCalled();
     expect(removeFile).not.toHaveBeenCalled();
   });
+  it("keeps file metadata when storage deletion fails so deletion can be retried", async () => {
+    const { users, admin } = await setup();
+    const projects = new InMemoryProjectRepository();
+    const project = await projects.save({ id: 0, estimateId: 1, nombre: "Obra", descripcion: "", clienteId: 2, direccion: "Madrid", tipo: "Reforma", estado: "en_curso", progreso: { value: 0 }, presupuesto: { amount: 0 }, fechaInicio: new Date(), fechaFinPrevista: new Date(), profesionalesAsignados: [], hitos: [], createdAt: new Date() } as never);
+    const removeFile = vi.fn(async () => undefined);
+    const files = {
+      findById: async () => ({ id: 1, projectId: project.id, uploadedBy: admin.id, sensitive: false, storageKey: "file" }),
+      delete: removeFile,
+    };
+    const service = new DeleteFileUseCase(users, projects, files as never, { delete: async () => { throw new Error("blob unavailable"); } } as never);
+
+    await expect(service.execute({ actorId: admin.id, fileId: 1 })).rejects.toThrow("blob unavailable");
+    expect(removeFile).not.toHaveBeenCalled();
+  });
   it("rejects active-content office documents before writing to storage", async () => {
     const { users, admin, events } = await setup();
     const projects = new InMemoryProjectRepository();
