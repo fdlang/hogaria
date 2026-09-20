@@ -85,7 +85,7 @@ async function fixture(page: Page, role: string) {
   }
   return emails;
 }
-for (const state of ["borrador", "rechazado"]) {
+for (const state of ["borrador", "en_revision", "rechazado"]) {
   test(`admin resumes ${state} and saves the same estimate`, async ({ page }) => {
     await fixture(page, "admin");
     let saved = false, revised = false;
@@ -108,13 +108,16 @@ for (const state of ["borrador", "rechazado"]) {
     });
     await page.reload();
     await page.getByRole("button", { name: "Mostrar propuestas" }).click();
-    await page.getByRole("button", { name: state === "borrador" ? "Editar borrador" : "Crear revisión" }).click();
-    await expect(page.getByLabel("Título visible al cliente")).toHaveValue(draft.titulo);
+    await page.getByRole("button", { name: ["borrador", "en_revision"].includes(state) ? "Editar borrador" : "Crear revisión" }).click();
+    const title = page.getByLabel("Título visible al cliente");
+    await expect(title).toHaveValue(draft.titulo);
+    await expect(title).toBeInViewport();
     await page.getByLabel("Título visible al cliente").fill("Título corregido");
     await page.getByRole("button", { name: "Continuar", exact: true }).click();
     await page.getByRole("button", { name: "Revisar propuesta" }).click();
     await page.getByRole("button", { name: "Guardar como borrador" }).click();
-    await expect(page.getByRole("heading", { name: "Nueva oportunidad" })).toBeVisible();
+    await expect(page.getByLabel("Buscar presupuestos")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Nueva oportunidad" })).toBeHidden();
     expect(saved).toBe(true);
     expect(revised).toBe(state === "rechazado");
   });
@@ -168,6 +171,14 @@ test("budget detail offers download only, never email", async ({ page }) => {
     }),
   ).toHaveCount(0);
   expect(emails).toHaveLength(0);
+});
+
+test("admin sees search first and opens the creation wizard explicitly", async ({ page }) => {
+  await fixture(page, "admin");
+  await expect(page.getByLabel("Buscar presupuestos")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nueva oportunidad" })).toBeHidden();
+  await page.getByRole("button", { name: "Nuevo presupuesto" }).click();
+  await expect(page.getByRole("heading", { name: "Nueva oportunidad" })).toBeVisible();
 });
 
 test("search stays visible and opens results independently of recent estimates", async ({ page }) => {

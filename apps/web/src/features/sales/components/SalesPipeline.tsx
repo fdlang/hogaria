@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Modal } from "@/shared/ui";
 import {
   EstimateContent,
@@ -85,11 +85,13 @@ export function SalesPipeline({
   }, [catalogItems]);
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [openingId, setOpeningId] = useState<number | null>(null);
   const [converting, setConverting] = useState<number | null>(null);
   const [sending, setSending] = useState<number | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<EstimateDTO | null>(null);
+  const [showEditor, setShowEditor] = useState(() => Boolean(new URLSearchParams(window.location.hash.split("?")[1] ?? window.location.search).get("opportunity")));
   const [opportunity, setOpportunity] = useState(blankOpportunity);
   const [selected, setSelected] = useState<number | null>(null);
   const [draft, setDraft] = useState(blankDraft);
@@ -98,11 +100,15 @@ export function SalesPipeline({
     setOpportunity(opportunityForSelection(existingOpportunity, opportunities));
   }, [existingOpportunity, opportunities]);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (showEditor) editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [showEditor, editingId]);
 
   const editEstimate = async (estimate: EstimateDTO) => {
-    if (saving) return;
+    if (saving || openingId !== null) return;
     if ((editingId !== null || draft.partidas.length > 0) && !window.confirm("Se descartarán los cambios sin guardar. ¿Continuar?")) return;
-    setSaving(true);
+    setOpeningId(estimate.id);
     setError("");
     try {
       const existing = ["borrador", "en_revision"].includes(estimate.estado)
@@ -112,10 +118,10 @@ export function SalesPipeline({
       setSelected(existing.oportunidadId);
       setDraft(existing.borrador);
       setStep(1);
-      await refresh();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      setShowEditor(true);
+      void refresh().catch(() => setError("El borrador está abierto, pero no se pudieron actualizar los listados."));
     } catch (cause) { setError((cause as Error).message || "No se pudo recuperar el presupuesto"); }
-    finally { setSaving(false); }
+    finally { setOpeningId(null); }
   };
 
   const refresh = () =>
@@ -233,6 +239,7 @@ export function SalesPipeline({
       setStep(0);
       setSelected(null);
       setDraft(blankDraft());
+      setShowEditor(false);
       await refresh();
     } catch (cause) {
       setError(
@@ -317,6 +324,28 @@ export function SalesPipeline({
       ],
     }));
   };
+  const openNewEstimate = () => {
+    setEditingId(null);
+    setSelected(null);
+    setExistingOpportunity("");
+    setOpportunity(blankOpportunity());
+    setDraft(blankDraft());
+    setStep(0);
+    setError("");
+    setShowEditor(true);
+  };
+  const closeEditor = () => {
+    const hasChanges = editingId !== null || selected !== null || draft.partidas.length > 0 || draft.titulo.trim() !== "";
+    if (hasChanges && !window.confirm("¿Cerrar el editor? Los cambios sin guardar se perderán.")) return;
+    setEditingId(null);
+    setSelected(null);
+    setExistingOpportunity("");
+    setOpportunity(blankOpportunity());
+    setDraft(blankDraft());
+    setStep(0);
+    setError("");
+    setShowEditor(false);
+  };
 
   return (
     <section>
@@ -329,21 +358,44 @@ export function SalesPipeline({
             enviada.
           </p>
         </div>
-        <Button
-          small
-          variant="ghost"
-          onClick={() => {
-            setError("");
-            void refresh().catch(() =>
-              setError("No se pudieron actualizar los presupuestos."),
-            );
-          }}
-        >
-          Actualizar
-        </Button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Button small onClick={openNewEstimate}>Nuevo presupuesto</Button>
+          <Button
+            small
+            variant="ghost"
+            onClick={() => {
+              setError("");
+              void refresh().catch(() =>
+                setError("No se pudieron actualizar los presupuestos."),
+              );
+            }}
+          >
+            Actualizar
+          </Button>
+        </div>
       </header>
 
-      <div className="sales-steps">
+      {error && (
+        <p role="alert" className="sales-error">
+          {error}
+        </p>
+      )}
+
+      <RecentEstimates
+        api={api}
+        estimates={estimates}
+        sending={sending}
+        converting={converting}
+        openingId={openingId}
+        onPreview={setPreview}
+        onSend={send}
+        onConvert={convert}
+        onEdit={editEstimate}
+        editing={saving}
+      />
+
+      {showEditor && <section className="sales-editor" aria-label="Editor de presupuesto">
+      <div className="sales-steps" ref={editorRef}>
         {steps.map((label, index) => (
           <button
             key={label}
@@ -358,15 +410,7 @@ export function SalesPipeline({
           </button>
         ))}
       </div>
-      {selected !== null && <Button small variant="ghost" disabled={saving} onClick={() => {
-        if (!window.confirm("¿Cerrar el editor? Los cambios sin guardar se perderán.")) return;
-        setEditingId(null); setSelected(null); setDraft(blankDraft()); setStep(0); setError("");
-      }}>Cerrar editor</Button>}
-      {error && (
-        <p role="alert" className="sales-error">
-          {error}
-        </p>
-      )}
+      <Button small variant="ghost" disabled={saving} onClick={closeEditor}>Cerrar editor</Button>
 
       {step === 0 && (
         <div className="sales-card">
@@ -636,18 +680,7 @@ export function SalesPipeline({
           </Button>
         </div>
       )}
-
-      <RecentEstimates
-        api={api}
-        estimates={estimates}
-        sending={sending}
-        converting={converting}
-        onPreview={setPreview}
-        onSend={send}
-        onConvert={convert}
-        onEdit={editEstimate}
-        editing={saving}
-      />
+      </section>}
       <Modal
         open={preview !== null}
         onClose={() => setPreview(null)}
@@ -674,6 +707,7 @@ function RecentEstimates({
   estimates,
   sending,
   converting,
+  openingId,
   onPreview,
   onSend,
   onConvert,
@@ -684,6 +718,7 @@ function RecentEstimates({
   estimates: EstimateDTO[];
   sending: number | null;
   converting: number | null;
+  openingId: number | null;
   onPreview: (estimate: EstimateDTO) => void;
   onSend: (estimate: EstimateDTO) => void;
   onConvert: (estimate: EstimateDTO) => void;
@@ -749,7 +784,7 @@ function RecentEstimates({
             </div>
             <div className="estimate-list__actions">
               {["borrador", "en_revision", "enviado", "rechazado", "caducado"].includes(estimate.estado) && (
-                <Button small variant="ghost" disabled={editing} onClick={() => void onEdit(estimate)}>
+                <Button small variant="ghost" loading={openingId === estimate.id} disabled={editing || openingId !== null} onClick={() => void onEdit(estimate)}>
                   {["borrador", "en_revision"].includes(estimate.estado) ? "Editar borrador" : "Crear revisión"}
                 </Button>
               )}
