@@ -149,3 +149,25 @@ CREATE TABLE IF NOT EXISTS solicitudes (
   ip INET,
   fecha TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Repair databases created before account lifecycle states were introduced.
+-- Keep this after account_activation_tokens so pending invitations are preserved.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS account_status TEXT;
+UPDATE users
+SET account_status = CASE
+  WHEN activo THEN 'active'
+  WHEN EXISTS (
+    SELECT 1
+    FROM account_activation_tokens token
+    WHERE token.user_id = users.id AND token.used_at IS NULL
+  ) THEN 'pending_activation'
+  ELSE 'archived'
+END
+WHERE account_status IS NULL;
+ALTER TABLE users ALTER COLUMN account_status SET DEFAULT 'active';
+ALTER TABLE users ALTER COLUMN account_status SET NOT NULL;
+DO $$ BEGIN
+  ALTER TABLE users ADD CONSTRAINT users_account_status_check
+    CHECK (account_status IN ('pending_activation','active','archived'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
