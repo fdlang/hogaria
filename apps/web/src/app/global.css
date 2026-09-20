@@ -286,6 +286,25 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 @media (hover: hover) and (pointer: fine) {
   .admin-home-grid > a:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(48,45,41,.1); border-color: var(--copper); }
 }
+.professional-work-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid #995637;
+  border-radius: 8px;
+  background: #995637;
+  color: #fffaf4;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.professional-work-link:hover { background: #81472f; }
+.professional-work-link:focus-visible {
+  outline: 3px solid #bb774f;
+  outline-offset: 3px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .admin-home-grid > a { transition: none; }
   .admin-home-grid > a:hover { transform: none; }

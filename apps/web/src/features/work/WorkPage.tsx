@@ -8,6 +8,7 @@ import type {
 import type { UsersApi } from "@/features/users/api/users.api";
 import { usePermissions } from "@/shared/hooks/usePermissions";
 import { useNotifications } from "@/shared/ui/notifications";
+import { useNavigation } from "@/app/Router";
 import { WorkApi, type Entry } from "./work.api";
 import { WorkRates, WorkProjectSummary } from "./WorkSettings";
 import {
@@ -33,6 +34,12 @@ export function WorkPage({
   users: UsersApi;
 }) {
   const { isAdmin, isProfesional } = usePermissions();
+  const { currentPath } = useNavigation();
+  const requestedProjectId = (() => {
+    const raw = new URLSearchParams(currentPath.split("?")[1] ?? "").get("projectId");
+    const parsed = Number(raw);
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+  })();
   const [revision, setRevision] = useState(0);
   const refresh = () => setRevision((x) => x + 1);
   const [audit, setAudit] = useState(false);
@@ -41,7 +48,10 @@ export function WorkPage({
     push("Cambio guardado correctamente", "success");
     refresh();
   };
-  const [filters, setFilters] = useState<WorkFilters>({ page: 0 });
+  const [filters, setFilters] = useState<WorkFilters>({
+    page: 0,
+    ...(requestedProjectId ? { projectId: requestedProjectId } : {}),
+  });
   const projectQuery = useWorkQuery(
     () => projects.list(),
     [projects, revision],
@@ -68,13 +78,17 @@ export function WorkPage({
         </p>
         <button onClick={refresh}>Actualizar</button>
       </header>
-      {projectQuery.error && <p role="alert">{projectQuery.error}</p>}
+      {projectQuery.error && <p role="alert">No se pudieron cargar tus obras. Actualiza la página o inténtalo de nuevo.</p>}
       {people.error && <p role="alert">{people.error}</p>}
-      {!isAdmin && (
+      {!isAdmin && projectQuery.loading && (
+        <section className="work-card"><p role="status">Cargando obras asignadas…</p></section>
+      )}
+      {!isAdmin && !projectQuery.loading && !projectQuery.error && (
         <WorkClock
           key={revision}
           api={api}
           projects={projectQuery.value ?? []}
+          preferredProjectId={requestedProjectId}
           onSaved={saved}
         />
       )}
@@ -253,15 +267,27 @@ export function WorkPage({
 function WorkClock({
   api,
   projects,
+  preferredProjectId,
   onSaved,
 }: {
   api: WorkApi;
   projects: ProjectDTO[];
+  preferredProjectId?: number;
   onSaved: () => void;
 }) {
   const current = useWorkQuery(() => api.current(), [api]);
   const operation = useRef(crypto.randomUUID());
   const c = current.value;
+  const eligibleProjects = projects.filter((project) =>
+    ["planificacion", "en_curso"].includes(project.estado),
+  );
+  const defaultProjectId = eligibleProjects.some(
+    (project) => project.id === preferredProjectId,
+  )
+    ? preferredProjectId
+    : eligibleProjects.length === 1
+      ? eligibleProjects[0]!.id
+      : undefined;
   return (
     <section className="work-card">
       <h2>Registrar trabajo</h2>
@@ -269,10 +295,10 @@ function WorkClock({
       {current.error && <p role="alert">{current.error}</p>}
       {c &&
         (!c.engagement ? (
-          <p>
-            Administración debe configurar tu vinculación y tarifa antes de
-            registrar trabajo.
-          </p>
+          <div className="work-guidance" role="status">
+            <strong>Tu acceso está activo, pero falta configurar el fichaje.</strong>
+            <p>Administración debe indicar tu tipo de vinculación y tu tarifa antes de que puedas registrar trabajo.</p>
+          </div>
         ) : c.open ? (
           <>
             <p>
@@ -314,6 +340,11 @@ function WorkClock({
               />
             </WorkForm>
           </>
+        ) : eligibleProjects.length === 0 ? (
+          <div className="work-guidance" role="status">
+            <strong>No tienes ninguna obra disponible para registrar trabajo.</strong>
+            <p>Necesitas estar asignado a una obra en planificación o en curso. Contacta con administración si crees que deberías tener acceso.</p>
+          </div>
         ) : (
           <WorkForm
             submit={
@@ -332,15 +363,11 @@ function WorkClock({
           >
             <label>
               Obra asignada
-              <select name="projectId" required defaultValue="">
+              <select name="projectId" required defaultValue={defaultProjectId ?? ""}>
                 <option value="" disabled>
                   Selecciona una obra
                 </option>
-                {projects
-                  .filter((p) =>
-                    ["planificacion", "en_curso"].includes(p.estado),
-                  )
-                  .map((p) => (
+                {eligibleProjects.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.nombre}
                     </option>

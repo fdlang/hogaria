@@ -106,6 +106,18 @@
   display: grid;
   gap: 12px;
 }
+.work-guidance {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #d8c4ad;
+  border-radius: 8px;
+  background: #fffaf4;
+}
+.work-guidance strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
 @media (max-width: 600px) {
   .work-card,
   .work-record {

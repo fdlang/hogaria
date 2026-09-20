@@ -243,7 +243,11 @@ function ClientProjectDetailRoute({ apis }: { apis: AllApis }) {
 
 function ProfesionalDashboardRoute({ apis }: { apis: AllApis }) {
   const { navigate } = useNavigation();
-  return <ProfesionalDashboard apis={apis} onOpenProject={id => navigate(`#/profesional/projects/${id}`)} />;
+  return <ProfesionalDashboard
+    apis={apis}
+    onOpenProject={id => navigate(`#/profesional/projects/${id}`)}
+    onOpenWork={() => navigate("#/profesional/work")}
+  />;
 }
 
 function ProfesionalProjectDetailRoute({ apis }: { apis: AllApis }) {

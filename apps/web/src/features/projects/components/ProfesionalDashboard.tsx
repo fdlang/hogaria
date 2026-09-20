@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { ProjectsApi } from "@/features/projects/api/projects.api";
 import { useProjects } from "../hooks/useProjects";
 import { useAuth }     from "@/features/auth/hooks/useAuth";
-import { Spinner, EmptyState } from "@/shared/ui";
+import { Spinner, EmptyState, Button } from "@/shared/ui";
 import { PageHeader } from "@/shared/ui/page-header";
 import { StatCard }   from "@/shared/ui/stat-card";
 import { ProjectStatusBadge, ProfesionBadge } from "@/shared/ui/badges";
@@ -17,9 +17,10 @@ import { PROFESIONES, Profesion } from "@reformapro/domain";
 interface Props {
   apis: { projects: ProjectsApi };
   onOpenProject: (id: number) => void;
+  onOpenWork: () => void;
 }
 
-export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
+export function ProfesionalDashboard({ apis, onOpenProject, onOpenWork }: Props) {
   const { user } = useAuth();
   const projects = useProjects(apis.projects);
 
@@ -49,6 +50,9 @@ export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
             subtitle={profInfo?.desc}
           />
         </div>
+        <Button className="professional-work-cta" onClick={onOpenWork}>
+          Registrar trabajo
+        </Button>
       </header>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 30 }}>
@@ -62,7 +66,7 @@ export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
       </h2>
 
       {proj.length === 0
-        ? <EmptyState icon="◎" title="Sin proyectos asignados" hint="El administrador te asignará cuando corresponda" />
+        ? <EmptyState icon="◎" title="Sin proyectos asignados" hint="Necesitas una obra asignada para registrar trabajo. Administración te avisará cuando esté disponible." />
         : <div role="list" style={{ display: "grid", gap: 10 }}>
             {proj.map(p => {
               const pendingMilestones = p.hitos.filter(h => !h.completado).length;

@@ -2,8 +2,15 @@ import { test, expect, type Page } from "@playwright/test";
 const project = {
   id: 1,
   nombre: "Baño Pinto",
+  descripcion: "Reforma de baño",
+  direccion: "Pinto, Madrid",
+  tipo: "Reforma integral",
   estado: "en_curso",
+  progreso: 25,
+  fechaInicio: "2026-09-01T00:00:00Z",
+  fechaFinPrevista: "2026-10-01T00:00:00Z",
   profesionalesAsignados: [{ userId: 2 }],
+  hitos: [],
 };
 const rate = {
   id: "rate",
@@ -39,7 +46,16 @@ const seed = {
   reviewReason: "",
   createdAt: "2026-09-19T08:00:00Z",
 };
-async function fixture(page: Page, role = "profesional", fail = false) {
+async function fixture(
+  page: Page,
+  role = "profesional",
+  fail = false,
+  options: {
+    path?: string;
+    projects?: typeof project[];
+    engagement?: "empleado" | "autonomo" | "subcontrata" | null;
+  } = {},
+) {
   let entry: typeof seed | null =
     role === "admin"
       ? { ...seed, endedAt: "2026-09-19T10:00:00Z", status: "enviado" }
@@ -62,16 +78,16 @@ async function fixture(page: Page, role = "profesional", fail = false) {
         rol: role,
         activo: true,
       };
-    else if (path === "/projects") payload = [project];
+    else if (path === "/projects") payload = options.projects ?? [project];
     else if (path === "/users")
       payload = [
         { id: 2, nombre: "Operario", activo: true, rol: "profesional" },
       ];
     else if (path === "/work/current")
       payload = {
-        engagement: "empleado",
-        rateUnit: "hora",
-        unitLabel: "hora",
+        engagement: options.engagement === undefined ? "empleado" : options.engagement,
+        rateUnit: options.engagement === null ? null : "hora",
+        unitLabel: options.engagement === null ? null : "hora",
         open: entry?.status === "abierto" ? entry : null,
       };
     else if (path === "/work/entries")
@@ -136,9 +152,36 @@ async function fixture(page: Page, role = "profesional", fail = false) {
     }
     await route.fulfill({ json: payload });
   });
-  await page.goto(`/${role}/work`);
+  await page.goto(options.path ?? `/${role}/work`);
   return calls;
 }
+test("professional can discover work tracking from the dashboard", async ({
+  page,
+}) => {
+  await fixture(page, "profesional", false, { path: "/profesional" });
+  await expect(
+    page.getByRole("button", { name: "Registrar trabajo", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Registrar trabajo", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Mi trabajo", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Obra asignada")).toHaveValue("1");
+});
+test("work tracking explains when no assigned work is available", async ({ page }) => {
+  await fixture(page, "profesional", false, { projects: [] });
+  await expect(
+    page.getByText("No tienes ninguna obra disponible para registrar trabajo."),
+  ).toBeVisible();
+});
+test("work tracking explains when configuration is incomplete", async ({ page }) => {
+  await fixture(page, "profesional", false, { engagement: null });
+  await expect(
+    page.getByText("Tu acceso está activo, pero falta configurar el fichaje."),
+  ).toBeVisible();
+});
 for (const width of [390, 1440])
   test(`employee workflow at ${width}px`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 });

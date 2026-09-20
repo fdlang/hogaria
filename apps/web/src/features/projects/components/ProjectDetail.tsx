@@ -37,7 +37,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const updateProgress = useProgressUpdater(apis.projects, project);
   const toggleMilestone = useMilestoneToggler(apis.projects, project);
   const files          = useProjectFiles(apis.files, projectId);
-  const { can, isAdmin, isCliente } = usePermissions();
+  const { can, isAdmin, isCliente, isProfesional } = usePermissions();
   const professionals  = useUsers(apis.users, "profesional", isAdmin);
   const { push }       = useNotifications();
   const confirm        = useConfirm();
@@ -145,7 +145,14 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
       <PageHeader
         title={p.nombre}
         subtitle={`${p.direccion} · ${p.tipo}`}
-        actions={<ProjectStatusBadge estado={p.estado} />}
+        actions={<>
+          <ProjectStatusBadge estado={p.estado} />
+          {isProfesional && ["planificacion", "en_curso"].includes(p.estado) && (
+            <a className="professional-work-link" href={`#/profesional/work?projectId=${p.id}`}>
+              Registrar trabajo
+            </a>
+          )}
+        </>}
       />
       {isAdmin && nextStates[p.estado].length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
         {nextStates[p.estado].map(estado => <Button key={estado} small variant="ghost" loading={transitioning === estado} disabled={transitioning !== null || (estado === "finalizado" && p.progreso !== 100)} onClick={() => void handleTransition(estado)}>{estado === "en_curso" ? "Iniciar/Reanudar obra" : estado === "pausado" ? "Pausar obra" : "Finalizar obra"}</Button>)}
