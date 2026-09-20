@@ -11,9 +11,8 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
 3. Crea una base PostgreSQL gestionada y aplica la migración antes de publicar:
    `npm run db:migrate --workspace @reformapro/api`.
 
-   Si ya utilizas el esquema comercial versionado, ejecuta además una sola vez:
-   `npm run db:migrate-sales-signature --workspace @reformapro/api` y
-   `npm run db:migrate-estimate-rejection --workspace @reformapro/api`.
+   El runner principal aplica de forma idempotente el esquema base y todas las
+   ampliaciones incluidas en el repositorio.
 4. Configura estas variables para Preview y Production:
 
    - `DATABASE_URL`: URL de PostgreSQL gestionado.
@@ -26,6 +25,10 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
    - `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`: opcionales,
      sólo para crear el primer administrador.
    - `VITE_API_URL`: opcional. Déjalo vacío para usar `/api` en el mismo dominio.
+   - `BLOB_READ_WRITE_TOKEN`: obligatorio para documentos privados.
+   - `CLIENT_NOTIFICATIONS_ENABLED`: `true` para activar avisos de cuenta.
+   - `CRON_SECRET`: secreto aleatorio usado por el cron de Vercel.
+   - `NOTIFICATION_RETRY_SECRET`: secreto alternativo si se usa el workflow de GitHub.
    - `VITE_EMAILJS_SERVICE_ID`, `VITE_EMAILJS_AUTOREPLY_TEMPLATE_ID` y
      `VITE_EMAILJS_PUBLIC_KEY`: opcionales. Habilitan el email de confirmación
      de EmailJS tras registrar una solicitud. La clave pública puede estar en
@@ -33,15 +36,16 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
 
 ## Activar jornadas y costes
 
-Aplicar `npm run db:migrate-work-tracking --workspace @reformapro/api` primero en una rama de prueba de Neon y después, con copia verificada, en la base objetivo. No requiere secretos nuevos. Desplegar API y web juntas, configurar las tarifas por profesional y comprobar entrada/pausa/salida, aprobación y costes con cuentas de prueba. No borrar datos históricos para repetir la migración.
+Ejecuta la migración principal primero en una rama de prueba de Neon y después,
+con copia verificada, en la base objetivo. Despliega API y web juntas, configura
+las tarifas históricas por profesional y comprueba entrada, pausa, salida,
+aprobación y costes con cuentas de prueba. No borres datos históricos para
+repetir la migración.
 
-Consulta [WORK_TRACKING.md](docs/WORK_TRACKING.md) para el plan de verificación y los límites de la auditoría local.
-
-Antes de activar los avisos de novedades de cuenta, seguir
-[CLIENT_NOTIFICATIONS.md](docs/CLIENT_NOTIFICATIONS.md): aplicar la migración
-aditiva, configurar Resend, APP_URL HTTPS y CRON_SECRET, y habilitar
-CLIENT_NOTIFICATIONS_ENABLED. Los presupuestos solo se descargan: los avisos
-no adjuntan PDF. El cron diario reintenta avisos pendientes.
+Antes de activar los avisos de cuenta, configura Resend, `APP_URL` con HTTPS y
+el secreto del cron; después establece `CLIENT_NOTIFICATIONS_ENABLED=true`.
+Los presupuestos solo se descargan: los avisos no adjuntan PDF. El cron diario
+reintenta los avisos pendientes.
 
 ## Garantías incluidas
 

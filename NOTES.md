@@ -1,13 +1,15 @@
-- Estado: Fases 3 y 4 completadas; cambios confirmados, validados y revisados por tres agentes.
-- Disparador: cambio de producto (flujo comercial, firma, órdenes de cambio, jornadas, tarifas y notificaciones).
-- Hecho: catálogo tipado de 25 reglas y test de trazabilidad de archivos en `packages/domain/src/rules`.
-- Hecho: revisión final paralela de negocio, experiencia y riesgo aprobada sin bloqueos.
-- Decisión: mantener HOG-SEC-001/002, HOG-USR-001, HOG-EST-004 y HOG-WRK-001 sin cambios.
-- Hecho: activación desde hash, revocación de sesiones, estados públicos y pipeline comercial transaccional compatible con históricos.
-- Hecho: versiones y auditoría append-only; edición contractual directa bloqueada; obra finalizada en solo lectura profesional.
-- Hecho: firma ligada al hash canónico y sesiones revocables; validez probatoria aún requiere asesor jurídico.
-- Alto: parametrizar IVA/redondeo y revisar órdenes de cambio/tarifas; a validar por gestor.
-- Pendiente externo: definir segregación/umbrales, MFA administrativo y plazos de retención con gestor/DPD.
-- Escala: paginar usuarios, proyectos, oportunidades, solicitudes y catálogo antes de superar 500 registros por colección.
-- Métricas pendientes: excepciones, sobrescrituras, rectificaciones, SLA, mutaciones bloqueadas, SoD, retención y latencia.
-- Próxima revisión recomendada: 2026-12-20, o antes si cambia producto, normativa, volumen o aumentan incidencias.
+- Estado: auditoría funcional y revisión final completadas.
+- Corregido: alta de todos los roles mediante activación de un solo uso.
+- Corregido: reenvíos concurrentes, fallo posterior a entrega y revocación de enlaces hermanos.
+- Corregido: validación de profesiones, contactos, contraseñas y formularios obligatorios.
+- Corregido: política única de céntimos para importes, líneas e IVA.
+- Corregido: cargas asíncronas antiguas, doble envío y mutaciones concurrentes de UI.
+- Corregido: actualizaciones parciales de oportunidades, catálogo y solicitudes.
+- Corregido: borrado documental oculto y reintentable ante fallos parciales.
+- Corregido: rutas privadas desconocidas, barra final y estados de usuario inactivo.
+- Corregido: modales de propuestas, formulario de catálogo y creación de oportunidades.
+- Documentación: README y despliegue alineados con migraciones, invitaciones y notificaciones.
+- Validación: API 163, web 47 y dominio 7 pruebas; typecheck y build correctos.
+- Navegador: 78 escenarios correctos en Chromium y WebKit.
+- Pendiente no bloqueante: logout sigue siendo revocación local hasta que expire la sesión.
+- Decisión: presupuestos descargables; las notificaciones no adjuntan documentos.

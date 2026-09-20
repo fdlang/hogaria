@@ -66,13 +66,9 @@ docker compose up -d
 npm run db:migrate --workspace @reformapro/api
 ```
 
-Tras desplegar el flujo comercial versionado, aplica también las migraciones
-incrementales pendientes (una sola vez por base de datos):
-
-```bash
-npm run db:migrate-sales-signature --workspace @reformapro/api
-npm run db:migrate-estimate-rejection --workspace @reformapro/api
-```
+El comando principal aplica de forma idempotente el esquema base y las
+ampliaciones de jornadas, notificaciones, flujo comercial y auditoría. Debe
+ejecutarse una vez contra cada base tras desplegar cambios de esquema.
 
 La primera ejecución puede crear un administrador usando las variables
 `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME` de `apps/api/.env`.
@@ -96,9 +92,13 @@ npm run db:migrate --workspace @reformapro/api
 | Variable | Uso |
 | --- | --- |
 | `DATABASE_URL` | Conexión PostgreSQL. Obligatoria en producción. |
-| `RESEND_API_KEY` | Clave de Resend para invitaciones seguras de clientes. |
+| `RESEND_API_KEY` | Clave de Resend para invitaciones de cuentas y avisos transaccionales. |
 | `EMAIL_FROM` | Remitente verificado en Resend, p. ej. `Hogaria <info@hogaria.design>`. |
 | `APP_URL` | URL pública, p. ej. `https://www.hogaria.design`. |
+| `BLOB_READ_WRITE_TOKEN` | Acceso al almacén privado de documentos. |
+| `CLIENT_NOTIFICATIONS_ENABLED` | Activa los avisos transaccionales al cliente (`true`/`false`). |
+| `CRON_SECRET` | Secreto usado por el cron de Vercel para reintentar avisos. |
+| `NOTIFICATION_RETRY_SECRET` | Secreto alternativo del workflow de reintentos de GitHub Actions. |
 | `HMAC_SECRET` | Secreto de al menos 32 caracteres para sesiones y firmas. Obligatorio en producción. |
 | `ALLOWED_ORIGINS` | Orígenes CORS adicionales, separados por comas. |
 | `SEED_ADMIN_EMAIL` | Email del administrador inicial. |
@@ -136,6 +136,9 @@ ruta concreta; no debe reutilizarse el destino de otra obra.
 - Las claves HMAC persisten mediante `HMAC_SECRET`; no se generan por instancia.
 - CORS se limita a mismo origen y a `ALLOWED_ORIGINS`.
 - No subas `apps/api/.env`, credenciales ni secretos al repositorio.
+- Las cuentas creadas desde administración nacen inactivas y reciben un enlace
+  de activación de un solo uso. El enlace caduca, queda invalidado tras fijar la
+  contraseña y puede reenviarse desde la ficha de una cuenta inactiva.
 - Los binarios se guardan en Vercel Blob privado (`BLOB_READ_WRITE_TOKEN`).
   PostgreSQL conserva sus metadatos y clasificación; la API comprueba permisos
   específicos de contrato/factura antes de servir cada descarga. Los documentos
@@ -145,15 +148,19 @@ ruta concreta; no debe reutilizarse el destino de otra obra.
 
 El módulo **Jornadas** permite configurar tarifas históricas, registrar fichajes de empleados o partes de colaboradores, revisar/corregir/aprobar y comparar el coste de mano de obra por obra. Los profesionales acceden desde **Mi trabajo**; los clientes no tienen acceso a esos datos.
 
-Antes de habilitarlo, aplicar `npm run db:migrate-work-tracking --workspace @reformapro/api` y configurar las tarifas. Consulta [la guía y auditoría del módulo](docs/WORK_TRACKING.md) para sus reglas, límites y pruebas.
+Antes de habilitarlo, ejecuta la migración principal y configura las tarifas
+históricas de cada profesional. Los clientes no acceden a jornadas, tarifas ni
+costes internos.
 
 ## Presupuestos: búsqueda y PDF
 
 El listado permite buscar y filtrar por estado. Las propuestas publicadas se pueden
 descargar en PDF. No se envían documentos por correo.
-Consulta [configuración, seguridad y pruebas](docs/ESTIMATE_PDF.md).
-Los avisos automáticos de novedades, sin adjuntos, se activan siguiendo
-[la guía de notificaciones](docs/CLIENT_NOTIFICATIONS.md).
+Los importes admiten como máximo dos decimales; cada línea y su IVA se redondean
+a céntimos antes de acumular el total. Los avisos automáticos informan de
+novedades sin adjuntar documentos y solo se envían cuando
+`CLIENT_NOTIFICATIONS_ENABLED=true`; los fallidos quedan en cola para el cron
+diario configurado en `vercel.json`.
 
 ## Licencia
 
