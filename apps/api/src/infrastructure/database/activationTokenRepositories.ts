@@ -26,6 +26,7 @@ export class InMemoryActivationTokenRepository
     this.revisions.set(token.tokenHash, this.users.activationRevision(token.userId));
   }
   async promote(userId: number, tokenHash: string) {
+    if (!this.items.some(token => token.userId === userId && token.tokenHash === tokenHash)) return;
     for (const old of this.items) if (old.userId === userId && old.tokenHash !== tokenHash) this.revisions.delete(old.tokenHash);
     this.items = this.items.filter(token => token.userId !== userId || token.tokenHash === tokenHash);
   }
@@ -48,8 +49,8 @@ export class InMemoryActivationTokenRepository
     if (!token) throw invalid();
     if (this.revisions.get(hash) !== this.users.activationRevision(token.userId)) throw invalid();
     this.users.activateAccount(token.userId, passwordHash);
-    this.items.splice(index, 1);
-    this.revisions.delete(hash);
+    for (const item of this.items) if (item.userId === token.userId) this.revisions.delete(item.tokenHash);
+    this.items = this.items.filter(item => item.userId !== token.userId);
   }
 }
 export class PostgresActivationTokenRepository
@@ -92,10 +93,13 @@ export class PostgresActivationTokenRepository
     );
   }
   async promote(userId: number, tokenHash: string) {
-    await this.pool.query(
-      "DELETE FROM account_activation_tokens WHERE user_id=$1 AND token_hash<>$2",
-      [userId, tokenHash],
-    );
+    await this.transaction(async (client) => {
+      await client.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [userId]);
+      await client.query(
+        "DELETE FROM account_activation_tokens WHERE user_id=$1 AND token_hash<>$2 AND EXISTS (SELECT 1 FROM account_activation_tokens target WHERE target.user_id=$1 AND target.token_hash=$2)",
+        [userId, tokenHash],
+      );
+    });
   }
   async discard(tokenHash: string) {
     await this.pool.query("DELETE FROM account_activation_tokens WHERE token_hash=$1", [tokenHash]);
@@ -126,6 +130,10 @@ export class PostgresActivationTokenRepository
         [hash],
       );
       if (result.rowCount !== 1) throw invalid();
+      await client.query(
+        "DELETE FROM account_activation_tokens WHERE user_id=$1",
+        [result.rows[0].user_id],
+      );
       const updated = await client.query(
         "UPDATE users SET password_hash=$2,activo=true,session_version=session_version+1 WHERE id=$1 AND rol IN ('admin','cliente','profesional') RETURNING id",
         [result.rows[0].user_id, passwordHash],

@@ -11,7 +11,7 @@ import { ValidationError, ForbiddenError, NotFoundError, ConflictError } from "@
 import { ClientContext } from "./auth.use-cases.js";
 import { PasswordHasher } from "../../infrastructure/database/inMemoryRepositories.js";
 import { AccountActivationUseCases } from "./account-activation.use-cases.js";
-import { isValidAccountPassword, PROFESIONES } from "@reformapro/domain";
+import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword, PROFESIONES } from "@reformapro/domain";
 
 const isProfesion = (value: unknown): value is Profesion =>
   typeof value === "string" && Object.prototype.hasOwnProperty.call(PROFESIONES, value);
@@ -109,10 +109,11 @@ export class UpdateUserUseCase {
     if (Object.keys(cmd.changes).some(key => !allowed.has(key))) throw new ValidationError("Campo de usuario no permitido");
     const { newPassword, ...fields } = cmd.changes;
     if (fields.activo !== undefined && typeof fields.activo !== "boolean") throw new ValidationError("Estado no válido", "activo");
+    if (fields.activo === true && !target.activo) throw new ConflictError("Reactiva la cuenta mediante un enlace de acceso seguro");
     if (fields.nombre !== undefined && (typeof fields.nombre !== "string" || !fields.nombre.trim())) throw new ValidationError("Nombre obligatorio", "nombre");
     if (fields.profesion !== undefined && (target.rol !== "profesional" || !isProfesion(fields.profesion))) throw new ValidationError("Profesión no válida", "profesion");
     if (cmd.actorId === cmd.userId && fields.activo === false) throw new ValidationError("No puedes desactivar tu propia cuenta");
-    if (newPassword !== undefined && !isValidAccountPassword(newPassword)) throw new ValidationError("Usa al menos 12 caracteres, incluyendo letras y números", "newPassword");
+    if (newPassword !== undefined && !isValidAccountPassword(newPassword)) throw new ValidationError(ACCOUNT_PASSWORD_REQUIREMENTS, "newPassword");
     const passwordHash = newPassword === undefined ? undefined : await this.hasher.hash(newPassword);
     const updated = await this.users.update(cmd.userId, fields, passwordHash);
 

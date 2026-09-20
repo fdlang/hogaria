@@ -35,7 +35,7 @@ export function AdminUsers({ api }: Props) {
 
   const [modal, setModal] = useState<ModalState>({ kind: "closed" });
   const [filterRol, setFilterRol] = useState<UserDTO["rol"] | "all">("all");
-  const [filterStatus, setFilterStatus] = useState<"active" | "inactive" | "all">("active");
+  const [filterStatus, setFilterStatus] = useState<"active" | "inactive" | "all">("all");
   const [search, setSearch] = useState("");
   const [sendingInvitationId, setSendingInvitationId] = useState<number | null>(null);
 
@@ -127,7 +127,7 @@ export function AdminUsers({ api }: Props) {
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
           style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", minWidth: 145 }}>
           <option value="active">Activos</option>
-          <option value="inactive">Archivados</option>
+          <option value="inactive">Inactivos</option>
           <option value="all">Todos los estados</option>
         </select>
       </div>
@@ -138,7 +138,7 @@ export function AdminUsers({ api }: Props) {
         rowKey={u => u.id}
         loading={users.loading}
         error={users.error}
-        emptyMessage={search ? `Sin resultados para "${search}"` : filterStatus === "inactive" ? "No hay usuarios archivados" : "No hay usuarios activos"}
+        emptyMessage={search ? `Sin resultados para "${search}"` : filterStatus === "inactive" ? "No hay usuarios inactivos" : filterStatus === "active" ? "No hay usuarios activos" : "No hay usuarios"}
         actions={u => (
           <div style={{ display: "flex", gap: 6 }}>
             {can("user.manage") && <Button small variant="ghost" onClick={() => setModal({ kind: "edit", user: u })}>Editar</Button>}
@@ -231,11 +231,6 @@ function UserFormView({ api, initialUser, onSaved, onCancel }: {
             value={form.state.newPassword ?? ""} error={form.errors.newPassword}
             onChange={e => form.setField("newPassword", e.target.value)} />
 
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#71685e", marginBottom: 12 }}>
-            <input type="checkbox" checked={form.state.activo}
-              onChange={e => form.setField("activo", e.target.checked)} />
-            Usuario activo
-          </label>
         </>
       )}
 

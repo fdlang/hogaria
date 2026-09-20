@@ -368,6 +368,23 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
       "caducado",
     );
   });
+  it("consumes every activation link belonging to the account", async () => {
+    const tokens = new PostgresActivationTokenRepository(pool);
+    await tokens.stage({ userId: clientId, tokenHash: "primary", expiresAt: new Date(Date.now() + 60000), usedAt: null });
+    await tokens.stage({ userId: clientId, tokenHash: "sibling", expiresAt: new Date(Date.now() + 60000), usedAt: null });
+    await tokens.complete("primary", "new-password");
+    expect(await tokens.findValid("sibling", new Date())).toBeNull();
+    await expect(tokens.complete("sibling", "other-password")).rejects.toThrow();
+  });
+  it("does not let a stale concurrent promotion delete the winning link", async () => {
+    const tokens = new PostgresActivationTokenRepository(pool);
+    await tokens.stage({ userId: clientId, tokenHash: "first-promotion", expiresAt: new Date(Date.now() + 60000), usedAt: null });
+    await tokens.stage({ userId: clientId, tokenHash: "second-promotion", expiresAt: new Date(Date.now() + 60000), usedAt: null });
+    await tokens.promote(clientId, "second-promotion");
+    await tokens.promote(clientId, "first-promotion");
+    expect(await tokens.findValid("first-promotion", new Date())).toBeNull();
+    expect(await tokens.findValid("second-promotion", new Date())).not.toBeNull();
+  });
   it("preserves project domain values across SQL and HTTP serialization", async () => {
     const project = await projects.save({
       id: 0,

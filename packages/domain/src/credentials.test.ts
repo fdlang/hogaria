@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isValidAccountPassword } from "./credentials";
+import { isValidAccountPassword } from "./credentials.js";
 
 describe("isValidAccountPassword", () => {
   it.each(["short1", "abcdefghijkl", "123456789012"])("rejects %s", value => {

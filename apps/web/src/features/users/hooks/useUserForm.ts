@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { UsersApi, UserDTO, CreateUserPayload } from "../api/users.api";
-import { Profesion } from "@reformapro/domain";
+import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword, Profesion } from "@reformapro/domain";
 
 export interface UserFormState {
   email: string;
@@ -13,13 +13,12 @@ export interface UserFormState {
   rol: UserDTO["rol"];
   profesion: Profesion | null;
   telefono: string;
-  activo: boolean;
   newPassword?: string;
 }
 
 const EMPTY: UserFormState = {
   email: "", nombre: "", rol: "cliente",
-  profesion: null, telefono: "", activo: true, newPassword: "",
+  profesion: null, telefono: "", newPassword: "",
 };
 
 export type UserFormErrors = Partial<Record<keyof UserFormState, string>>;
@@ -35,7 +34,6 @@ export function useUserForm(api: UsersApi, initial: UserDTO | null = null) {
       email: initial.email, nombre: initial.nombre, rol: initial.rol,
       profesion: (initial.profesion ?? null) as Profesion | null,
       telefono:  initial.telefono ?? "",
-      activo:    initial.activo,
       newPassword: "",
     });
   }, [initial]);
@@ -51,7 +49,7 @@ export function useUserForm(api: UsersApi, initial: UserDTO | null = null) {
     if (!state.email.trim())  e.email  = "Obligatorio";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email)) e.email = "Email inválido";
     if (state.rol === "profesional" && !state.profesion) e.profesion = "Selecciona profesión";
-    if (state.newPassword && (state.newPassword.length < 12 || new TextEncoder().encode(state.newPassword).length > 72 || !/[a-z]/i.test(state.newPassword) || !/\d/.test(state.newPassword))) e.newPassword = "Usa al menos 12 caracteres, incluyendo letras y números (máximo 72 bytes)";
+    if (state.newPassword && !isValidAccountPassword(state.newPassword)) e.newPassword = ACCOUNT_PASSWORD_REQUIREMENTS;
     return e;
   }, [state]);
 
@@ -65,7 +63,6 @@ export function useUserForm(api: UsersApi, initial: UserDTO | null = null) {
           nombre: state.nombre,
           telefono: state.telefono,
           profesion: state.profesion ?? undefined,
-          activo: state.activo,
           newPassword: state.newPassword || undefined,
         });
       }

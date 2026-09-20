@@ -97,8 +97,25 @@ describe("AccountActivationUseCases", () => {
     configureActivationPasswordHasher(hasher.hash);
     const useCases = new AccountActivationUseCases(users, tokens, email, "https://hogaria.test");
 
-    await expect(useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("promotion unavailable");
+    await expect(useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" })).resolves.toMatchObject({ email: client.email.value });
     const deliveredToken = new URLSearchParams(deliveredUrl.split("?")[1]).get("token")!;
     await expect(useCases.activate(deliveredToken, "ClaveSegura2026")).resolves.toBeUndefined();
+  });
+
+  it("keeps the winner of two interleaved promotions and consumes every sibling link", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const client = await users.save({ id: 0, email: Email.of("concurrent@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: false, createdAt: new Date() }, "");
+    const tokens = new InMemoryActivationTokenRepository(users);
+    await tokens.stage({ userId: client.id, tokenHash: "first", expiresAt: new Date(Date.now() + 60_000), usedAt: null });
+    await tokens.stage({ userId: client.id, tokenHash: "second", expiresAt: new Date(Date.now() + 60_000), usedAt: null });
+
+    await tokens.promote(client.id, "second");
+    await tokens.promote(client.id, "first");
+    expect(await tokens.findValid("first", new Date())).toBeNull();
+    expect(await tokens.findValid("second", new Date())).not.toBeNull();
+
+    await tokens.stage({ userId: client.id, tokenHash: "sibling", expiresAt: new Date(Date.now() + 60_000), usedAt: null });
+    await tokens.complete("second", "hash:new");
+    expect(await tokens.findValid("sibling", new Date())).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import type { IUserRepository } from "@reformapro/domain/repositories";
 import { ConflictError, ForbiddenError, ValidationError } from "@reformapro/domain/errors";
 import type { ClientContext } from "./auth.use-cases.js";
-import { isValidAccountPassword } from "@reformapro/domain";
+import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword } from "@reformapro/domain";
 
 export interface ActivationToken { userId: number; tokenHash: string; expiresAt: Date; usedAt: Date | null; }
 export interface IActivationTokenRepository {
@@ -50,14 +50,14 @@ export class AccountActivationUseCases {
       await this.tokens.discard(hash).catch(() => undefined);
       throw error;
     }
-    // Once the email has been delivered, never discard its token. If promotion
-    // fails, the staged link remains valid and a retry can reconcile the set.
-    await this.tokens.promote(user.id, hash);
+    // Once the email has been delivered, never fail the request or discard its
+    // token. A staged token is already valid; promotion only retires older links.
+    await this.tokens.promote(user.id, hash).catch(() => undefined);
     return { expiresAt, email: user.email.value, requestedBy: context.ip };
   }
   async activate(token: string, password: string) {
     if (typeof token !== "string" || token.length < 40 || token.length > 200) throw new ValidationError("Enlace de activación no válido", "token");
-    if (!isValidAccountPassword(password)) throw new ValidationError("Usa al menos 12 caracteres, incluyendo letras y números", "password");
+    if (!isValidAccountPassword(password)) throw new ValidationError(ACCOUNT_PASSWORD_REQUIREMENTS, "password");
     const hash = await tokenHash(token); const record = await this.tokens.findValid(hash, new Date());
     if (!record) throw new ConflictError("El enlace ha caducado, ya se utilizó o no es válido");
     const user = await this.users.findById(record.userId); if (!user) throw new ConflictError("La invitación ya no está disponible");
