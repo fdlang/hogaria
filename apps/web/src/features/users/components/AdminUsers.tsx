@@ -37,6 +37,7 @@ export function AdminUsers({ api }: Props) {
   const [filterRol, setFilterRol] = useState<UserDTO["rol"] | "all">("all");
   const [filterStatus, setFilterStatus] = useState<"active" | "inactive" | "all">("active");
   const [search, setSearch] = useState("");
+  const [sendingInvitationId, setSendingInvitationId] = useState<number | null>(null);
 
   const filtered = useMemo(() => {
     return (users.data ?? []).filter(u => {
@@ -64,6 +65,18 @@ export function AdminUsers({ api }: Props) {
       push("Usuario archivado. Puedes recuperarlo desde el filtro Archivados.", "success");
       users.refresh();
     } catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
+  };
+
+  const resendInvitation = async (user: UserDTO) => {
+    try {
+      setSendingInvitationId(user.id);
+      await api.resendInvitation(user.id);
+      push(`Enlace de acceso enviado a ${user.email}`, "success");
+    } catch (error) {
+      push((error as { message?: string }).message ?? "No se pudo enviar el acceso", "error");
+    } finally {
+      setSendingInvitationId(null);
+    }
   };
 
   const columns: ColumnDef<UserDTO>[] = [
@@ -129,6 +142,11 @@ export function AdminUsers({ api }: Props) {
         actions={u => (
           <div style={{ display: "flex", gap: 6 }}>
             {can("user.manage") && <Button small variant="ghost" onClick={() => setModal({ kind: "edit", user: u })}>Editar</Button>}
+            {can("user.manage") && !u.activo && (
+              <Button small variant="ghost" onClick={() => void resendInvitation(u)} disabled={sendingInvitationId === u.id}>
+                {sendingInvitationId === u.id ? "Enviando…" : "Enviar acceso"}
+              </Button>
+            )}
             {can("user.manage") && u.activo && <Button small variant="danger" onClick={() => handleDelete(u)}>✕</Button>}
           </div>
         )}

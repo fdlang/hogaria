@@ -46,11 +46,13 @@ export class AccountActivationUseCases {
     const activationUrl = `${this.appUrl.replace(/\/$/, "")}/#/activar-cuenta?token=${encodeURIComponent(token)}`;
     try {
       await this.email.sendActivation({ to: user.email.value, name: user.nombre, activationUrl, expiresAt });
-      await this.tokens.promote(user.id, hash);
     } catch (error) {
       await this.tokens.discard(hash).catch(() => undefined);
       throw error;
     }
+    // Once the email has been delivered, never discard its token. If promotion
+    // fails, the staged link remains valid and a retry can reconcile the set.
+    await this.tokens.promote(user.id, hash);
     return { expiresAt, email: user.email.value, requestedBy: context.ip };
   }
   async activate(token: string, password: string) {

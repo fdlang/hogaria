@@ -75,4 +75,30 @@ describe("AccountActivationUseCases", () => {
     const firstToken = new URLSearchParams(firstUrl.split("?")[1]).get("token")!;
     await expect(useCases.activate(firstToken, "ClaveSegura2026")).resolves.toBeUndefined();
   });
+
+  it("keeps a delivered activation link valid when token promotion fails", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("admin4@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
+    const client = await users.save({ id: 0, email: Email.of("promotion@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: false, createdAt: new Date() }, "");
+    const innerTokens = new InMemoryActivationTokenRepository(users);
+    let deliveredUrl = "";
+    const tokens = {
+      replace: innerTokens.replace.bind(innerTokens),
+      stage: innerTokens.stage.bind(innerTokens),
+      promote: async () => { throw new Error("promotion unavailable"); },
+      discard: innerTokens.discard.bind(innerTokens),
+      findValid: innerTokens.findValid.bind(innerTokens),
+      complete: innerTokens.complete.bind(innerTokens),
+    };
+    const email = {
+      isConfigured: () => true,
+      sendActivation: async (input: { activationUrl: string }) => { deliveredUrl = input.activationUrl; },
+    };
+    configureActivationPasswordHasher(hasher.hash);
+    const useCases = new AccountActivationUseCases(users, tokens, email, "https://hogaria.test");
+
+    await expect(useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("promotion unavailable");
+    const deliveredToken = new URLSearchParams(deliveredUrl.split("?")[1]).get("token")!;
+    await expect(useCases.activate(deliveredToken, "ClaveSegura2026")).resolves.toBeUndefined();
+  });
 });
