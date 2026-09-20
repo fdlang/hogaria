@@ -461,7 +461,7 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .private-action-card__actions { flex-wrap: wrap; }
   .professional-card__main { align-items: flex-start !important; }
   .professional-card__heading { align-items: flex-start !important; flex-wrap: wrap; }
-  .professional-card__meta, .audit-entry-details { overflow-wrap: anywhere; }
+  .professional-card__meta { overflow-wrap: anywhere; }
   .solicitud-meta-row { align-items: flex-start !important; flex-direction: column; gap: 4px; }
   .project-documents-header { align-items: flex-start !important; }
   .file-upload-controls { width: 100%; flex-wrap: wrap; }

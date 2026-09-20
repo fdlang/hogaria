@@ -14,7 +14,7 @@ import type { IUserRepository } from "@reformapro/domain/repositories";
 import { ClientContext } from "./auth.use-cases.js";
 import { isValidSpanishPhone } from "@reformapro/domain";
 
-export type SolicitudStatus = "pendiente" | "contactado" | "rechazado";
+type SolicitudStatus = "pendiente" | "contactado" | "rechazado";
 export interface Solicitud {
   id: number; nombre: string; email: string; telefono: string; tipo: string;
   descripcion: string; fecha: Date; estado: SolicitudStatus; ip: string; motivo: string | null;

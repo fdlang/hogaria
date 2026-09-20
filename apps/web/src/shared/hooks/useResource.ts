@@ -67,7 +67,6 @@ export interface MutationState {
 }
 export interface MutationHandle<Args extends unknown[], R> extends MutationState {
   mutate: (...args: Args) => Promise<R>;
-  reset:  () => void;
 }
 
 export function useMutation<Args extends unknown[], R>(
@@ -91,8 +90,7 @@ export function useMutation<Args extends unknown[], R>(
     }
   }, [fn]);
 
-  const reset = useCallback(() => setState({ loading: false, error: null }), []);
-  return useMemo(() => ({ ...state, mutate, reset }), [state, mutate, reset]);
+  return useMemo(() => ({ ...state, mutate }), [state, mutate]);
 }
 
 // ─────────────────────────────────────────────────────────────

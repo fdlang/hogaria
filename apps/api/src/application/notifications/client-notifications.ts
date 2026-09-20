@@ -6,7 +6,7 @@ import type {
 } from "@reformapro/domain/repositories";
 import type { IFileRepository } from "../use-cases/file.use-cases.js";
 
-export type NoticeKind = "estimate" | "document" | "project" | "project-update";
+type NoticeKind = "estimate" | "document" | "project" | "project-update";
 export type Notice = {
   id: string;
   clientId: number;

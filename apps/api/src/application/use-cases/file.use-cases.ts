@@ -44,8 +44,8 @@ export interface IFileStorage {
 }
 
 // Server uploads on Vercel stay below the platform request-body limit.
-export const MAX_FILE_BYTES = 3 * 1024 * 1024;
-export const ALLOWED_MIMES = new Set([
+const MAX_FILE_BYTES = 3 * 1024 * 1024;
+const ALLOWED_MIMES = new Set([
   "image/jpeg", "image/png", "image/webp", "image/gif",
   "application/pdf",
 ]);
