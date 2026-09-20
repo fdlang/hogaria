@@ -63,7 +63,7 @@ export class CreateUserUseCase {
       id: 0, // repository assigns
       email, nombre: cmd.nombre.trim(), rol: cmd.rol,
       // Every account sets its own password through a one-time link.
-      activo: false, createdAt: new Date(),
+      activo: false, accountStatus: "pending_activation", createdAt: new Date(),
       ...(cmd.profesion !== undefined ? { profesion: cmd.profesion } : {}),
       ...(cmd.telefono  !== undefined ? { telefono:  cmd.telefono  } : {}),
     };
@@ -144,7 +144,7 @@ export class DeleteUserUseCase {
     if (!target) throw new NotFoundError("Usuario");
 
     // Soft-delete by deactivating (keeps referential integrity for historical budgets/audit)
-    await this.users.update(cmd.userId, { activo: false });
+    await this.users.update(cmd.userId, { activo: false, accountStatus: "archived" });
     await this.events.emit({
       type: "UserDeactivated", eventId: crypto.randomUUID(), occurredAt: new Date(),
       actorId: actor.id, actorName: actor.nombre,

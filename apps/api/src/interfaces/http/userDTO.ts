@@ -10,6 +10,7 @@ export function toUserDTO(user: User) {
     profesion: user.profesion ?? null,
     telefono: user.telefono ?? null,
     activo: user.activo,
+    accountStatus: user.accountStatus ?? (user.activo ? "active" : "pending_activation"),
     createdAt: user.createdAt.toISOString(),
   };
 }

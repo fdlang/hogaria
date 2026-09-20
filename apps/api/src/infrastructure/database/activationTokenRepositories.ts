@@ -15,6 +15,7 @@ export class InMemoryActivationTokenRepository
   constructor(
     private readonly users: Pick<InMemoryUserRepository, "activateAccount" | "activationRevision">,
   ) {}
+  async hasIssued(userId: number) { return this.items.some(token => token.userId === userId); }
   async replace(token: ActivationToken) {
     for (const old of this.items) if (old.userId === token.userId) this.revisions.delete(old.tokenHash);
     this.items = this.items.filter((t) => t.userId !== token.userId);
@@ -57,6 +58,7 @@ export class PostgresActivationTokenRepository
   implements IActivationTokenRepository
 {
   constructor(private readonly pool: pg.Pool) {}
+  async hasIssued(userId: number) { return (await this.pool.query("SELECT 1 FROM account_activation_tokens WHERE user_id=$1 LIMIT 1", [userId])).rowCount === 1; }
   private async transaction<T>(fn: (client: pg.PoolClient) => Promise<T>) {
     const client = await this.pool.connect();
     try {
@@ -135,7 +137,7 @@ export class PostgresActivationTokenRepository
         [result.rows[0].user_id],
       );
       const updated = await client.query(
-        "UPDATE users SET password_hash=$2,activo=true,session_version=session_version+1 WHERE id=$1 AND rol IN ('admin','cliente','profesional') RETURNING id",
+        "UPDATE users SET password_hash=$2,activo=true,account_status='active',session_version=session_version+1 WHERE id=$1 AND rol IN ('admin','cliente','profesional') RETURNING id",
         [result.rows[0].user_id, passwordHash],
       );
       if (updated.rowCount !== 1) throw invalid();

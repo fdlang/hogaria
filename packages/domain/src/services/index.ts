@@ -5,10 +5,10 @@ export type { Profesion } from "../entities/index.js";
 export type Action = "project.update" | "project.read" | "project.update.progress" | "project.update.milestones" | "user.manage";
 
 export class PermissionPolicy {
-  static readonly PROFESSIONAL_ACCESS: Record<Profesion, { subirImagen: boolean }> = {
-    albanil: { subirImagen: true }, electricista: { subirImagen: true },
-    fontanero: { subirImagen: true }, pintor: { subirImagen: true },
-    carpintero: { subirImagen: true }, reformista: { subirImagen: true },
+  static readonly PROFESSIONAL_ACCESS: Record<Profesion, { uploadTechnicalDocuments: boolean }> = {
+    albanil: { uploadTechnicalDocuments: true }, electricista: { uploadTechnicalDocuments: true },
+    fontanero: { uploadTechnicalDocuments: true }, pintor: { uploadTechnicalDocuments: true },
+    carpintero: { uploadTechnicalDocuments: true }, reformista: { uploadTechnicalDocuments: true },
   };
 
   static can(user: User, action: Action, context: { project?: Project } = {}) {

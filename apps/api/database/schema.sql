@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   profesion TEXT,
   telefono TEXT,
   activo BOOLEAN NOT NULL DEFAULT TRUE,
+  account_status TEXT NOT NULL DEFAULT 'active' CHECK (account_status IN ('pending_activation','active','archived')),
   session_version INTEGER NOT NULL DEFAULT 0,
   password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -88,6 +89,14 @@ CREATE TABLE IF NOT EXISTS project_files (
   uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS project_files_project_id_idx ON project_files(project_id);
+
+CREATE TABLE IF NOT EXISTS professional_documents (
+  id BIGSERIAL PRIMARY KEY,
+  professional_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  payload JSONB NOT NULL,
+  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS professional_documents_professional_idx ON professional_documents(professional_id, uploaded_at DESC);
 
 CREATE TABLE IF NOT EXISTS catalog_items (
   id BIGSERIAL PRIMARY KEY,

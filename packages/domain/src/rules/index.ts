@@ -40,16 +40,28 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/file.use-cases.ts"], tests: ["apps/api/src/application/use-cases/audit-regressions.test.ts", "apps/api/src/application/use-cases/security-regressions.test.ts"],
   },
   {
-    id: "HOG-SEC-003", description: "Las invitaciones de acceso son de un solo uso, caducan y nunca transportan contraseñas.", origin: "security", owner: "seguridad",
+    id: "HOG-SEC-003", description: "El alta envía una única invitación automática, de un solo uso y sin transportar contraseñas.", origin: "security", owner: "seguridad",
     assumption: "El correo es el canal de incorporación verificado para clientes y profesionales.", validScale: "Altas ocasionales; requiere cola duradera al crecer el volumen de invitaciones.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
-    metrics: [metric("activation_expiry_rate", "Invitaciones caducadas sin activación", "database"), metric("activation_resend_rate", "Reenvíos por cuenta")],
+    metrics: [metric("activation_expiry_rate", "Invitaciones caducadas sin activación", "database"), metric("duplicate_identity_attempt_rate", "Altas duplicadas bloqueadas")],
     implementation: ["apps/api/src/application/use-cases/account-activation.use-cases.ts", "apps/api/src/infrastructure/database/activationTokenRepositories.ts"], tests: ["apps/api/src/application/use-cases/account-activation.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
+  },
+  {
+    id: "HOG-SEC-005", description: "La documentación laboral del profesional es privada y solo la administra el rol de administración.", origin: "security", owner: "seguridad",
+    assumption: "La documentación laboral no forma parte de la documentación técnica compartida de una obra.", validScale: "Una empresa con profesionales internos y autónomos; revisar al incorporar RR. HH. externo.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
+    metrics: [metric("professional_document_access_denial_rate", "Accesos no administrativos bloqueados", "audit_log"), metric("professional_document_delete_rate", "Documentos laborales eliminados", "database")],
+    implementation: ["apps/api/src/application/use-cases/professional-document.use-cases.ts"], tests: ["apps/api/src/application/use-cases/professional-document.use-cases.test.ts"],
   },
   {
     id: "HOG-USR-001", description: "Siempre debe permanecer al menos un administrador activo.", origin: "security", owner: "direccion",
     assumption: "La continuidad operativa depende de administradores internos sin autoservicio de recuperación privilegiada.", validScale: "Una empresa con uno o varios administradores.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("last_admin_block_count", "Intentos bloqueados de desactivar al último administrador", "audit_log"), metric("active_admin_count", "Administradores activos", "database")],
     implementation: ["apps/api/src/application/use-cases/user.use-cases.ts", "apps/api/src/infrastructure/database/postgresRepositories.ts"], tests: ["apps/api/src/application/use-cases/security-regressions.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
+  },
+  {
+    id: "HOG-USR-002", description: "Cada email identifica una sola cuenta y su ciclo distingue activación pendiente, cuenta activa y archivo.", origin: "security", owner: "administracion",
+    assumption: "El email normalizado es el identificador operativo único de cada persona.", validScale: "Una empresa con miles de identidades; revisar si se incorporan varias organizaciones o identidades federadas.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
+    metrics: [metric("duplicate_identity_attempt_rate", "Altas duplicadas bloqueadas", "database"), metric("pending_activation_count", "Cuentas pendientes de activar", "database")],
+    implementation: ["apps/api/src/application/use-cases/user.use-cases.ts", "apps/api/database/professional-users.sql"], tests: ["apps/api/src/application/use-cases/account-activation.use-cases.test.ts"],
   },
   {
     id: "HOG-COM-001", description: "Una solicitud se convierte de forma idempotente en una única oportunidad.", origin: "business", owner: "comercial",

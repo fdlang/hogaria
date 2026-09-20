@@ -6,10 +6,10 @@ import type { IFileStorage } from "../../application/use-cases/file.use-cases.js
 export class VercelBlobFileStorage implements IFileStorage {
   constructor(private readonly token = process.env.BLOB_READ_WRITE_TOKEN) {}
 
-  async put(input: { projectId: number; filename: string; contentType: string; bytes: Uint8Array }): Promise<{ key: string }> {
+  async put(input: { scope: "projects" | "professionals"; ownerId: number; filename: string; contentType: string; bytes: Uint8Array }): Promise<{ key: string }> {
     if (!this.token) throw new ValidationError("El almacenamiento de documentos no está configurado");
     const filename = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const pathname = `projects/${input.projectId}/${crypto.randomUUID()}-${filename}`;
+    const pathname = `${input.scope}/${input.ownerId}/${crypto.randomUUID()}-${filename}`;
     const result = await put(pathname, Buffer.from(input.bytes), {
       access: "private",
       addRandomSuffix: false,

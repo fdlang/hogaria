@@ -5,6 +5,7 @@ import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword } from "@reformap
 
 export interface ActivationToken { userId: number; tokenHash: string; expiresAt: Date; usedAt: Date | null; }
 export interface IActivationTokenRepository {
+  hasIssued(userId: number): Promise<boolean>;
   replace(token: ActivationToken): Promise<void>;
   stage(token: ActivationToken): Promise<void>;
   promote(userId: number, tokenHash: string): Promise<void>;
@@ -37,10 +38,8 @@ export class AccountActivationUseCases {
     this.ensureConfigured(); const actor = await this.users.findById(actorId); if (!actor || actor.rol !== "admin") throw new ForbiddenError();
     const user = await this.users.findById(userId);
     if (!user) throw new ValidationError("La cuenta no existe", "userId");
-    // Clients cannot receive a second activation once active. For professionals,
-    // an admin may re-send the secure access link to recover accounts created
-    // before the invitation flow existed.
-    if (user.activo && user.rol !== "profesional") throw new ConflictError("La cuenta ya está activada");
+    if (user.activo) throw new ConflictError("La cuenta ya está activada");
+    if (await this.tokens.hasIssued(user.id)) throw new ConflictError("La invitación de acceso ya fue enviada al crear la cuenta");
     const token = newToken(); const expiresAt = new Date(Date.now() + this.ttlMs); const hash = await tokenHash(token);
     await this.tokens.stage({ userId: user.id, tokenHash: hash, expiresAt, usedAt: null });
     const activationUrl = `${this.appUrl.replace(/\/$/, "")}/#/activar-cuenta?token=${encodeURIComponent(token)}`;

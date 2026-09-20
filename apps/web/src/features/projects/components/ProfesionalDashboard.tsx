@@ -65,7 +65,7 @@ export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {Object.entries(perms).map(([k, v]) => (
               <code key={k} style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, background: v ? "#247a5518" : "#b5483f18", color: v ? "#247a55" : "#b5483f" }}>
-                {v ? "✓" : "✗"} {k.replace(/([A-Z])/g, " $1").toLowerCase()}
+                {v ? "Permitido:" : "No permitido:"} {k === "uploadTechnicalDocuments" ? "subir documentación técnica a proyectos asignados" : k}
               </code>
             ))}
           </div>

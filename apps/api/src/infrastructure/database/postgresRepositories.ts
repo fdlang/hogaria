@@ -5,6 +5,7 @@ import { IAuditRepository, ICatalogRepository, IChangeOrderRepository, IEstimate
 import { NotFoundError, ConflictError } from "@reformapro/domain/errors";
 import type { PasswordHasher } from "./inMemoryRepositories.js";
 import type { ProjectFile, IFileRepository } from "../../application/use-cases/file.use-cases.js";
+import type { IProfessionalDocumentRepository, ProfessionalDocument } from "../../application/use-cases/professional-document.use-cases.js";
 import type { ISolicitudRepository } from "../../application/use-cases/solicitud.use-cases.js";
 import { calculateEstimateTotals } from "@reformapro/domain";
 
@@ -15,12 +16,12 @@ const restoreProject = (id: number, p: any): Project => ({ ...p, id, progreso: P
 
 export class PostgresUserRepository implements IUserRepository {
   constructor(private readonly pool: pg.Pool | pg.PoolClient, private readonly hasher: PasswordHasher) {}
-  private map(r: Row): User { return { id: Number(r.id), email: Email.of(r.email), nombre: r.nombre, rol: r.rol as UserRole, activo: r.activo, sessionVersion: Number(r.session_version ?? 0), createdAt: date(r.created_at), ...(r.profesion ? { profesion: r.profesion } : {}), ...(r.telefono ? { telefono: r.telefono } : {}) }; }
+  private map(r: Row): User { return { id: Number(r.id), email: Email.of(r.email), nombre: r.nombre, rol: r.rol as UserRole, activo: r.activo, accountStatus: r.account_status ?? (r.activo ? "active" : "pending_activation"), sessionVersion: Number(r.session_version ?? 0), createdAt: date(r.created_at), ...(r.profesion ? { profesion: r.profesion } : {}), ...(r.telefono ? { telefono: r.telefono } : {}) }; }
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM users WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async findByEmail(email: string) { const r = await this.pool.query("SELECT * FROM users WHERE lower(email)=lower($1)", [email]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async findAll() { return (await this.pool.query("SELECT * FROM users ORDER BY id")).rows.map(r => this.map(r)); }
   async findByRole(role: UserRole) { return (await this.pool.query("SELECT * FROM users WHERE rol=$1 ORDER BY id", [role])).rows.map(r => this.map(r)); }
-  async save(user: User, passwordHash = "") { const r = await this.pool.query("INSERT INTO users(email,nombre,rol,profesion,telefono,activo,password_hash,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *", [user.email.value,user.nombre,user.rol,user.profesion ?? null,user.telefono ?? null,user.activo,passwordHash,user.createdAt]); return this.map(r.rows[0]); }
+  async save(user: User, passwordHash = "") { try { const r = await this.pool.query("INSERT INTO users(email,nombre,rol,profesion,telefono,activo,account_status,password_hash,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *", [user.email.value,user.nombre,user.rol,user.profesion ?? null,user.telefono ?? null,user.activo,user.accountStatus ?? (user.activo ? "active" : "pending_activation"),passwordHash,user.createdAt]); return this.map(r.rows[0]); } catch (error) { if ((error as { code?: string }).code === "23505") throw new ConflictError("Ya existe un usuario con ese email"); throw error; } }
   async update(id: number, changes: Partial<Omit<User,"id"|"createdAt">>, passwordHash?: string) {
     const ownsConnection = !("release" in this.pool);
     const client = ownsConnection ? await (this.pool as pg.Pool).connect() : this.pool as pg.PoolClient;
@@ -32,12 +33,14 @@ export class PostgresUserRepository implements IUserRepository {
       if (!found.rows[0]) throw new NotFoundError("Usuario");
       const current = this.map(found.rows[0]);
       const next = { ...current, ...changes };
+      if (changes.accountStatus) next.activo = changes.accountStatus === "active";
+      else if (changes.activo !== undefined) next.accountStatus = changes.activo ? "active" : "archived";
       if (current.rol === "admin" && current.activo && (!next.activo || next.rol !== "admin")) {
         const other = await client.query("SELECT id FROM users WHERE rol='admin' AND activo=true AND id<>$1 LIMIT 1", [id]);
         if (!other.rows.length) throw new ConflictError("Debe quedar un administrador activo");
       }
       const revokeSessions = changes.activo === false || passwordHash !== undefined || changes.rol !== undefined;
-      const result = await client.query("UPDATE users SET nombre=$2,rol=$3,profesion=$4,telefono=$5,activo=$6,password_hash=COALESCE($7,password_hash),session_version=session_version+$8 WHERE id=$1 RETURNING *", [id,next.nombre,next.rol,next.profesion ?? null,next.telefono ?? null,next.activo,passwordHash ?? null,revokeSessions ? 1 : 0]);
+      const result = await client.query("UPDATE users SET nombre=$2,rol=$3,profesion=$4,telefono=$5,activo=$6,account_status=$7,password_hash=COALESCE($8,password_hash),session_version=session_version+$9 WHERE id=$1 RETURNING *", [id,next.nombre,next.rol,next.profesion ?? null,next.telefono ?? null,next.activo,next.accountStatus ?? (next.activo ? "active" : "archived"),passwordHash ?? null,revokeSessions ? 1 : 0]);
       if (changes.activo === false || passwordHash !== undefined || changes.rol !== undefined) await client.query("DELETE FROM account_activation_tokens WHERE user_id=$1", [id]);
       if (ownsConnection) await client.query("COMMIT");
       return this.map(result.rows[0]);
@@ -208,3 +211,21 @@ export class PostgresSolicitudRepository implements ISolicitudRepository {
   async update(id: number, changes: { estado: "contactado" | "rechazado"; motivo: string | null }) { const r = await this.pool.query("UPDATE solicitudes SET estado=$2,motivo=$3 WHERE id=$1 AND estado='pendiente' RETURNING *", [id, changes.estado, changes.motivo]); if (!r.rows[0]) throw new ConflictError("La solicitud ya no está pendiente"); return this.map(r.rows[0]); }
 }
 export class PostgresFileRepository implements IFileRepository { constructor(private readonly pool: pg.Pool) {} async save(file: Omit<ProjectFile,"id">) { const r=await this.pool.query("INSERT INTO project_files(project_id,payload,uploaded_at) VALUES($1,$2,$3) RETURNING id",[file.projectId,{...file,uploadedAt:file.uploadedAt.toISOString()},file.uploadedAt]); return { ...file, id:Number(r.rows[0].id) }; } async findById(id:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE id=$1",[id]); return r.rows[0] ? { ...r.rows[0].payload, id:Number(r.rows[0].id), uploadedAt:date(r.rows[0].payload.uploadedAt) } as ProjectFile : null; } async findByProject(projectId:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE project_id=$1 ORDER BY id",[projectId]); return r.rows.map(row=>({ ...row.payload,id:Number(row.id),uploadedAt:date(row.payload.uploadedAt) } as ProjectFile)); } async markDeleting(id:number) { const r=await this.pool.query("UPDATE project_files SET payload=jsonb_set(payload,'{deleting}','true'::jsonb,true) WHERE id=$1",[id]); if(r.rowCount!==1) throw new NotFoundError("Archivo"); } async delete(id:number) { await this.pool.query("DELETE FROM project_files WHERE id=$1",[id]); } }
+
+export class PostgresProfessionalDocumentRepository implements IProfessionalDocumentRepository {
+  constructor(private readonly pool: pg.Pool) {}
+  async save(document: Omit<ProfessionalDocument, "id">) {
+    const result = await this.pool.query("INSERT INTO professional_documents(professional_id,payload,uploaded_at) VALUES($1,$2,$3) RETURNING id", [document.professionalId, { ...document, uploadedAt: document.uploadedAt.toISOString() }, document.uploadedAt]);
+    return { ...document, id: Number(result.rows[0].id) };
+  }
+  async findById(id: number) {
+    const result = await this.pool.query("SELECT id,payload FROM professional_documents WHERE id=$1", [id]);
+    return result.rows[0] ? { ...result.rows[0].payload, id: Number(result.rows[0].id), uploadedAt: date(result.rows[0].payload.uploadedAt) } as ProfessionalDocument : null;
+  }
+  async findByProfessional(professionalId: number) {
+    const result = await this.pool.query("SELECT id,payload FROM professional_documents WHERE professional_id=$1 ORDER BY uploaded_at DESC,id DESC", [professionalId]);
+    return result.rows.map(row => ({ ...row.payload, id: Number(row.id), uploadedAt: date(row.payload.uploadedAt) } as ProfessionalDocument));
+  }
+  async markDeleting(id: number) { const result = await this.pool.query("UPDATE professional_documents SET payload=jsonb_set(payload,'{deleting}','true'::jsonb,true) WHERE id=$1", [id]); if (result.rowCount !== 1) throw new NotFoundError("Documento"); }
+  async delete(id: number) { await this.pool.query("DELETE FROM professional_documents WHERE id=$1", [id]); }
+}

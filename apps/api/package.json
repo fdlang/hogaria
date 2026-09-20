@@ -11,6 +11,7 @@
     "notifications:queue": "node --env-file=.env ./scripts/notification-queue.mjs",
     "db:migrate-client-notifications": "node --env-file=.env ./scripts/migrate-client-notifications.mjs",
     "db:reset-operational": "node --env-file=.env ./scripts/reset-operational.mjs",
+    "db:reset-all": "node --env-file=.env ./scripts/reset-all.mjs",
     "db:migrate-sales-signature": "node --env-file=.env ./scripts/migrate-sales-signature.mjs",
     "db:migrate-estimate-rejection": "node --env-file=.env ./scripts/migrate-estimate-rejection.mjs",
     "db:migrate-account-activation": "node --env-file=.env ./scripts/migrate-account-activation.mjs",

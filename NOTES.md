@@ -1,15 +1,13 @@
-- Estado: auditoría funcional y revisión final completadas.
-- Corregido: alta de todos los roles mediante activación de un solo uso.
-- Corregido: reenvíos concurrentes, fallo posterior a entrega y revocación de enlaces hermanos.
-- Corregido: validación de profesiones, contactos, contraseñas y formularios obligatorios.
-- Corregido: política única de céntimos para importes, líneas e IVA.
-- Corregido: cargas asíncronas antiguas, doble envío y mutaciones concurrentes de UI.
-- Corregido: actualizaciones parciales de oportunidades, catálogo y solicitudes.
-- Corregido: borrado documental oculto y reintentable ante fallos parciales.
-- Corregido: rutas privadas desconocidas, barra final y estados de usuario inactivo.
-- Corregido: modales de propuestas, formulario de catálogo y creación de oportunidades.
-- Documentación: README y despliegue alineados con migraciones, invitaciones y notificaciones.
-- Validación: API 163, web 47 y dominio 7 pruebas; typecheck y build correctos.
-- Navegador: 78 escenarios correctos en Chromium y WebKit.
-- Pendiente no bloqueante: logout sigue siendo revocación local hasta que expire la sesión.
-- Decisión: presupuestos descargables; las notificaciones no adjuntan documentos.
+- Estado: ciclo de usuarios y zona de profesionales corregidos y validados.
+- Alta: invitación automática única; eliminado el reenvío manual.
+- Identidad: email único sin distinguir mayúsculas/minúsculas.
+- Estados: activación pendiente, activo y archivado diferenciados.
+- Migración: conserva el usuario canónico y archiva duplicados heredados.
+- Profesionales: archivados ocultos en la vista operativa.
+- Documentos: carga, listado, descarga y borrado privados para administración.
+- Separación: documentos laborales fuera de los archivos técnicos de obra.
+- Seguridad: clientes y profesionales no acceden a documentos laborales.
+- Validación: dominio 7, API 166 y web 47 pruebas correctas.
+- Navegador: 80 escenarios correctos en Chromium y WebKit.
+- Typecheck y builds de API/web correctos; dominio no define script build.
+- Pendiente despliegue: ejecutar migración mediante el flujo autorizado de producción.

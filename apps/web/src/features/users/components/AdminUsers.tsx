@@ -26,6 +26,9 @@ type ModalState =
   | { kind: "create" }
   | { kind: "edit"; user: UserDTO };
 
+type AccountStatus = NonNullable<UserDTO["accountStatus"]>;
+const accountStatusOf = (user: UserDTO): AccountStatus => user.accountStatus ?? (user.activo ? "active" : "pending_activation");
+
 export function AdminUsers({ api }: Props) {
   const users     = useUsers(api);
   const mutations = useUserMutations(api);
@@ -35,15 +38,15 @@ export function AdminUsers({ api }: Props) {
 
   const [modal, setModal] = useState<ModalState>({ kind: "closed" });
   const [filterRol, setFilterRol] = useState<UserDTO["rol"] | "all">("all");
-  const [filterStatus, setFilterStatus] = useState<"active" | "inactive" | "all">("all");
+  const [filterStatus, setFilterStatus] = useState<AccountStatus | "current" | "all">("current");
   const [search, setSearch] = useState("");
-  const [sendingInvitationId, setSendingInvitationId] = useState<number | null>(null);
 
   const filtered = useMemo(() => {
     return (users.data ?? []).filter(u => {
       if (filterRol !== "all" && u.rol !== filterRol) return false;
-      if (filterStatus === "active" && !u.activo) return false;
-      if (filterStatus === "inactive" && u.activo) return false;
+      const status = accountStatusOf(u);
+      if (filterStatus === "current" && status === "archived") return false;
+      if (filterStatus !== "current" && filterStatus !== "all" && status !== filterStatus) return false;
       if (search) {
         const q = search.toLowerCase();
         if (!u.nombre.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
@@ -67,18 +70,6 @@ export function AdminUsers({ api }: Props) {
     } catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
   };
 
-  const resendInvitation = async (user: UserDTO) => {
-    try {
-      setSendingInvitationId(user.id);
-      await api.resendInvitation(user.id);
-      push(`Enlace de acceso enviado a ${user.email}`, "success");
-    } catch (error) {
-      push((error as { message?: string }).message ?? "No se pudo enviar el acceso", "error");
-    } finally {
-      setSendingInvitationId(null);
-    }
-  };
-
   const columns: ColumnDef<UserDTO>[] = [
     { key: "nombre", header: "Usuario", sortBy: u => u.nombre,
       render: u => (
@@ -92,10 +83,12 @@ export function AdminUsers({ api }: Props) {
     { key: "profesion", header: "Profesión",
       render: u => u.rol === "profesional" && u.profesion ? <ProfesionBadge profesion={u.profesion as Profesion} /> : <span style={{ color: "#85786b" }}>—</span> },
     { key: "telefono",  header: "Teléfono",  render: u => u.telefono || <span style={{ color: "#85786b" }}>—</span> },
-    { key: "activo",    header: "Estado",    sortBy: u => (u.activo ? 1 : 0),
-      render: u => u.activo
-        ? <span style={{ fontSize: 12, color: "#34d399" }}>● Activo</span>
-        : <span style={{ fontSize: 12, color: "#b5483f" }}>● Inactivo</span> },
+    { key: "activo", header: "Estado", sortBy: accountStatusOf,
+      render: u => accountStatusOf(u) === "active"
+        ? <span style={{ fontSize: 12, color: "#247a55" }}>● Activo</span>
+        : accountStatusOf(u) === "pending_activation"
+          ? <span style={{ fontSize: 12, color: "#a85f3b" }}>● Invitación pendiente</span>
+          : <span style={{ fontSize: 12, color: "#71685e" }}>● Archivado</span> },
     { key: "desde", header: "Desde", sortBy: u => u.createdAt, align: "right",
       render: u => formatDate(u.createdAt) },
   ];
@@ -126,8 +119,10 @@ export function AdminUsers({ api }: Props) {
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
           style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", minWidth: 145 }}>
+          <option value="current">Usuarios actuales</option>
           <option value="active">Activos</option>
-          <option value="inactive">Inactivos</option>
+          <option value="pending_activation">Invitación pendiente</option>
+          <option value="archived">Archivados</option>
           <option value="all">Todos los estados</option>
         </select>
       </div>
@@ -138,15 +133,10 @@ export function AdminUsers({ api }: Props) {
         rowKey={u => u.id}
         loading={users.loading}
         error={users.error}
-        emptyMessage={search ? `Sin resultados para "${search}"` : filterStatus === "inactive" ? "No hay usuarios inactivos" : filterStatus === "active" ? "No hay usuarios activos" : "No hay usuarios"}
+        emptyMessage={search ? `Sin resultados para "${search}"` : "No hay usuarios en este estado"}
         actions={u => (
           <div style={{ display: "flex", gap: 6 }}>
             {can("user.manage") && <Button small variant="ghost" onClick={() => setModal({ kind: "edit", user: u })}>Editar</Button>}
-            {can("user.manage") && !u.activo && (
-              <Button small variant="ghost" onClick={() => void resendInvitation(u)} disabled={sendingInvitationId === u.id}>
-                {sendingInvitationId === u.id ? "Enviando…" : "Enviar acceso"}
-              </Button>
-            )}
             {can("user.manage") && u.activo && <Button small variant="danger" onClick={() => handleDelete(u)}>✕</Button>}
           </div>
         )}

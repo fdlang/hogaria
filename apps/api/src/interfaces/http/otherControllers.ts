@@ -7,8 +7,10 @@ import { QueryAuditLogUseCase } from "../../application/use-cases/audit.use-case
 import { ListSolicitudesUseCase, Solicitud, SubmitSolicitudUseCase, UpdateSolicitudStatusUseCase } from "../../application/use-cases/solicitud.use-cases.js";
 import { DownloadFileUseCase, UploadFileUseCase, DeleteFileUseCase, ListFilesUseCase, ProjectFile } from "../../application/use-cases/file.use-cases.js";
 import { AuditEntry } from "@reformapro/domain/entities";
+import { ValidationError } from "@reformapro/domain/errors";
 import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
+import { ProfessionalDocumentUseCases, type ProfessionalDocument } from "../../application/use-cases/professional-document.use-cases.js";
 
 // ─────────────────────────────────────────────────────────────
 // Audit
@@ -169,6 +171,47 @@ export function fileController(deps: {
           },
         };
       } catch (e) { return toHttpError(e); }
+    },
+  };
+}
+
+function toProfessionalDocumentDTO(document: ProfessionalDocument) {
+  return {
+    id: document.id, professionalId: document.professionalId, uploadedBy: document.uploadedBy,
+    nombre: document.nombre, tipo: document.tipo, tamano: document.tamano,
+    uploadedAt: document.uploadedAt.toISOString(),
+  };
+}
+
+export function professionalDocumentController(documents: ProfessionalDocumentUseCases) {
+  const idOf = (value: string) => {
+    const id = Number(value);
+    if (!Number.isSafeInteger(id) || id < 1) throw new ValidationError("Identificador no válido");
+    return id;
+  };
+  return {
+    async list(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try { return { status: 200, body: (await documents.list(req.actorId, idOf(req.params.id))).map(toProfessionalDocumentDTO) }; }
+      catch (error) { return toHttpError(error); }
+    },
+    async upload(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        const body = (req.body ?? {}) as { nombre?: unknown; tipo?: unknown; tamano?: unknown; contenidoBase64?: unknown };
+        if (typeof body.nombre !== "string" || typeof body.tipo !== "string" || typeof body.tamano !== "number" || typeof body.contenidoBase64 !== "string") throw new ValidationError("Documento no válido");
+        const document = await documents.upload({ actorId: req.actorId, professionalId: idOf(req.params.id), nombre: body.nombre, tipo: body.tipo, tamano: body.tamano, contenidoBase64: body.contenidoBase64 });
+        return { status: 201, body: toProfessionalDocumentDTO(document) };
+      } catch (error) { return toHttpError(error); }
+    },
+    async download(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        const { document, bytes } = await documents.download(req.actorId, idOf(req.params.id));
+        const filename = document.nombre.replace(/[\\"\r\n]/g, "_");
+        return { status: 200, body: bytes, headers: { "Content-Type": document.tipo, "Content-Length": String(bytes.byteLength), "Content-Disposition": `attachment; filename="${filename}"`, "Cache-Control": "private, no-store" } };
+      } catch (error) { return toHttpError(error); }
+    },
+    async delete(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try { await documents.delete(req.actorId, idOf(req.params.id)); return { status: 204, body: null }; }
+      catch (error) { return toHttpError(error); }
     },
   };
 }

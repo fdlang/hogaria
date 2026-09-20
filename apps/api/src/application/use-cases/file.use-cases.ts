@@ -38,14 +38,14 @@ export interface IFileRepository {
 }
 
 export interface IFileStorage {
-  put(input: { projectId: number; filename: string; contentType: string; bytes: Uint8Array }): Promise<{ key: string }>;
+  put(input: { scope: "projects" | "professionals"; ownerId: number; filename: string; contentType: string; bytes: Uint8Array }): Promise<{ key: string }>;
   delete(key: string): Promise<void>;
   get(key: string): Promise<Uint8Array>;
 }
 
 // Server uploads on Vercel stay below the platform request-body limit.
-const MAX_FILE_BYTES = 3 * 1024 * 1024;
-const ALLOWED_MIMES = new Set([
+export const MAX_FILE_BYTES = 3 * 1024 * 1024;
+export const ALLOWED_MIMES = new Set([
   "image/jpeg", "image/png", "image/webp", "image/gif",
   "application/pdf",
 ]);
@@ -75,7 +75,7 @@ export class UploadFileUseCase {
     // Authorization:
     //   - Admin: always
     //   - Cliente: must own the project
-    //   - Profesional: must be assigned AND their profession must allow `subirImagen`
+    //   - Profesional: must be assigned AND their profession must allow technical documents
     if (actor.rol === "cliente" && project.clienteId !== actor.id) throw new ForbiddenError();
     if (actor.rol === "cliente") {
       if (cmd.sensitive || classification !== "publico") throw new ForbiddenError("Los clientes solo pueden compartir documentos públicos de su obra");
@@ -83,7 +83,7 @@ export class UploadFileUseCase {
     if (actor.rol === "profesional") {
       const assignment = project.profesionalesAsignados.find(a => a.userId === actor.id);
       if (!assignment) throw new ForbiddenError();
-      if (!PermissionPolicy.PROFESSIONAL_ACCESS[assignment.profesion as Profesion]?.subirImagen) {
+      if (!PermissionPolicy.PROFESSIONAL_ACCESS[assignment.profesion as Profesion]?.uploadTechnicalDocuments) {
         throw new ForbiddenError("Tu profesión no permite subir archivos");
       }
       // Profesionales NEVER upload sensitive files (contracts/invoices/plans)
@@ -99,17 +99,8 @@ export class UploadFileUseCase {
     }
 
     // Metadata alone is never accepted: persist exactly the bytes selected in the browser.
-    const bytes = decodeBase64(cmd.contenidoBase64);
-    if (bytes.byteLength === 0) throw new ValidationError("El archivo está vacío");
-    if (bytes.byteLength > MAX_FILE_BYTES) throw new ValidationError(`Archivo supera ${MAX_FILE_BYTES / 1024 / 1024} MB`);
-
-    // Content validation
-    if (cmd.tamaño > MAX_FILE_BYTES)    throw new ValidationError(`Archivo supera ${MAX_FILE_BYTES / 1024 / 1024} MB`);
-    if (!ALLOWED_MIMES.has(cmd.tipo))   throw new ValidationError(`Tipo de archivo no permitido: ${cmd.tipo}`);
-    if (typeof cmd.nombre !== "string" || !cmd.nombre.trim() || cmd.nombre.length > 255)            throw new ValidationError("Nombre de archivo obligatorio");
-    assertFileSignature(bytes, cmd.tipo);
-
-    const stored = await this.storage.put({ projectId: cmd.projectId, filename: cmd.nombre.trim(), contentType: cmd.tipo, bytes });
+    const bytes = validateUploadedFile(cmd.contenidoBase64, cmd.nombre, cmd.tipo, cmd.tamaño);
+    const stored = await this.storage.put({ scope: "projects", ownerId: cmd.projectId, filename: cmd.nombre.trim(), contentType: cmd.tipo, bytes });
     let saved: ProjectFile;
     try {
       saved = await this.files.save({
@@ -248,4 +239,16 @@ function assertFileSignature(bytes: Uint8Array, mime: string) {
     }
   })();
   if (!valid) throw new ValidationError("El contenido no coincide con el tipo de archivo declarado", "contenidoBase64");
+}
+
+export function validateUploadedFile(contentBase64: string, filename: string, mime: string, declaredSize: number): Uint8Array {
+  if (typeof filename !== "string" || !filename.trim() || filename.length > 255) throw new ValidationError("Nombre de archivo obligatorio");
+  if (!Number.isSafeInteger(declaredSize) || declaredSize < 0 || declaredSize > MAX_FILE_BYTES) throw new ValidationError(`Archivo supera ${MAX_FILE_BYTES / 1024 / 1024} MB`);
+  if (!ALLOWED_MIMES.has(mime)) throw new ValidationError(`Tipo de archivo no permitido: ${mime}`);
+  const bytes = decodeBase64(contentBase64);
+  if (bytes.byteLength === 0) throw new ValidationError("El archivo está vacío");
+  if (bytes.byteLength > MAX_FILE_BYTES) throw new ValidationError(`Archivo supera ${MAX_FILE_BYTES / 1024 / 1024} MB`);
+  if (bytes.byteLength !== declaredSize) throw new ValidationError("El tamaño declarado no coincide con el archivo");
+  assertFileSignature(bytes, mime);
+  return bytes;
 }

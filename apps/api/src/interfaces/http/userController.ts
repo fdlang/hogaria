@@ -39,10 +39,6 @@ export function userController(deps: {
       } catch (e) { return toHttpError(e); }
     },
 
-    async resendInvitation(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
-      try { const result = await deps.activation.invite(req.actorId, idOf(req.params.id), ctxOf(req)); return { status: 202, body: { email: result.email, expiresAt: result.expiresAt.toISOString() } }; } catch (e) { return toHttpError(e); }
-    },
-
     async activate(req: HttpRequest): Promise<HttpResponse> {
       try { const body = req.body as { token?: string; password?: string }; await deps.activation.activate(body.token ?? "", body.password ?? ""); return { status: 204, body: null }; } catch (e) { return toHttpError(e); }
     },

@@ -19,7 +19,7 @@ import { buildApp } from "./bootstrap.js";
 import { authController, requireAuth, HttpRequest, HttpResponse } from "./interfaces/http/authController.js";
 import { userController }    from "./interfaces/http/userController.js";
 import { projectController } from "./interfaces/http/projectController.js";
-import { auditController, solicitudController, fileController } from "./interfaces/http/otherControllers.js";
+import { auditController, solicitudController, fileController, professionalDocumentController } from "./interfaces/http/otherControllers.js";
 import { salesController } from "./interfaces/http/salesController.js";
 import { catalogController } from "./interfaces/http/catalogController.js";
 import { workController } from "./interfaces/http/workController.js";
@@ -82,6 +82,7 @@ function getRuntime(): Promise<Runtime> {
       upload: app.useCases.uploadFile, delete: app.useCases.deleteFile, list: app.useCases.listFiles,
       download: app.useCases.downloadFile,
     });
+    const professionalDocuments = professionalDocumentController(app.useCases.professionalDocuments);
     const sales = salesController({ opportunities: app.useCases.opportunities, estimates: app.useCases.estimates, changes: app.useCases.changes });
     const catalog = catalogController({ catalog: app.useCases.catalog });
     const work = workController(app.useCases.work);
@@ -137,7 +138,10 @@ function getRuntime(): Promise<Runtime> {
   route("POST",   "/users",        req => users.create(req as never), { protected: true }),
   route("PATCH",  "/users/:id",    req => users.update(req as never), { protected: true }),
   route("DELETE", "/users/:id",    req => users.delete(req as never), { protected: true }),
-  route("POST", "/users/:id/invitation", req => users.resendInvitation(req as never), { protected: true }),
+  route("GET", "/professionals/:id/documents", req => professionalDocuments.list(req as never), { protected: true }),
+  route("POST", "/professionals/:id/documents", req => professionalDocuments.upload(req as never), { protected: true }),
+  route("GET", "/professional-documents/:id/download", req => professionalDocuments.download(req as never), { protected: true }),
+  route("DELETE", "/professional-documents/:id", req => professionalDocuments.delete(req as never), { protected: true }),
 
   // Projects
   route("GET",    "/projects",          req => projects.list(req   as never), { protected: true }),

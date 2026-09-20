@@ -28,7 +28,7 @@ BEGIN
  RETURN NEW;
 END $$;
 DO $$ DECLARE target text; BEGIN
- FOREACH target IN ARRAY ARRAY['users','projects','opportunities','estimates','budget_versions','change_orders','catalog_items','solicitudes','project_files'] LOOP
+ FOREACH target IN ARRAY ARRAY['users','projects','opportunities','estimates','budget_versions','change_orders','catalog_items','solicitudes','project_files','professional_documents'] LOOP
   EXECUTE format('DROP TRIGGER IF EXISTS durable_business_audit ON %I',target);
   EXECUTE format('CREATE TRIGGER durable_business_audit AFTER INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION audit_business_write()',target);
  END LOOP;

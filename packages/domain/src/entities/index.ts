@@ -1,8 +1,9 @@
 import { Email, Money, Percentage } from "../value-objects/index.js";
 
 export type UserRole = "admin" | "cliente" | "profesional";
+export type UserAccountStatus = "pending_activation" | "active" | "archived";
 export type Profesion = "albanil" | "electricista" | "fontanero" | "pintor" | "carpintero" | "reformista";
-export interface User { id: number; email: Email; nombre: string; rol: UserRole; profesion?: Profesion; telefono?: string; activo: boolean; sessionVersion?: number; createdAt: Date; }
+export interface User { id: number; email: Email; nombre: string; rol: UserRole; profesion?: Profesion; telefono?: string; activo: boolean; accountStatus?: UserAccountStatus; sessionVersion?: number; createdAt: Date; }
 
 export type ProjectStatus = "planificacion" | "en_curso" | "pausado" | "finalizado";
 export interface ProjectProfessional { userId: number; profesion?: Profesion; }

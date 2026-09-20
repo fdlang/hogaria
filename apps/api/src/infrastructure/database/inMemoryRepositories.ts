@@ -46,9 +46,10 @@ export class InMemoryUserRepository implements IUserRepository {
   }
 
   async save(user: User, passwordHash?: string): Promise<User> {
+    if (this.users.some(existing => existing.email.value.toLowerCase() === user.email.value.toLowerCase())) throw new ConflictError("Ya existe un usuario con ese email");
     const id = user.id || this.nextId++;
     if (user.id && id >= this.nextId) this.nextId = id + 1;
-    const stored: StoredUser = { ...user, id, sessionVersion: user.sessionVersion ?? 0, passwordHash: passwordHash ?? "" };
+    const stored: StoredUser = { ...user, id, accountStatus: user.accountStatus ?? (user.activo ? "active" : "pending_activation"), sessionVersion: user.sessionVersion ?? 0, passwordHash: passwordHash ?? "" };
     this.users.push(stored);
     return this.strip(stored);
   }
@@ -58,6 +59,8 @@ export class InMemoryUserRepository implements IUserRepository {
     const current = this.users[idx];
     if (!current) throw new NotFoundError("Usuario");
     const merged: StoredUser = { ...current, ...changes };
+    if (changes.accountStatus) merged.activo = changes.accountStatus === "active";
+    else if (changes.activo !== undefined) merged.accountStatus = changes.activo ? "active" : "archived";
     if (current.rol === "admin" && current.activo && (!merged.activo || merged.rol !== "admin") && !this.users.some(u => u.id !== id && u.rol === "admin" && u.activo)) throw new ConflictError("Debe quedar un administrador activo");
     if (passwordHash !== undefined) merged.passwordHash = passwordHash;
     if (changes.activo === false || passwordHash !== undefined || changes.rol !== undefined) {
@@ -86,6 +89,7 @@ export class InMemoryUserRepository implements IUserRepository {
     if (!user || !["cliente", "profesional"].includes(user.rol)) throw new NotFoundError("Invitación");
     user.passwordHash = passwordHash;
     user.activo = true;
+    user.accountStatus = "active";
     user.sessionVersion = (user.sessionVersion ?? 0) + 1;
   }
 

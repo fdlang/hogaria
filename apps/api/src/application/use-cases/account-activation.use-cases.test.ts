@@ -10,6 +10,12 @@ const hasher = {
 };
 
 describe("AccountActivationUseCases", () => {
+  it("rejects duplicate email identities regardless of letter case", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    await users.save({ id: 0, email: Email.of("pro@hogaria.test"), nombre: "Uno", rol: "profesional", profesion: "reformista", activo: false, createdAt: new Date() });
+    await expect(users.save({ id: 0, email: Email.of("PRO@hogaria.test"), nombre: "Dos", rol: "profesional", profesion: "reformista", activo: false, createdAt: new Date() })).rejects.toThrow("Ya existe");
+  });
+
   it("destroys an activation link after successful use", async () => {
     configureActivationPasswordHasher(hasher.hash);
     const users = new InMemoryUserRepository(hasher);
@@ -37,7 +43,7 @@ describe("AccountActivationUseCases", () => {
   it("invites a professional through the same one-time activation flow", async () => {
     const users = new InMemoryUserRepository(hasher);
     const admin = await users.save({ id: 0, email: Email.of("admin2@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
-    const professional = await users.save({ id: 0, email: Email.of("pro@hogaria.test"), nombre: "Profesional", rol: "profesional", profesion: "electricista", activo: true, createdAt: new Date() }, "");
+    const professional = await users.save({ id: 0, email: Email.of("pro@hogaria.test"), nombre: "Profesional", rol: "profesional", profesion: "electricista", activo: false, accountStatus: "pending_activation", createdAt: new Date() }, "");
     configureActivationPasswordHasher(hasher.hash);
     let delivered = false, url = "";
     const email = { isConfigured: () => true, sendActivation: async (input: {activationUrl: string}) => { delivered = true; url=input.activationUrl; } };
@@ -52,7 +58,7 @@ describe("AccountActivationUseCases", () => {
     await expect(useCases.activate(token,"OtraClaveSegura2026")).rejects.toThrow();
   });
 
-  it("keeps the previous activation link valid when a resend email fails", async () => {
+  it("blocks a second invitation and keeps the original activation link valid", async () => {
     const users = new InMemoryUserRepository(hasher);
     const admin = await users.save({ id: 0, email: Email.of("admin3@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
     const client = await users.save({ id: 0, email: Email.of("resend@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: false, createdAt: new Date() }, "");
@@ -64,13 +70,14 @@ describe("AccountActivationUseCases", () => {
       sendActivation: async (input: { activationUrl: string }) => {
         attempts += 1;
         if (attempts === 1) firstUrl = input.activationUrl;
-        else throw new Error("mail unavailable");
+        else throw new Error("a second email must never be attempted");
       },
     };
     configureActivationPasswordHasher(hasher.hash);
     const useCases = new AccountActivationUseCases(users, tokens, email, "https://hogaria.test");
     await useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" });
-    await expect(useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("mail unavailable");
+    await expect(useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("ya fue enviada");
+    expect(attempts).toBe(1);
 
     const firstToken = new URLSearchParams(firstUrl.split("?")[1]).get("token")!;
     await expect(useCases.activate(firstToken, "ClaveSegura2026")).resolves.toBeUndefined();
@@ -84,6 +91,7 @@ describe("AccountActivationUseCases", () => {
     let deliveredUrl = "";
     const tokens = {
       replace: innerTokens.replace.bind(innerTokens),
+      hasIssued: innerTokens.hasIssued.bind(innerTokens),
       stage: innerTokens.stage.bind(innerTokens),
       promote: async () => { throw new Error("promotion unavailable"); },
       discard: innerTokens.discard.bind(innerTokens),

@@ -54,6 +54,8 @@ import { NotFoundError } from "@reformapro/domain/errors";
 import { Email } from "@reformapro/domain/value-objects";
 import { IAuditRepository, ICatalogRepository, IChangeOrderRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
 import { PostgresAuditRepository, PostgresCatalogRepository, PostgresChangeOrderRepository, PostgresEstimateRepository, PostgresFileRepository, PostgresOpportunityRepository, PostgresProjectRepository, PostgresSolicitudRepository, PostgresUserRepository } from "./infrastructure/database/postgresRepositories.js";
+import { PostgresProfessionalDocumentRepository } from "./infrastructure/database/postgresRepositories.js";
+import { ProfessionalDocumentUseCases, type IProfessionalDocumentRepository, type ProfessionalDocument } from "./application/use-cases/professional-document.use-cases.js";
 import pg from "pg";
 import { auditedPool } from "./infrastructure/audit/request-audit.js";
 import { PostgresCooldownGate } from "./infrastructure/database/postgresCooldownGate.js";
@@ -107,6 +109,16 @@ class InMemoryFileRepository implements IFileRepository {
   }
 }
 
+class InMemoryProfessionalDocumentRepository implements IProfessionalDocumentRepository {
+  private documents: ProfessionalDocument[] = [];
+  private nextId = 1;
+  async save(document: Omit<ProfessionalDocument, "id">) { const saved = { ...document, id: this.nextId++ }; this.documents.push(saved); return saved; }
+  async findById(id: number) { return this.documents.find(document => document.id === id) ?? null; }
+  async findByProfessional(professionalId: number) { return this.documents.filter(document => document.professionalId === professionalId); }
+  async markDeleting(id: number) { const document = await this.findById(id); if (!document) throw new NotFoundError("Documento"); document.deleting = true; }
+  async delete(id: number) { const index = this.documents.findIndex(document => document.id === id); if (index === -1) throw new NotFoundError("Documento"); this.documents.splice(index, 1); }
+}
+
 // ─────────────────────────────────────────────────────────────
 // AppDependencies
 // ─────────────────────────────────────────────────────────────
@@ -150,6 +162,7 @@ export interface AppDependencies {
     work:                      WorkTrackingUseCases;
     estimateDocuments:         EstimateDocumentUseCases;
     notifications:             ClientNotifications;
+    professionalDocuments:     ProfessionalDocumentUseCases;
   };
 }
 
@@ -175,6 +188,7 @@ export async function buildApp(): Promise<AppDependencies> {
   const audit: IAuditRepository = pool ? new PostgresAuditRepository(pool) : new InMemoryAuditRepository();
   const files: IFileRepository = pool ? new PostgresFileRepository(pool) : new InMemoryFileRepository();
   const fileStorage: IFileStorage = new VercelBlobFileStorage();
+  const professionalDocuments = pool ? new PostgresProfessionalDocumentRepository(pool) : new InMemoryProfessionalDocumentRepository();
   const solicitudes: ISolicitudRepository = pool ? new PostgresSolicitudRepository(pool) : new InMemorySolicitudRepository();
   const opportunities: IOpportunityRepository = pool ? new PostgresOpportunityRepository(pool) : new InMemoryOpportunityRepository();
   const estimates: IEstimateRepository = pool ? new PostgresEstimateRepository(pool) : new InMemoryEstimateRepository();
@@ -237,6 +251,7 @@ export async function buildApp(): Promise<AppDependencies> {
     catalog:                    new CatalogUseCases(users, catalog),
     activation,
     work: new WorkTrackingUseCases(users, projects, workStore),
+    professionalDocuments: new ProfessionalDocumentUseCases(users, professionalDocuments, fileStorage),
   };
 
   return { users, projects, audit, events, tokens, files, solicitudes, opportunities, estimates, changes, catalog, useCases };

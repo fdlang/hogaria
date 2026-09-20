@@ -138,7 +138,7 @@ ruta concreta; no debe reutilizarse el destino de otra obra.
 - No subas `apps/api/.env`, credenciales ni secretos al repositorio.
 - Las cuentas creadas desde administración nacen inactivas y reciben un enlace
   de activación de un solo uso. El enlace caduca, queda invalidado tras fijar la
-  contraseña y puede reenviarse desde la ficha de una cuenta inactiva.
+  contraseña y solo se envía automáticamente durante el alta inicial.
 - Los binarios se guardan en Vercel Blob privado (`BLOB_READ_WRITE_TOKEN`).
   PostgreSQL conserva sus metadatos y clasificación; la API comprueba permisos
   específicos de contrato/factura antes de servir cada descarga. Los documentos
