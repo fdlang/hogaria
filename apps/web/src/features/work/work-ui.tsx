@@ -6,7 +6,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-export function message(error: unknown) {
+function message(error: unknown) {
   return (
     (error as { message?: string })?.message ??
     "No se pudo completar la operación"

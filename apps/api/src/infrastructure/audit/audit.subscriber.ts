@@ -39,8 +39,6 @@ const ACTION_CODES: Record<DomainEvent["type"], string> = {
 };
 
 export class AuditSubscriber {
-  private unsubscribers: Array<() => void> = [];
-
   constructor(
     private readonly events: IEventEmitter,
     private readonly audit: IAuditRepository,
@@ -48,14 +46,8 @@ export class AuditSubscriber {
 
   start(): void {
     (Object.keys(ACTION_CODES) as Array<DomainEvent["type"]>).forEach(type => {
-      const unsub = this.events.subscribe(type, evt => this.persist(evt));
-      this.unsubscribers.push(unsub);
+      this.events.subscribe(type, evt => this.persist(evt));
     });
-  }
-
-  stop(): void {
-    this.unsubscribers.forEach(u => u());
-    this.unsubscribers = [];
   }
 
   private async persist(evt: DomainEvent): Promise<void> {

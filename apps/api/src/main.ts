@@ -69,6 +69,7 @@ function getRuntime(): Promise<Runtime> {
       activation: app.useCases.activation,
     });
     const projects = projectController({
+      users: app.users,
       update: app.useCases.updateProject,
       delete: app.useCases.deleteProject, list: app.useCases.listProjects,
       get: app.useCases.getProject,

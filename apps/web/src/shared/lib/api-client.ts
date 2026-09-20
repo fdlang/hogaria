@@ -3,7 +3,7 @@
  * The rest of the app sees typed API surfaces, NEVER raw fetch() calls.
  */
 
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+export type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
 export interface ApiError {
   status: number;
@@ -23,7 +23,6 @@ export class ApiClient {
   }
 
   setToken(token: string | null): void { this.token = token; }
-  getToken(): string | null            { return this.token; }
 
   async request<T>(path: string, opts: { method?: HttpMethod; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -50,7 +49,6 @@ export class ApiClient {
 
   get<T>(path: string, signal?: AbortSignal):                    Promise<T> { return this.request<T>(path, { method: "GET", signal }); }
   post<T>(path: string, body?: unknown, signal?: AbortSignal):   Promise<T> { return this.request<T>(path, { method: "POST", body, signal }); }
-  put<T>(path: string, body?: unknown, signal?: AbortSignal):    Promise<T> { return this.request<T>(path, { method: "PUT", body, signal }); }
   patch<T>(path: string, body?: unknown, signal?: AbortSignal):  Promise<T> { return this.request<T>(path, { method: "PATCH", body, signal }); }
   delete<T>(path: string, signal?: AbortSignal):                 Promise<T> { return this.request<T>(path, { method: "DELETE", signal }); }
 

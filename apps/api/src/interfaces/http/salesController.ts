@@ -4,11 +4,11 @@ import { toHttpError } from "./errorMiddleware.js";
 import type { HttpRequest, HttpResponse } from "./authController.js";
 
 const dateOrNull = (value: unknown) => value ? new Date(String(value)) : null;
-export const opportunityDTO = (o: Opportunity) => ({ ...o, fechaVisita: o.fechaVisita?.toISOString() ?? null, createdAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString() });
-export const estimateDTO = (e: Estimate) => ({ ...e, createdAt: e.createdAt.toISOString(), updatedAt: e.updatedAt.toISOString() });
-export const estimateVersionDTO = (v: EstimateVersion) => ({ ...v, enviadoAt: v.enviadoAt?.toISOString() ?? null, firmadoAt: v.firmadoAt?.toISOString() ?? null, createdAt: v.createdAt.toISOString() });
-export const changeOrderDTO = (c: ChangeOrder) => ({ ...c, aprobadoAt: c.aprobadoAt?.toISOString() ?? null, createdAt: c.createdAt.toISOString() });
-export const publicChangeOrderDTO = (c: PublicChangeOrder) => ({ ...c, aprobadoAt: c.aprobadoAt?.toISOString() ?? null, createdAt: c.createdAt.toISOString() });
+const opportunityDTO = (o: Opportunity) => ({ ...o, fechaVisita: o.fechaVisita?.toISOString() ?? null, createdAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString() });
+const estimateDTO = (e: Estimate) => ({ ...e, createdAt: e.createdAt.toISOString(), updatedAt: e.updatedAt.toISOString() });
+const estimateVersionDTO = (v: EstimateVersion) => ({ ...v, enviadoAt: v.enviadoAt?.toISOString() ?? null, firmadoAt: v.firmadoAt?.toISOString() ?? null, createdAt: v.createdAt.toISOString() });
+const changeOrderDTO = (c: ChangeOrder) => ({ ...c, aprobadoAt: c.aprobadoAt?.toISOString() ?? null, createdAt: c.createdAt.toISOString() });
+const publicChangeOrderDTO = (c: PublicChangeOrder) => ({ ...c, aprobadoAt: c.aprobadoAt?.toISOString() ?? null, createdAt: c.createdAt.toISOString() });
 const isPublicChangeOrder = (change: ChangeOrder | PublicChangeOrder): change is PublicChangeOrder => "propuesta" in change;
 
 export function salesController(deps: { opportunities: OpportunityUseCases; estimates: EstimateUseCases; changes: ChangeOrderUseCases }) {

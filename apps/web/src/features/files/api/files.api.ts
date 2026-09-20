@@ -6,8 +6,8 @@ import { ApiClient } from "@/shared/lib/api-client";
 export interface FileDTO {
   id: number; projectId: number; uploadedBy: number;
   nombre: string; tipo: string; tamaño: number;
-  storageKey: string; sensitive: boolean;
-  classification?: "publico" | "contrato" | "factura" | "reservado";
+  sensitive: boolean;
+  classification?: "publico" | "tecnico" | "contrato" | "factura" | "reservado";
   uploadedAt: string;
 }
 

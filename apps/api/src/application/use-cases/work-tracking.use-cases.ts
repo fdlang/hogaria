@@ -20,7 +20,7 @@ import type {
 } from "@reformapro/domain/repositories";
 import type { WorkStore, WorkRepository } from "./work-tracking.ports.js";
 
-export function positiveId(value: unknown): number {
+function positiveId(value: unknown): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1)
     throw new ValidationError("Identificador inválido");
   return value;
@@ -64,7 +64,7 @@ function uuid(value: unknown): string {
     throw new ValidationError("Identificador de operación inválido");
   return value;
 }
-export function publicWork(entry: WorkEntry): PublicWorkEntry {
+function publicWork(entry: WorkEntry): PublicWorkEntry {
   const { rate: _rate, approvedCostCents: _cost, ...publicEntry } = entry;
   return publicEntry;
 }

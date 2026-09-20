@@ -17,9 +17,3 @@ export class BcryptPasswordHasher implements PasswordHasher {
   hash(plaintext: string): Promise<string>                     { return this.bcrypt.hash(plaintext, this.cost); }
   verify(plaintext: string, hash: string): Promise<boolean>   { return this.bcrypt.compare(plaintext, hash); }
 }
-
-// For unit tests only — NEVER use in any deployed environment.
-export class PlainPasswordHasher implements PasswordHasher {
-  async hash(plaintext: string): Promise<string>  { return `plain:${plaintext}`; }
-  async verify(plaintext: string, hash: string): Promise<boolean> { return hash === `plain:${plaintext}`; }
-}

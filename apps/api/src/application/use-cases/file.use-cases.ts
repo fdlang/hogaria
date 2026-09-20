@@ -12,6 +12,7 @@ import { IProjectRepository, IUserRepository } from "@reformapro/domain/reposito
 import { IEventEmitter } from "@reformapro/domain/events";
 import { ForbiddenError, NotFoundError, ValidationError } from "@reformapro/domain/errors";
 import { PermissionPolicy, Profesion } from "@reformapro/domain/services";
+import type { UserRole } from "@reformapro/domain/entities";
 import { ClientContext } from "./auth.use-cases.js";
 
 export interface ProjectFile {
@@ -23,7 +24,7 @@ export interface ProjectFile {
   tamaño: number;      // bytes
   storageKey: string;  // S3 key
   sensitive: boolean;
-  classification?: "publico" | "contrato" | "factura" | "reservado";
+  classification?: "publico" | "tecnico" | "contrato" | "factura" | "reservado";
   uploadedAt: Date;
 }
 
@@ -70,16 +71,17 @@ export class UploadFileUseCase {
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
     if(typeof cmd.sensitive!=="boolean")throw new ValidationError("Indica la privacidad del documento");
-    const classification=cmd.classification??(cmd.sensitive?"reservado":"publico");
-    if(!["publico","contrato","factura","reservado"].includes(classification))throw new ValidationError("Clasificación de documento no válida");
-    if((classification==="publico")===cmd.sensitive)throw new ValidationError("La clasificación y privacidad no coinciden");
-    if(actor.rol!=="admin"&&classification!== "publico"&&classification!=="reservado")throw new ForbiddenError("Solo administración clasifica contratos y facturas");
+    let classification=cmd.classification??(cmd.sensitive?"reservado":"publico");
+    if(!["publico","tecnico","contrato","factura","reservado"].includes(classification))throw new ValidationError("Clasificación de documento no válida");
 
     // Authorization:
     //   - Admin: always
     //   - Cliente: must own the project
     //   - Profesional: must be assigned AND their profession must allow `subirImagen`
     if (actor.rol === "cliente" && project.clienteId !== actor.id) throw new ForbiddenError();
+    if (actor.rol === "cliente") {
+      if (cmd.sensitive || classification !== "publico") throw new ForbiddenError("Los clientes solo pueden compartir documentos públicos de su obra");
+    }
     if (actor.rol === "profesional") {
       const assignment = project.profesionalesAsignados.find(a => a.userId === actor.id);
       if (!assignment) throw new ForbiddenError();
@@ -88,6 +90,14 @@ export class UploadFileUseCase {
       }
       // Profesionales NEVER upload sensitive files (contracts/invoices/plans)
       if (cmd.sensitive) throw new ForbiddenError("Los profesionales no pueden subir archivos sensibles");
+      // Worker uploads are operational evidence, never customer-facing financial
+      // or contractual documents. The server assigns the classification instead
+      // of trusting the browser-provided value.
+      classification = "tecnico";
+    }
+    if (actor.rol === "admin") {
+      const sensitiveClassification = ["contrato","factura","reservado"].includes(classification);
+      if (sensitiveClassification !== cmd.sensitive) throw new ValidationError("La clasificación y privacidad no coinciden");
     }
 
     // Metadata alone is never accepted: persist exactly the bytes selected in the browser.
@@ -173,15 +183,7 @@ export class ListFilesUseCase {
 
     const all = await this.files.findByProject(cmd.projectId);
 
-    // Clientes see all (including sensitive — their contracts/invoices)
-    // Profesionales see everything EXCEPT sensitive files unless their profession permits
-    if (actor.rol === "profesional") {
-      const assignment = project.profesionalesAsignados.find(a => a.userId === actor.id);
-      const perms = assignment ? PermissionPolicy.PROFESSIONAL_ACCESS[assignment.profesion as Profesion] : null;
-      return all.filter(f => canReadFile(f, perms));
-    }
-
-    return all;
+    return all.filter(file => canReadFile(file, actor.rol));
   }
 }
 
@@ -200,20 +202,17 @@ export class DownloadFileUseCase {
     const project = await this.projects.findById(file.projectId);
     if (!project) throw new NotFoundError("Proyecto");
     PermissionPolicy.authorize(actor, "project.read", { project });
-    if (actor.rol === "profesional") {
-      const assignment = project.profesionalesAsignados.find(a => a.userId === actor.id);
-      const perms = assignment ? PermissionPolicy.PROFESSIONAL_ACCESS[assignment.profesion as Profesion] : null;
-      if (!canReadFile(file,perms)) throw new ForbiddenError();
-    }
+    if (!canReadFile(file,actor.rol)) throw new ForbiddenError();
     return { file, bytes: await this.storage.get(file.storageKey) };
   }
 }
 
-function canReadFile(file:ProjectFile,perms:{verContrato:boolean;verFactura:boolean}|null|undefined):boolean {
-  if(!file.sensitive&&(!file.classification||file.classification==="publico"))return true;
-  if(file.classification==="contrato")return !!perms?.verContrato;
-  if(file.classification==="factura")return !!perms?.verFactura;
-  return false; // Legacy sensitive files stay reserved until classified by admin.
+function canReadFile(file:ProjectFile,role:UserRole):boolean {
+  if(role==="admin")return true;
+  const classification=file.classification??(file.sensitive?"reservado":"publico");
+  if(role==="profesional")return classification==="publico"||classification==="tecnico";
+  if(role==="cliente")return classification!=="reservado";
+  return false;
 }
 function decodeBase64(value: string): Uint8Array {
   if (typeof value !== "string" || !/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 !== 0) {

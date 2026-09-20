@@ -5,13 +5,13 @@ export type { Profesion } from "../entities/index.js";
 export type Action = "project.update" | "project.read" | "project.update.progress" | "project.update.milestones" | "user.manage";
 
 export class PermissionPolicy {
-  static readonly PROFESSIONAL_ACCESS: Record<Profesion, { subirImagen: boolean; verContrato: boolean; verFactura: boolean }> = {
-    albanil: { subirImagen: true, verContrato: true, verFactura: false },
-    electricista: { subirImagen: true, verContrato: true, verFactura: false },
-    fontanero: { subirImagen: true, verContrato: true, verFactura: false },
-    pintor: { subirImagen: true, verContrato: false, verFactura: false },
-    carpintero: { subirImagen: true, verContrato: true, verFactura: false },
-    reformista: { subirImagen: true, verContrato: true, verFactura: true },
+  static readonly PROFESSIONAL_ACCESS: Record<Profesion, { subirImagen: boolean; verDocumentacionTecnica: boolean }> = {
+    albanil: { subirImagen: true, verDocumentacionTecnica: true },
+    electricista: { subirImagen: true, verDocumentacionTecnica: true },
+    fontanero: { subirImagen: true, verDocumentacionTecnica: true },
+    pintor: { subirImagen: true, verDocumentacionTecnica: true },
+    carpintero: { subirImagen: true, verDocumentacionTecnica: true },
+    reformista: { subirImagen: true, verDocumentacionTecnica: true },
   };
 
   static can(user: User, action: Action, context: { project?: Project } = {}) {

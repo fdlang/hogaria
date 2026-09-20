@@ -9,7 +9,6 @@ import { UserRole } from "@reformapro/domain/entities";
 import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
 
-export { toUserDTO } from "./userDTO.js";
 import { toUserDTO } from "./userDTO.js";
 
 export function userController(deps: {

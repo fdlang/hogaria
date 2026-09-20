@@ -4,10 +4,12 @@ import { InMemoryUserRepository, InMemoryProjectRepository, InMemoryOpportunityR
 import { InMemoryActivationTokenRepository } from "../../infrastructure/database/activationTokenRepositories.js";
 import { InMemoryEventEmitter } from "../../infrastructure/events/inMemoryEventEmitter.js";
 import { UpdateUserUseCase, DeleteUserUseCase } from "./user.use-cases.js";
-import { DeleteFileUseCase } from "./file.use-cases.js";
+import { DeleteFileUseCase, DownloadFileUseCase, ListFilesUseCase } from "./file.use-cases.js";
 import { OpportunityUseCases } from "./sales.use-cases.js";
 import { EstimateUseCases } from "./sales.use-cases.js";
 import { InMemoryEstimateRepository } from "../../infrastructure/database/inMemoryRepositories.js";
+import { projectController, toProjectDTO } from "../../interfaces/http/projectController.js";
+import { toFileDTO } from "../../interfaces/http/otherControllers.js";
 
 const hasher = { hash: async (s: string) => `hash:${s}`, verify: async () => true };
 const ctx = { ip: "test", userAgent: "test" };
@@ -73,5 +75,66 @@ describe("Security and integrity regressions", () => {
     await expect(service.execute({ actorId: client.id, fileId: 1 })).rejects.toThrow();
     expect(removeBlob).not.toHaveBeenCalled();
     expect(removeFile).not.toHaveBeenCalled();
+  });
+  it("removes commercial fields from every professional project response", async () => {
+    const project = {
+      id: 7, revision: 3, estimateId: 91, nombre: "Obra", descripcion: "Ejecución", clienteId: 12,
+      direccion: "Madrid", tipo: "Reforma", estado: "en_curso", progreso: { value: 30 },
+      presupuesto: { amount: 48500 }, fechaInicio: new Date("2026-01-01"), fechaFinPrevista: new Date("2026-03-01"),
+      profesionalesAsignados: [{ userId: 4, profesion: "reformista" }], hitos: [], createdAt: new Date("2026-01-01"),
+    } as never;
+    const dto = toProjectDTO(project, "professional");
+    expect(dto).not.toHaveProperty("presupuesto");
+    expect(dto).not.toHaveProperty("estimateId");
+    expect(dto).not.toHaveProperty("clienteId");
+    expect(dto).toMatchObject({ id: 7, nombre: "Obra", direccion: "Madrid", progreso: 30 });
+  });
+  it("uses the restricted project DTO at the authenticated HTTP boundary", async () => {
+    const { users } = await setup();
+    const professional = await users.save({ id: 0, email: Email.of("dto-worker@test.es"), nombre: "Worker", rol: "profesional", profesion: "reformista", activo: true, createdAt: new Date() });
+    const project = {
+      id: 7, revision: 1, estimateId: 91, nombre: "Obra", descripcion: "", clienteId: 12, direccion: "Madrid", tipo: "Reforma",
+      estado: "en_curso", progreso: { value: 30 }, presupuesto: { amount: 48500 }, fechaInicio: new Date(), fechaFinPrevista: new Date(),
+      profesionalesAsignados: [{ userId: professional.id, profesion: "reformista" }], hitos: [], createdAt: new Date(),
+    } as never;
+    const controller = projectController({ users, list: { execute: vi.fn(async () => [project]) } } as never);
+    const response = await controller.list({ actorId: professional.id } as never);
+    expect(response.status).toBe(200);
+    expect((response.body as Array<Record<string, unknown>>)[0]).not.toHaveProperty("presupuesto");
+    expect((response.body as Array<Record<string, unknown>>)[0]).not.toHaveProperty("estimateId");
+    expect((response.body as Array<Record<string, unknown>>)[0]).not.toHaveProperty("clienteId");
+  });
+  it("never exposes invoices, contracts or reserved files to an assigned professional", async () => {
+    const { users } = await setup();
+    const professional = await users.save({ id: 0, email: Email.of("worker@test.es"), nombre: "Worker", rol: "profesional", profesion: "reformista", activo: true, createdAt: new Date() });
+    const projects = new InMemoryProjectRepository();
+    const project = await projects.save({
+      id: 0, estimateId: 1, nombre: "Obra", descripcion: "", clienteId: 2, direccion: "Madrid", tipo: "Reforma",
+      estado: "en_curso", progreso: { value: 0 }, presupuesto: { amount: 10000 }, fechaInicio: new Date(),
+      fechaFinPrevista: new Date(), profesionalesAsignados: [{ userId: professional.id, profesion: "reformista" }], hitos: [], createdAt: new Date(),
+    } as never);
+    const base = { projectId: project.id, uploadedBy: 1, nombre: "documento.pdf", tipo: "application/pdf", tamaño: 10, sensitive: false, uploadedAt: new Date() };
+    const stored = [
+      { ...base, id: 1, storageKey: "public", classification: "publico" },
+      { ...base, id: 2, storageKey: "technical", classification: "tecnico" },
+      { ...base, id: 3, storageKey: "contract", classification: "contrato", sensitive: true },
+      { ...base, id: 4, storageKey: "invoice", classification: "factura", sensitive: true },
+      { ...base, id: 5, storageKey: "reserved", classification: "reservado", sensitive: true },
+    ];
+    const files = {
+      findByProject: vi.fn(async () => stored),
+      findById: vi.fn(async (id: number) => stored.find(file => file.id === id) ?? null),
+    } as never;
+    const listed = await new ListFilesUseCase(users, projects, files).execute({ actorId: professional.id, projectId: project.id });
+    expect(listed.map(file => file.id)).toEqual([1, 2]);
+    const storage = { get: vi.fn(async () => new Uint8Array([1])) } as never;
+    const download = new DownloadFileUseCase(users, projects, files, storage);
+    await expect(download.execute({ actorId: professional.id, fileId: 2 })).resolves.toBeDefined();
+    for (const fileId of [3, 4, 5]) await expect(download.execute({ actorId: professional.id, fileId })).rejects.toThrow();
+    expect(storage.get).toHaveBeenCalledTimes(1);
+  });
+  it("does not expose private storage keys in file metadata", () => {
+    const dto = toFileDTO({ id: 1, projectId: 2, uploadedBy: 3, nombre: "plano.pdf", tipo: "application/pdf", tamaño: 10, storageKey: "private/internal/key", sensitive: false, classification: "tecnico", uploadedAt: new Date("2026-01-01") });
+    expect(dto).not.toHaveProperty("storageKey");
   });
 });

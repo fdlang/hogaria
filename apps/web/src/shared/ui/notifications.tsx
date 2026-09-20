@@ -71,6 +71,3 @@ function NotificationStack({ items, onDismiss }: { items: Notif[]; onDismiss: (i
     </div>
   );
 }
-
-// Barrel export for main.tsx
-export { NotificationsProvider as default };

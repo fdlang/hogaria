@@ -76,7 +76,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
     catch (e) { push((e as { message?: string }).message ?? "No se pudo desasignar", "error"); }
   };
 
-  const handleFileUpload = async (file: File, sensitive: boolean, classification?: "publico" | "contrato" | "factura" | "reservado") => {
+  const handleFileUpload = async (file: File, sensitive: boolean, classification?: "publico" | "tecnico" | "contrato" | "factura" | "reservado") => {
     try { await files.upload(file, sensitive, classification); push(`${file.name} subido`, "success"); }
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
   };
@@ -188,7 +188,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
               {canUploadFiles && <FileUploadButton onUpload={handleFileUpload} canMarkSensitive={canManageProject} />}
             </div>
             {files.data.length === 0
-              ? <EmptyState icon="📄" title="Sin documentos" hint="Sube planos, fotos o contratos" />
+              ? <EmptyState icon="📄" title="Sin documentos" hint={isAdmin ? "Sube planos, fotos, contratos o facturas" : isCliente ? "Comparte fotos o documentos generales" : "Sube fotos o documentación técnica"} />
               : <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
                   {files.data.map(f => (
                     <li className="project-file-item" key={f.id}
@@ -214,7 +214,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           <div style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, marginBottom: 14 }}>
             <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Detalles</h3>
             <dl style={{ display: "grid", gap: 10, fontSize: 12 }}>
-              <Meta k="Presupuesto"       v={formatMoney(p.presupuesto)} />
+              {(isAdmin || isCliente) && p.presupuesto !== undefined && <Meta k="Presupuesto" v={formatMoney(p.presupuesto)} />}
               <Meta k="Fecha inicio"      v={formatDate(p.fechaInicio)} />
               <Meta k="Entrega prevista"  v={formatDate(p.fechaFinPrevista)} />
               <Meta k="Tipo"               v={p.tipo} />
@@ -262,17 +262,17 @@ function Meta({ k, v }: { k: string; v: string }) {
 }
 
 function FileUploadButton({ onUpload, canMarkSensitive }: {
-  onUpload: (file: File, sensitive: boolean, classification: "publico" | "contrato" | "factura" | "reservado") => void;
+  onUpload: (file: File, sensitive: boolean, classification: "publico" | "tecnico" | "contrato" | "factura" | "reservado") => void;
   canMarkSensitive: boolean;
 }) {
-  const [classification, setClassification] = useState<"publico" | "contrato" | "factura" | "reservado">("publico");
+  const [classification, setClassification] = useState<"publico" | "tecnico" | "contrato" | "factura" | "reservado">("publico");
   return (
     <div className="file-upload-controls" style={{ display: "flex", alignItems: "center", gap: 10 }}>
       {canMarkSensitive && (
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#71685e" }}>
           Tipo de documento
           <select value={classification} onChange={e => setClassification(e.target.value as typeof classification)}>
-            <option value="publico">General</option><option value="contrato">Contrato</option><option value="factura">Factura</option><option value="reservado">Reservado</option>
+            <option value="publico">General</option><option value="tecnico">Documentación técnica</option><option value="contrato">Contrato</option><option value="factura">Factura</option><option value="reservado">Reservado</option>
           </select>
         </label>
       )}
@@ -281,7 +281,7 @@ function FileUploadButton({ onUpload, canMarkSensitive }: {
         <input type="file" style={{ display: "none" }}
           onChange={e => {
             const file = e.target.files?.[0];
-            if (file) onUpload(file, classification !== "publico", classification);
+            if (file) onUpload(file, ["contrato", "factura", "reservado"].includes(classification), classification);
             e.target.value = "";
           }} />
       </label>

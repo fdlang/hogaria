@@ -100,11 +100,11 @@ export function solicitudController(deps: { submit: SubmitSolicitudUseCase; list
 // ─────────────────────────────────────────────────────────────
 // Files
 // ─────────────────────────────────────────────────────────────
-function toFileDTO(f: ProjectFile) {
+export function toFileDTO(f: ProjectFile) {
   return {
     id: f.id, projectId: f.projectId, uploadedBy: f.uploadedBy,
     nombre: f.nombre, tipo: f.tipo, tamaño: f.tamaño,
-    storageKey: f.storageKey, sensitive: f.sensitive,
+    sensitive: f.sensitive,
     classification: f.classification ?? (f.sensitive ? "reservado" : "publico"),
     uploadedAt: f.uploadedAt.toISOString(),
   };

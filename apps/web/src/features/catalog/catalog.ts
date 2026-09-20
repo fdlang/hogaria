@@ -16,8 +16,6 @@ export interface CatalogItem {
 
 export interface CatalogCategory { categoria: string; items: CatalogItem[]; }
 
-export const CATALOG_UPDATED_AT = "2026-09-18";
-
 export const CATALOG: CatalogCategory[] = [
   { categoria: "Previos y gestión", items: [
     { ref: "PRE-001", descripcion: "Protección de zonas comunes y vivienda", unidad: "global", precio: 380, iva: 21 },

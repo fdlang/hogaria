@@ -76,8 +76,8 @@ export function AdminProjects({ api, onOpenProject }: Props) {
         </div>
       )
     },
-    { key: "presupuesto", header: "Presupuesto", sortBy: p => p.presupuesto, align: "right",
-      render: p => formatMoney(p.presupuesto) },
+    { key: "presupuesto", header: "Presupuesto", sortBy: p => p.presupuesto ?? 0, align: "right",
+      render: p => formatMoney(p.presupuesto ?? 0) },
     { key: "entrega",     header: "Entrega",  sortBy: p => p.fechaFinPrevista, align: "right",
       render: p => formatDate(p.fechaFinPrevista) },
   ];

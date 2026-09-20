@@ -140,7 +140,7 @@ describe("Audit: authenticated controller boundaries", () => {
   });
 });
 describe("Audit: document classification", () => {
-  it("separates invoice/contract permissions and denies unclassified sensitive documents", async () => {
+  it("keeps invoice, contract and reserved documents outside every professional role", async () => {
     const users = new InMemoryUserRepository({
       hash: async () => "hash",
       verify: async () => true,
@@ -174,6 +174,7 @@ describe("Audit: document classification", () => {
         classification: "factura",
       },
       { id: 3, projectId: project.id, sensitive: true },
+      { id: 4, projectId: project.id, sensitive: false, classification: "tecnico", storageKey: "technical" },
     ];
     const repository = {
       findByProject: async () => files,
@@ -185,17 +186,18 @@ describe("Audit: document classification", () => {
       (await list.execute({ actorId: pro.id, projectId: project.id })).map(
         (f) => f.id,
       ),
-    ).toEqual([1]);
+    ).toEqual([4]);
     const download = new DownloadFileUseCase(
       users,
       projects,
       repository as never,
       storage as never,
     );
-    for (const fileId of [2, 3])
+    await expect(download.execute({ actorId: pro.id, fileId: 4 })).resolves.toBeDefined();
+    for (const fileId of [1, 2, 3])
       await expect(
         download.execute({ actorId: pro.id, fileId }),
       ).rejects.toBeInstanceOf(ForbiddenError);
-    expect(storage.get).not.toHaveBeenCalled();
+    expect(storage.get).toHaveBeenCalledTimes(1);
   });
 });

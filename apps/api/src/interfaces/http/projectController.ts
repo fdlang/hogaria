@@ -6,15 +6,17 @@
 
 import { AssignProjectProfessionalUseCase, DeleteProjectUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "../../application/use-cases/project.use-cases.js";
 import { Project } from "@reformapro/domain/entities";
+import type { IUserRepository } from "@reformapro/domain/repositories";
+import { ForbiddenError } from "@reformapro/domain/errors";
 import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
 
-export function toProjectDTO(p: Project) {
-  return {
-    id: p.id, revision: p.revision ?? 0, estimateId: p.estimateId, nombre: p.nombre, descripcion: p.descripcion,
-    clienteId: p.clienteId, direccion: p.direccion, tipo: p.tipo,
+export function toProjectDTO(p: Project, audience: "full" | "professional" = "full") {
+  const operational = {
+    id: p.id, revision: p.revision ?? 0, nombre: p.nombre, descripcion: p.descripcion,
+    direccion: p.direccion, tipo: p.tipo,
     estado: p.estado,
-    progreso: p.progreso.value, presupuesto: p.presupuesto.amount,
+    progreso: p.progreso.value,
     fechaInicio:      p.fechaInicio.toISOString(),
     fechaFinPrevista: p.fechaFinPrevista.toISOString(),
     profesionalesAsignados: p.profesionalesAsignados,
@@ -23,9 +25,16 @@ export function toProjectDTO(p: Project) {
       fecha: h.fecha.toISOString(),
     })),
   };
+  return audience === "professional" ? operational : {
+    ...operational,
+    estimateId: p.estimateId,
+    clienteId: p.clienteId,
+    presupuesto: p.presupuesto.amount,
+  };
 }
 
 export function projectController(deps: {
+  users: IUserRepository;
   update: UpdateProjectUseCase;
   delete: DeleteProjectUseCase;
   list:   ListProjectsUseCase;
@@ -34,6 +43,11 @@ export function projectController(deps: {
   unassign: UnassignProjectProfessionalUseCase;
 }) {
   const ctxOf = (req: HttpRequest) => ({ ip: req.ip, userAgent: req.headers["user-agent"] ?? "unknown" });
+  const dtoFor = async (actorId: number, project: Project) => {
+    const actor = await deps.users.findById(actorId);
+    if (!actor?.activo) throw new ForbiddenError();
+    return toProjectDTO(project, actor?.rol === "profesional" ? "professional" : "full");
+  };
 
   return {
     // PATCH /projects/:id
@@ -45,7 +59,7 @@ export function projectController(deps: {
           ctx: ctxOf(req),
           changes: req.body as never,
         });
-        return { status: 200, body: toProjectDTO(project) };
+        return { status: 200, body: await dtoFor(req.actorId, project) };
       } catch (e) { return toHttpError(e); }
     },
 
@@ -61,7 +75,7 @@ export function projectController(deps: {
     async get(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {
         const project = await deps.get.execute({ actorId: req.actorId, projectId: parseInt(req.params.id, 10) });
-        return { status: 200, body: toProjectDTO(project) };
+        return { status: 200, body: await dtoFor(req.actorId, project) };
       } catch (e) { return toHttpError(e); }
     },
 
@@ -70,7 +84,7 @@ export function projectController(deps: {
       try {
         const body = (req.body ?? {}) as { userId?: number };
         const project = await deps.assign.execute({ actorId: req.actorId, projectId: Number(req.params.id), userId: body.userId! });
-        return { status: 200, body: toProjectDTO(project) };
+        return { status: 200, body: await dtoFor(req.actorId, project) };
       } catch (e) { return toHttpError(e); }
     },
 
@@ -78,7 +92,7 @@ export function projectController(deps: {
     async unassign(req: HttpRequest & { actorId: number; params: { id: string; userId: string } }): Promise<HttpResponse> {
       try {
         const project = await deps.unassign.execute({ actorId: req.actorId, projectId: parseInt(req.params.id, 10), userId: parseInt(req.params.userId, 10) });
-        return { status: 200, body: toProjectDTO(project) };
+        return { status: 200, body: await dtoFor(req.actorId, project) };
       } catch (e) { return toHttpError(e); }
     },
 
@@ -86,7 +100,7 @@ export function projectController(deps: {
     async list(req: HttpRequest & { actorId: number }): Promise<HttpResponse> {
       try {
         const projects = await deps.list.execute({ actorId: req.actorId });
-        return { status: 200, body: projects.map(toProjectDTO) };
+        return { status: 200, body: await Promise.all(projects.map(project => dtoFor(req.actorId, project))) };
       } catch (e) { return toHttpError(e); }
     },
   };

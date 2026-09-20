@@ -84,7 +84,7 @@ export interface ICommercialTransaction {
     estimateId?: number,
   ): Promise<T>;
 }
-export class PassthroughCommercialTransaction
+class PassthroughCommercialTransaction
   implements ICommercialTransaction
 {
   constructor(private readonly repositories: CommercialRepositories) {}
@@ -242,7 +242,7 @@ export class EstimateUseCases {
     private readonly users: IUserRepository,
     private readonly opportunities: IOpportunityRepository,
     private readonly estimates: IEstimateRepository,
-    private readonly projects: IProjectRepository,
+    projects: IProjectRepository,
     private readonly events: IEventEmitter,
     private readonly crypto: ISignatureCrypto,
     transaction?: ICommercialTransaction,
@@ -282,15 +282,6 @@ export class EstimateUseCases {
     }, id);
     for (const event of events) await this.events.emit(event);
     return result;
-  }
-  async list(actorId: number) {
-    const actor = await this.users.findById(actorId);
-    if (!actor) throw new ForbiddenError();
-    return actor.rol === "admin"
-      ? this.estimates.findAll()
-      : (await this.estimates.findAll()).filter(
-          (e) => e.clienteId === actor.id,
-        );
   }
   async publicList(actorId: number, query: { page?: number; search?: string; status?: string } = {}) {
     const actor = await this.users.findById(actorId);

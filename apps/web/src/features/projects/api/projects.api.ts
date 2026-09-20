@@ -7,10 +7,10 @@ import { ApiClient } from "@/shared/lib/api-client";
 
 export interface ProjectDTO {
   revision?: number;
-  id: number; nombre: string; descripcion: string; clienteId: number;
+  id: number; nombre: string; descripcion: string; clienteId?: number; estimateId?: number;
   direccion: string; tipo: string;
   estado: "planificacion" | "en_curso" | "pausado" | "finalizado";
-  progreso: number; presupuesto: number;
+  progreso: number; presupuesto?: number;
   fechaInicio: string; fechaFinPrevista: string;
   profesionalesAsignados: Array<{ userId: number; profesion: string }>;
   hitos: Array<{ id: string | number; nombre: string; completado: boolean; fecha: string }>;
