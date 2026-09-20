@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RequestSequence } from "./request-sequence";
 
 // ─────────────────────────────────────────────────────────────
 // useResource — list/collection fetching
@@ -30,24 +31,24 @@ export interface ResourceHandle<T> extends ResourceState<T> {
 
 export function useResource<T>(fetcher: () => Promise<T>, deps: unknown[] = []): ResourceHandle<T> {
   const [state, setState] = useState<ResourceState<T>>({ data: null, loading: true, error: null });
-  const aliveRef = useRef(true);
+  const requests = useRef(new RequestSequence());
 
   const load = useCallback(async () => {
+    const request = requests.current.begin();
     setState(s => ({ ...s, loading: true, error: null }));
     try {
       const data = await fetcher();
-      if (aliveRef.current) setState({ data, loading: false, error: null });
+      if (requests.current.isCurrent(request)) setState({ data, loading: false, error: null });
     } catch (e) {
       const message = (e as { message?: string }).message ?? "Error";
-      if (aliveRef.current) setState(s => ({ ...s, loading: false, error: message }));
+      if (requests.current.isCurrent(request)) setState(s => ({ ...s, loading: false, error: message }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   useEffect(() => {
-    aliveRef.current = true;
     load();
-    return () => { aliveRef.current = false; };
+    return () => { requests.current.invalidate(); };
   }, [load]);
 
   const setData = useCallback((updater: T | ((prev: T | null) => T)) => {
