@@ -34,7 +34,9 @@ test("client can inspect and download a published historical version", async ({p
   await page.getByRole("button",{name:"Ver histórico de versiones"}).click();
   await page.getByRole("button",{name:"Versión 1",exact:true}).click();
   const region = page.getByRole("region",{name:"Histórico de versiones"});
-  const download = page.waitForEvent("download");
+  const download = page.waitForEvent("download", event =>
+    event.suggestedFilename().includes("v1.pdf"),
+  );
   await region.getByRole("button",{name:"Descargar PDF"}).click();
   expect((await download).suggestedFilename()).toContain("v1.pdf");
 });
