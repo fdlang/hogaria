@@ -355,6 +355,9 @@ export class EstimateUseCases {
     return this.clientVisibleView(actor, estimate);
   }
   private async clientVisibleView(actor: User, estimate: Estimate) {
+    if (actor.rol === "admin" && ["borrador", "en_revision"].includes(estimate.estado)) {
+      return this.draftPreview(estimate);
+    }
     if (actor.rol === "cliente" && estimate.estado === "en_revision") {
       const published = (await this.estimates.findVersions(estimate.id)).filter(item => item.enviadoAt).sort((a,b) => b.version-a.version)[0];
       if (!published) throw new NotFoundError("Presupuesto");
@@ -374,6 +377,13 @@ export class EstimateUseCases {
   async adminDraft(actorId: number, id: number) {
     assertAdmin(await this.users.findById(actorId));
     return this.require(id);
+  }
+  async adminPreview(actorId: number, id: number) {
+    assertAdmin(await this.users.findById(actorId));
+    const estimate = await this.require(id);
+    return ["borrador", "en_revision"].includes(estimate.estado)
+      ? this.draftPreview(estimate)
+      : this.publicView(estimate);
   }
   async create(
     actorId: number,
@@ -767,6 +777,28 @@ export class EstimateUseCases {
                 : null,
           }
         : null,
+    };
+  }
+  private draftPreview(estimate: Estimate) {
+    const snapshot = publicSnapshot(estimate.borrador);
+    const totals = calculateEstimateTotals(snapshot.partidas);
+    return {
+      id: estimate.id,
+      numero: estimate.numero,
+      titulo: estimate.titulo,
+      estado: estimate.estado,
+      versionActual: estimate.versionActual,
+      motivoRechazo: estimate.motivoRechazo,
+      createdAt: estimate.createdAt,
+      updatedAt: estimate.updatedAt,
+      propuesta: {
+        ...snapshot,
+        ...totals,
+        enviadoAt: null,
+        expiresAt: null,
+        firmadoAt: null,
+        hash: null,
+      },
     };
   }
   private async verifySignedVersionIntegrity(estimate: Estimate, version: EstimateVersion) {

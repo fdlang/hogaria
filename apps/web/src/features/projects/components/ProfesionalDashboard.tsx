@@ -1,7 +1,6 @@
 /**
  * ProfesionalDashboard — the profesional's home page.
- * Shows only projects where they are assigned. Highlights their profession
- * and the permissions they have (via PermissionPolicy.PROFESSIONAL_ACCESS).
+ * Shows only projects where they are assigned and highlights their profession.
  */
 
 import { useMemo } from "react";
@@ -13,7 +12,7 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { StatCard }   from "@/shared/ui/stat-card";
 import { ProjectStatusBadge, ProfesionBadge } from "@/shared/ui/badges";
 import { formatDate } from "@/shared/lib/formatters";
-import { PROFESIONES, PermissionPolicy, Profesion } from "@reformapro/domain";
+import { PROFESIONES, Profesion } from "@reformapro/domain";
 
 interface Props {
   apis: { projects: ProjectsApi };
@@ -24,7 +23,6 @@ export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
   const { user } = useAuth();
   const projects = useProjects(apis.projects);
 
-  const perms    = user?.profesion ? PermissionPolicy.PROFESSIONAL_ACCESS[user.profesion as Profesion] : null;
   const profInfo = user?.profesion ? PROFESIONES[user.profesion as Profesion] : null;
 
   const stats = useMemo(() => {
@@ -58,19 +56,6 @@ export function ProfesionalDashboard({ apis, onOpenProject }: Props) {
         <StatCard label="Hitos pendientes"        value={stats.hitosAbiertos} accent="#fbbf24" />
         <StatCard label="Proyectos finalizados"   value={stats.finalizados}   accent="#c17248" />
       </div>
-
-      {perms && (
-        <aside style={{ padding: 14, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, marginBottom: 24, fontSize: 12, color: "#71685e" }}>
-          <strong style={{ color: "#c17248", display: "block", marginBottom: 6, fontSize: 12, letterSpacing: ".05em", textTransform: "uppercase" }}>Tus permisos</strong>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {Object.entries(perms).map(([k, v]) => (
-              <code key={k} style={{ fontSize: 12, padding: "2px 6px", borderRadius: 4, background: v ? "#247a5518" : "#b5483f18", color: v ? "#247a55" : "#b5483f" }}>
-                {v ? "Permitido:" : "No permitido:"} {k === "uploadTechnicalDocuments" ? "subir documentación técnica a proyectos asignados" : k}
-              </code>
-            ))}
-          </div>
-        </aside>
-      )}
 
       <h2 style={{ fontSize: 15, fontWeight: 700, color: "#c17248", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>
         Proyectos asignados

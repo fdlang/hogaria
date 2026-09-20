@@ -30,6 +30,21 @@ async function setup() {
 }
 
 describe("EstimateUseCases — client privacy and authorization", () => {
+  it("lets an administrator preview a draft without exposing internal fields to the client", async () => {
+    const { users, clientA, opportunityA, estimates, estimateUseCases } = await setup();
+    const admin = await users.save({ id: 0, email: Email.of("preview-admin@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const pending = await estimates.save({ oportunidadId: opportunityA.id, clienteId: clientA.id, numero: "HOG-DRAFT", titulo: draft.titulo, estado: "borrador", versionActual: 1, borrador: draft });
+
+    const preview = await estimateUseCases.publicGet(admin.id, pending.id);
+
+    expect(preview.propuesta?.titulo).toBe(draft.titulo);
+    expect(preview.propuesta?.totalConIva).toBe(242);
+    expect(JSON.stringify(preview)).not.toContain("costeUnitario");
+    expect(JSON.stringify(preview)).not.toContain("notaInterna");
+    expect(JSON.stringify(preview)).not.toContain("Margen reservado");
+    await expect(estimateUseCases.publicGet(clientA.id, pending.id)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
   it("keeps published history readable during a revision without exposing draft data", async () => {
     const {clientA,clientB,estimateA,estimates,estimateUseCases} = await setup();
     await estimates.update(estimateA.id,{estado:"en_revision",versionActual:2,titulo:"Secret draft",borrador:{...draft,titulo:"Secret draft"}});
