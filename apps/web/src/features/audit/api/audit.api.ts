@@ -3,8 +3,9 @@
  * Supports action filter, userId filter, date range.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiClient } from "@/shared/lib/api-client";
+import { RequestSequence } from "@/shared/hooks/request-sequence";
 
 export interface AuditEntryDTO {
   id: string; action: string; userId: number; userName: string;
@@ -41,15 +42,17 @@ export function useAuditLog(api: AuditApi, initialQuery: AuditQuery = {}) {
   const [page, setPage]       = useState<AuditPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
+  const requests = useRef(new RequestSequence());
 
   const fetchPage = useCallback(async (q: AuditQuery) => {
+    const request = requests.current.begin();
     setLoading(true); setError(null);
-    try { setPage(await api.query(q)); }
-    catch (e) { setError((e as { message?: string }).message ?? "Error"); }
-    finally   { setLoading(false); }
+    try { const result = await api.query(q); if (requests.current.isCurrent(request)) setPage(result); }
+    catch (e) { if (requests.current.isCurrent(request)) setError((e as { message?: string }).message ?? "Error"); }
+    finally   { if (requests.current.isCurrent(request)) setLoading(false); }
   }, [api]);
 
-  useEffect(() => { fetchPage(query); }, [query, fetchPage]);
+  useEffect(() => { fetchPage(query); return () => requests.current.invalidate(); }, [query, fetchPage]);
 
   const setFilter = useCallback((patch: Partial<AuditQuery>) => {
     setQuery(q => ({ ...q, ...patch, page: 0 })); // reset to first page on filter change
