@@ -5,6 +5,9 @@ import type { ClientContext } from "./auth.use-cases.js";
 export interface ActivationToken { userId: number; tokenHash: string; expiresAt: Date; usedAt: Date | null; }
 export interface IActivationTokenRepository {
   replace(token: ActivationToken): Promise<void>;
+  stage(token: ActivationToken): Promise<void>;
+  promote(userId: number, tokenHash: string): Promise<void>;
+  discard(tokenHash: string): Promise<void>;
   findValid(tokenHash: string, now: Date): Promise<ActivationToken | null>;
   /** Consume a still-valid link and activate its account in one transaction. */
   complete(tokenHash: string, passwordHash: string): Promise<void>;
@@ -37,10 +40,16 @@ export class AccountActivationUseCases {
     // an admin may re-send the secure access link to recover accounts created
     // before the invitation flow existed.
     if (user.activo && user.rol !== "profesional") throw new ConflictError("La cuenta ya está activada");
-    const token = newToken(); const expiresAt = new Date(Date.now() + this.ttlMs);
-    await this.tokens.replace({ userId: user.id, tokenHash: await tokenHash(token), expiresAt, usedAt: null });
+    const token = newToken(); const expiresAt = new Date(Date.now() + this.ttlMs); const hash = await tokenHash(token);
+    await this.tokens.stage({ userId: user.id, tokenHash: hash, expiresAt, usedAt: null });
     const activationUrl = `${this.appUrl.replace(/\/$/, "")}/#/activar-cuenta?token=${encodeURIComponent(token)}`;
-    await this.email.sendActivation({ to: user.email.value, name: user.nombre, activationUrl, expiresAt });
+    try {
+      await this.email.sendActivation({ to: user.email.value, name: user.nombre, activationUrl, expiresAt });
+      await this.tokens.promote(user.id, hash);
+    } catch (error) {
+      await this.tokens.discard(hash).catch(() => undefined);
+      throw error;
+    }
     return { expiresAt, email: user.email.value, requestedBy: context.ip };
   }
   async activate(token: string, password: string) {

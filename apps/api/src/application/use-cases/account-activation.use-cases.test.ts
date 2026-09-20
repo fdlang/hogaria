@@ -51,4 +51,28 @@ describe("AccountActivationUseCases", () => {
     expect((await users.findById(professional.id))?.sessionVersion).toBe(previousSessionVersion + 1);
     await expect(useCases.activate(token,"OtraClaveSegura2026")).rejects.toThrow();
   });
+
+  it("keeps the previous activation link valid when a resend email fails", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("admin3@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
+    const client = await users.save({ id: 0, email: Email.of("resend@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: false, createdAt: new Date() }, "");
+    const tokens = new InMemoryActivationTokenRepository(users);
+    let firstUrl = "";
+    let attempts = 0;
+    const email = {
+      isConfigured: () => true,
+      sendActivation: async (input: { activationUrl: string }) => {
+        attempts += 1;
+        if (attempts === 1) firstUrl = input.activationUrl;
+        else throw new Error("mail unavailable");
+      },
+    };
+    configureActivationPasswordHasher(hasher.hash);
+    const useCases = new AccountActivationUseCases(users, tokens, email, "https://hogaria.test");
+    await useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" });
+    await expect(useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("mail unavailable");
+
+    const firstToken = new URLSearchParams(firstUrl.split("?")[1]).get("token")!;
+    await expect(useCases.activate(firstToken, "ClaveSegura2026")).resolves.toBeUndefined();
+  });
 });

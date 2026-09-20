@@ -21,6 +21,18 @@ export class InMemoryActivationTokenRepository
     this.items.push(token);
     this.revisions.set(token.tokenHash, this.users.activationRevision(token.userId));
   }
+  async stage(token: ActivationToken) {
+    this.items.push(token);
+    this.revisions.set(token.tokenHash, this.users.activationRevision(token.userId));
+  }
+  async promote(userId: number, tokenHash: string) {
+    for (const old of this.items) if (old.userId === userId && old.tokenHash !== tokenHash) this.revisions.delete(old.tokenHash);
+    this.items = this.items.filter(token => token.userId !== userId || token.tokenHash === tokenHash);
+  }
+  async discard(tokenHash: string) {
+    this.items = this.items.filter(token => token.tokenHash !== tokenHash);
+    this.revisions.delete(tokenHash);
+  }
   async findValid(hash: string, now: Date) {
     return (
       this.items.find(
@@ -72,6 +84,21 @@ export class PostgresActivationTokenRepository
         [token.userId, token.tokenHash, token.expiresAt, token.usedAt],
       );
     });
+  }
+  async stage(token: ActivationToken) {
+    await this.pool.query(
+      "INSERT INTO account_activation_tokens(user_id,token_hash,expires_at,used_at) VALUES($1,$2,$3,$4)",
+      [token.userId, token.tokenHash, token.expiresAt, token.usedAt],
+    );
+  }
+  async promote(userId: number, tokenHash: string) {
+    await this.pool.query(
+      "DELETE FROM account_activation_tokens WHERE user_id=$1 AND token_hash<>$2",
+      [userId, tokenHash],
+    );
+  }
+  async discard(tokenHash: string) {
+    await this.pool.query("DELETE FROM account_activation_tokens WHERE token_hash=$1", [tokenHash]);
   }
   async findValid(hash: string, now: Date) {
     const { rows } = await this.pool.query(
