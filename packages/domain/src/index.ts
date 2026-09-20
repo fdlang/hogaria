@@ -6,4 +6,5 @@ export * from "./services/index.js";
 export * from "./work-tracking.js";
 export * from "./financial.js";
 export * from "./contact.js";
+export * from "./credentials.js";
 export * from "./rules/index.js";
