@@ -31,7 +31,7 @@ export function Router({ routes, fallback, layout = (content) => content }: { ro
   const readPath = () => {
     if (window.location.hash.startsWith("#/")) {
       const legacyPath = window.location.hash.slice(1);
-      window.history.replaceState(null, "", legacyPath);
+      if (!legacyPath.startsWith("/activar-cuenta?")) window.history.replaceState(null, "", legacyPath);
       return legacyPath;
     }
     return window.location.pathname || "/";

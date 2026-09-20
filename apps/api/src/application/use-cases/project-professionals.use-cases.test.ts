@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Email, Money, Percentage } from "@reformapro/domain/value-objects";
-import { NotFoundError, ValidationError } from "@reformapro/domain/errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "@reformapro/domain/errors";
 import { InMemoryProjectRepository, InMemoryUserRepository } from "../../infrastructure/database/inMemoryRepositories.js";
 import { InMemoryEventEmitter } from "../../infrastructure/events/inMemoryEventEmitter.js";
 import { AssignProjectProfessionalUseCase, GetProjectUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "./project.use-cases.js";
@@ -44,5 +44,18 @@ describe("project professional assignments", () => {
     await expect(update.execute({ actorId: professional.id, projectId: project.id, changes: { hitos: [{ id: "new", nombre: "Sustituido", completado: true, fecha: milestoneDate.toISOString() }], revision: 0 }, ctx })).rejects.toThrow("existentes");
     const updated = await update.execute({ actorId: professional.id, projectId: project.id, changes: { hitos: [{ id: "h1", nombre: "Inicio", completado: true, fecha: milestoneDate.toISOString() }], revision: 0 }, ctx });
     expect(updated.hitos[0]?.completado).toBe(true);
+  });
+
+  it("blocks professional changes after completion and direct contractual budget edits", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const projects = new InMemoryProjectRepository();
+    const admin = await users.save({ id: 0, email: Email.of("admin-closed@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() });
+    const professional = await users.save({ id: 0, email: Email.of("worker-closed@hogaria.test"), nombre: "Worker", rol: "profesional", profesion: "reformista", activo: true, createdAt: new Date() });
+    const project = await projects.save({ id: 0, estimateId: 1, nombre: "Obra", descripcion: "", clienteId: 20, direccion: "Calle", tipo: "Reforma", estado: "finalizado", progreso: Percentage.of(100), presupuesto: Money.of(100), fechaInicio: new Date("2026-09-01"), fechaFinPrevista: new Date("2026-11-01"), profesionalesAsignados: [{ userId: professional.id, profesion: "reformista" }], hitos: [], createdAt: new Date() });
+    const update = new UpdateProjectUseCase(users, projects, new InMemoryEventEmitter());
+    const ctx = { ip: "test", userAgent: "test" };
+
+    await expect(update.execute({ actorId: professional.id, projectId: project.id, changes: { progreso: 90, revision: 0 }, ctx })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(update.execute({ actorId: admin.id, projectId: project.id, changes: { presupuesto: 200, revision: 0 }, ctx })).rejects.toBeInstanceOf(ValidationError);
   });
 });

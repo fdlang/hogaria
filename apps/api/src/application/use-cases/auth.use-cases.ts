@@ -11,8 +11,8 @@ import { RateLimitError } from "@reformapro/domain/errors";
 import type { ICooldownGate } from "./solicitud.use-cases.js";
 
 export interface ITokenService {
-  sign(payload: { userId: number; email: string; rol: string; exp: number }): Promise<string>;
-  verify(token: string): Promise<{ userId: number; email: string; rol: string; exp: number } | null>;
+  sign(payload: { userId: number; email: string; rol: string; exp: number; sessionVersion: number }): Promise<string>;
+  verify(token: string): Promise<{ userId: number; email: string; rol: string; exp: number; sessionVersion: number } | null>;
 }
 
 export interface ClientContext {
@@ -51,6 +51,7 @@ export class LoginUseCase {
       email: user.email.value,
       rol: user.rol,
       exp,
+      sessionVersion: user.sessionVersion ?? 0,
     });
 
     await this.events.emit({

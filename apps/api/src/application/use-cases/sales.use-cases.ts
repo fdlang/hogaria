@@ -82,6 +82,7 @@ export interface ICommercialTransaction {
   execute<T>(
     operation: (repositories: CommercialRepositories) => Promise<T>,
     estimateId?: number,
+    opportunityId?: number,
   ): Promise<T>;
 }
 class PassthroughCommercialTransaction
@@ -100,6 +101,20 @@ class PassthroughCommercialTransaction
 
 function assertAdmin(user: User | null): asserts user is User {
   if (!user || user.rol !== "admin") throw new ForbiddenError();
+}
+const opportunityTransitions: Record<OpportunityStatus, OpportunityStatus[]> = {
+  nueva: ["contactada", "en_estudio", "descartada"],
+  contactada: ["visita_agendada", "en_estudio", "descartada"],
+  visita_agendada: ["en_estudio", "descartada"],
+  en_estudio: ["ganada", "descartada"],
+  ganada: [],
+  descartada: [],
+};
+function canTransitionOpportunity(from: OpportunityStatus, to: OpportunityStatus) {
+  return from === to || opportunityTransitions[from].includes(to);
+}
+function isOpenOpportunity(status: OpportunityStatus) {
+  return status !== "ganada" && status !== "descartada";
 }
 function publicSnapshot(draft: EstimateDraft): PublicEstimateSnapshot {
   return {
@@ -235,6 +250,9 @@ export class OpportunityUseCases {
       }
     }
     if (changes.estado !== undefined && !["nueva", "contactada", "visita_agendada", "en_estudio", "ganada", "descartada"].includes(changes.estado)) throw new ValidationError("Estado no válido", "estado");
+    if (changes.estado !== undefined && changes.estado !== current.estado) {
+      if (!canTransitionOpportunity(current.estado, changes.estado)) throw new ConflictError("Transición comercial no permitida");
+    }
     if (changes.fechaVisita !== undefined && changes.fechaVisita !== null && (!(changes.fechaVisita instanceof Date) || !Number.isFinite(changes.fechaVisita.getTime()))) throw new ValidationError("Fecha no válida", "fechaVisita");
     return this.opportunities.update(id, changes);
   }
@@ -294,7 +312,11 @@ export class EstimateUseCases {
     if (!["admin", "cliente"].includes(actor.rol)) throw new ForbiddenError();
     const page = query.page ?? 0;
     if (!Number.isSafeInteger(page) || page < 0 || page > 100000) throw new ValidationError("Página no válida");
-    const all = await this.estimates.findPage({ ...(actor.rol === "cliente" ? { clientId: actor.id } : {}), page, limit: 20, search: (query.search ?? "").trim().slice(0,200), status: query.status ?? "" });
+    const requestedStatus = query.status ?? "";
+    const repositoryStatus = actor.rol === "cliente" && requestedStatus === "actualizando"
+      ? "en_revision"
+      : requestedStatus;
+    const all = await this.estimates.findPage({ ...(actor.rol === "cliente" ? { clientId: actor.id } : {}), page, limit: 20, search: (query.search ?? "").trim().slice(0,200), status: repositoryStatus });
     // A proposal does not belong to the client portal until the business has
     // explicitly moved it beyond the internal draft state. This keeps titles,
     // numbers and workflow state of work-in-progress private as well.
@@ -321,7 +343,8 @@ export class EstimateUseCases {
     if (actor.rol === "cliente" && estimate.estado === "en_revision") {
       const published = (await this.estimates.findVersions(estimate.id)).filter(item => item.enviadoAt).sort((a,b) => b.version-a.version)[0];
       if (!published) throw new NotFoundError("Presupuesto");
-      return this.publicView({ ...estimate, titulo: published.snapshot.titulo, motivoRechazo: null }, published);
+      const visible = await this.publicView({ ...estimate, titulo: published.snapshot.titulo, motivoRechazo: null }, published);
+      return { ...visible, estado: "actualizando" };
     }
     return this.publicView(estimate);
   }
@@ -346,24 +369,31 @@ export class EstimateUseCases {
     const actor = await this.users.findById(actorId);
     assertAdmin(actor);
     validateDraft(draft);
-    const opportunity = await this.opportunities.findById(opportunityId);
-    if (!opportunity) throw new NotFoundError("Oportunidad");
-    if (!opportunity.clienteId)
-      throw new ConflictError(
-        "Vincula un cliente a la oportunidad antes de crear la propuesta",
-      );
     const now = new Date();
     const number = `HOG-${now.getFullYear()}-${crypto.randomUUID()}`;
-    const saved = await this.estimates.save({
-      oportunidadId: opportunityId,
-      clienteId: opportunity.clienteId,
-      numero: number,
-      titulo: draft.titulo.trim(),
-      estado: "borrador",
-      versionActual: 1,
-      borrador: draft,
-      motivoRechazo: null,
-    });
+    const saved = await this.transaction.execute(async ({ opportunities, estimates }) => {
+      const opportunity = await opportunities.findById(opportunityId);
+      if (!opportunity) throw new NotFoundError("Oportunidad");
+      if (!opportunity.clienteId)
+        throw new ConflictError(
+          "Vincula un cliente a la oportunidad antes de crear la propuesta",
+        );
+      if (!canTransitionOpportunity(opportunity.estado, "en_estudio"))
+        throw new ConflictError("La oportunidad está cerrada y no admite nuevas propuestas");
+      const created = await estimates.save({
+        oportunidadId: opportunityId,
+        clienteId: opportunity.clienteId,
+        numero: number,
+        titulo: draft.titulo.trim(),
+        estado: "borrador",
+        versionActual: 1,
+        borrador: draft,
+        motivoRechazo: null,
+      });
+      if (opportunity.estado !== "en_estudio")
+        await opportunities.update(opportunity.id, { estado: "en_estudio" });
+      return created;
+    }, undefined, opportunityId);
     await this.events.emit({
       type: "EstimateCreated",
       eventId: crypto.randomUUID(),
@@ -434,10 +464,6 @@ export class EstimateUseCases {
       version: version.version,
     });
     return saved;
-  }
-  async versions(actorId: number, id: number) {
-    await this.get(actorId, id);
-    return this.estimates.findVersions(id);
   }
   async history(actorId: number, id: number) {
     const actor = await this.users.findById(actorId);
@@ -529,6 +555,10 @@ export class EstimateUseCases {
       throw new ForbiddenError();
     if (estimate.estado !== "enviado")
       throw new ConflictError("La propuesta no está pendiente de firma");
+    const opportunity = await this.opportunities.findById(estimate.oportunidadId);
+    if (!opportunity) throw new NotFoundError("Oportunidad");
+    if (!isOpenOpportunity(opportunity.estado))
+      throw new ConflictError("La oportunidad ya no está abierta para aceptación");
     if (!input || input.version !== estimate.versionActual)
       throw new ConflictError(
         "La versión ha cambiado. Vuelve a abrir el presupuesto antes de firmar.",
@@ -574,6 +604,7 @@ export class EstimateUseCases {
       estimate.id,
       actor.id,
       now.getTime(),
+      hash.value,
     );
     const firma = {
       firmante: actor.nombre,
@@ -623,10 +654,13 @@ export class EstimateUseCases {
         );
         if (!current?.firmadoAt)
           throw new ConflictError("Falta la firma de la versión vigente");
+        await this.verifySignedVersionIntegrity(estimate, current);
         const opportunity = await opportunities.findById(
           estimate.oportunidadId,
         );
         if (!opportunity) throw new NotFoundError("Oportunidad");
+        if (!isOpenOpportunity(opportunity.estado))
+          throw new ConflictError("La oportunidad ya no está abierta para conversión");
         const subtotal = current.snapshot.partidas.reduce(
           (sum, line) =>
             sum +
@@ -654,6 +688,8 @@ export class EstimateUseCases {
         };
         const created = await projects.save(project);
         await estimates.update(id, { estado: "aceptado" });
+        if (opportunity.estado !== "en_estudio")
+          await opportunities.update(opportunity.id, { estado: "en_estudio" });
         await opportunities.update(opportunity.id, { estado: "ganada" });
         return created;
       },
@@ -686,13 +722,7 @@ export class EstimateUseCases {
       (await this.estimates.findVersions(estimate.id)).find(
         (v) => v.version === estimate.versionActual,
       ) ?? null;
-    if (version?.firma) {
-      const token = typeof version.firma.token === "string" ? version.firma.token : "";
-      const signedAt = typeof version.firma.fechaFirma === "string" ? Date.parse(version.firma.fechaFirma) : NaN;
-      if (!token || !Number.isFinite(signedAt) || !(await this.crypto.verifySignatureToken(token, estimate.id, estimate.clienteId, signedAt))) {
-        throw new ConflictError("No se ha podido verificar la integridad de la firma");
-      }
-    }
+    if (version?.firma) await this.verifySignedVersionIntegrity(estimate, version);
     const snapshot = version?.snapshot
       ? publicSnapshot(version.snapshot)
       : null;
@@ -754,6 +784,13 @@ export class EstimateUseCases {
           }
         : null,
     };
+  }
+  private async verifySignedVersionIntegrity(estimate: Estimate, version: EstimateVersion) {
+    const token = typeof version.firma?.token === "string" ? version.firma.token : "";
+    const storedHash = typeof version.firma?.hash === "string" ? version.firma.hash : "";
+    const signedAt = typeof version.firma?.fechaFirma === "string" ? Date.parse(version.firma.fechaFirma) : NaN;
+    const currentHash = await this.crypto.hashDocument(JSON.stringify({ estimateId: estimate.id, version: version.version, snapshot: version.snapshot }));
+    if (!token || !storedHash || currentHash.value !== storedHash || !Number.isFinite(signedAt) || !(await this.crypto.verifySignatureToken(token, estimate.id, estimate.clienteId, signedAt, storedHash))) throw new ConflictError("No se ha podido verificar la integridad de la firma");
   }
 }
 

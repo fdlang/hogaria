@@ -21,13 +21,22 @@ export class PostgresCommercialTransaction implements ICommercialTransaction {
   async execute<T>(
     operation: (repositories: CommercialRepositories) => Promise<T>,
     estimateId?: number,
+    opportunityId?: number,
   ): Promise<T> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      if (estimateId !== undefined)
+      if (estimateId !== undefined) {
         await client.query("SELECT id FROM estimates WHERE id=$1 FOR UPDATE", [
           estimateId,
+        ]);
+        await client.query("SELECT o.id FROM opportunities o JOIN estimates e ON e.oportunidad_id=o.id WHERE e.id=$1 FOR UPDATE OF o", [
+          estimateId,
+        ]);
+      }
+      if (opportunityId !== undefined)
+        await client.query("SELECT id FROM opportunities WHERE id=$1 FOR UPDATE", [
+          opportunityId,
         ]);
       const result = await operation({
         users: new PostgresUserRepository(client, this.hasher),

@@ -40,13 +40,14 @@ export class UpdateProjectUseCase {
     if (actor.rol === "admin") {
       // Admin allowlist — clienteId and profesionalesAsignados are NEVER allowed via this endpoint
       // (use dedicated endpoints for reassigning client or managing professionals)
-      const allowed: Array<keyof Project> = ["progreso", "estado", "nombre", "descripcion", "direccion", "tipo", "presupuesto", "fechaInicio", "fechaFinPrevista", "hitos"];
+      const allowed: Array<keyof Project> = ["progreso", "estado", "nombre", "descripcion", "direccion", "tipo", "fechaInicio", "fechaFinPrevista", "hitos"];
       for (const key of allowed) {
         const v = (changes as Record<string, unknown>)[key];
         if (v !== undefined) built[key] = v;
       }
     } else if (actor.rol === "profesional") {
       PermissionPolicy.authorize(actor, "project.read", { project });
+      if (project.estado === "finalizado") throw new ForbiddenError("Una obra finalizada es de solo lectura");
       // Profesional: ONLY progreso and hitos, and only if policy allows
       const forbidden = Object.keys(changes).filter(k => k !== "progreso" && k !== "hitos");
       if (forbidden.length) throw new ForbiddenError(`No puedes editar: ${forbidden.join(", ")}`);

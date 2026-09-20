@@ -117,7 +117,7 @@ export function PublicLanding({ api, onLogin }: Props) {
     try {
       await submit(form);
       void sendAutomaticReply(form).catch(() => undefined);
-      push("Solicitud enviada correctamente. Te contactaremos en menos de 24 h.", "success");
+      push("Solicitud enviada correctamente. Nuestro equipo la revisará y se pondrá en contacto contigo.", "success");
       setForm({ nombre: "", email: "", telefono: "", tipo: "", descripcion: "" });
       setErrors({});
     } catch {

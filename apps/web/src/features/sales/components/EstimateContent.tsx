@@ -10,11 +10,13 @@ export function EstimateSearch({
   status,
   onQuery,
   onStatus,
+  statuses = ["borrador", "en_revision", "enviado", "firmado", "aceptado", "rechazado", "caducado"],
 }: {
   query: string;
   status: string;
   onQuery: (s: string) => void;
   onStatus: (s: string) => void;
+  statuses?: string[];
 }) {
   return (
     <div className="estimate-search">
@@ -31,15 +33,7 @@ export function EstimateSearch({
         Estado
         <select value={status} onChange={(e) => onStatus(e.target.value)}>
           <option value="">Todos los estados</option>
-          {[
-            "borrador",
-            "en_revision",
-            "enviado",
-            "firmado",
-            "aceptado",
-            "rechazado",
-            "caducado",
-          ].map((s) => (
+          {statuses.map((s) => (
             <option key={s} value={s}>
               {estimateStatus(s)}
             </option>

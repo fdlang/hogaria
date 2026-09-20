@@ -61,6 +61,7 @@ export class AuditSubscriber {
   // Never include passwords, tokens or PII in the audit log payload.
   private redact(evt: DomainEvent): Record<string, unknown> {
     const { type, eventId: _, occurredAt: __, actorId: ___, actorName: ____, ip: _____, userAgent: ______, ...details } = evt;
+    for (const key of ["password", "token", "canvasSignature", "consentimiento", "motivo", "descripcion", "notasInternas"]) delete details[key];
     return { type, ...details };
   }
 }

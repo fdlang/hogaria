@@ -1,5 +1,5 @@
 import { ValidationError } from "@reformapro/domain/errors";
-import { Money, Percentage } from "@reformapro/domain/value-objects";
+import { Percentage } from "@reformapro/domain/value-objects";
 import type { Project } from "@reformapro/domain/entities";
 export function projectChanges(value: unknown): Partial<Project> {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -8,7 +8,6 @@ export function projectChanges(value: unknown): Partial<Project> {
     out: Record<string, unknown> = {};
   const allowed = [
     "progreso",
-    "presupuesto",
     "estado",
     "nombre",
     "descripcion",
@@ -38,7 +37,6 @@ export function projectChanges(value: unknown): Partial<Project> {
   };
   for (const [key, v] of Object.entries(input)) {
     if (key === "progreso") out[key] = Percentage.of(num(v, 100));
-    else if (key === "presupuesto") out[key] = Money.of(num(v, 1_000_000_000));
     else if (key === "fechaInicio" || key === "fechaFinPrevista")
       out[key] = date(v);
     else if (key === "estado") {

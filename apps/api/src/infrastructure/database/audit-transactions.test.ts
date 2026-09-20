@@ -103,7 +103,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   afterAll(() => db.close());
   beforeEach(async () => {
     await db.exec(
-      "TRUNCATE users CASCADE; TRUNCATE client_email_notifications; DROP TRIGGER IF EXISTS test_failure ON estimates; DROP TRIGGER IF EXISTS activation_failure ON users;",
+      "ALTER TABLE budget_versions DISABLE TRIGGER budget_version_no_truncate; TRUNCATE users CASCADE; ALTER TABLE budget_versions ENABLE TRIGGER budget_version_no_truncate; TRUNCATE client_email_notifications; DROP TRIGGER IF EXISTS test_failure ON estimates; DROP TRIGGER IF EXISTS activation_failure ON users;",
     );
     adminId = (
       await users.save({
@@ -343,6 +343,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   });
   it("only one concurrent activation wins and expired links cannot be consumed", async () => {
     const tokens = new PostgresActivationTokenRepository(pool);
+    const previousSessionVersion = (await users.findById(clientId))?.sessionVersion ?? 0;
     await tokens.replace({
       userId: clientId,
       tokenHash: "token",
@@ -355,6 +356,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     ]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect((await users.findById(clientId))?.activo).toBe(true);
+    expect((await users.findById(clientId))?.sessionVersion).toBe(previousSessionVersion + 1);
     expect(await tokens.findValid("token", new Date())).toBeNull();
     await tokens.replace({
       userId: clientId,
@@ -388,12 +390,12 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     await useCase.execute({
       actorId: adminId,
       projectId: project.id,
-      changes: { progreso: 50, presupuesto: 200, fechaInicio: "2026-09-01" },
+      changes: { progreso: 50, fechaInicio: "2026-09-01" },
       ctx,
     });
     const restored = toProjectDTO((await projects.findById(project.id))!);
     expect(restored.progreso).toBe(50);
-    expect(restored.presupuesto).toBe(200);
+    expect(restored.presupuesto).toBe(100);
     expect(restored.fechaInicio).toBe("2026-09-01T00:00:00.000Z");
   });
   it("queues only customer-visible project changes and team uploads", async () => {
@@ -415,6 +417,22 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     await service.update(adminId, estimateId, { ...draft, partidas: [{ ...draft.partidas[0]!, descuento: 100 }] });
     await service.send(adminId, estimateId, ctx);
     expect((await service.publicGet(clientId, estimateId)).propuesta?.totalConIva).toBe(0);
+  });
+  it("keeps published proposal snapshots immutable in the database", async () => {
+    await users.update(clientId, { activo: true });
+    await service.send(adminId, estimateId, ctx);
+
+    await expect(query("UPDATE budget_versions SET snapshot=jsonb_set(snapshot,'{titulo}',to_jsonb('Alterado'::text)) WHERE estimate_id=$1", [estimateId])).rejects.toThrow("inmutable");
+    await expect(query("DELETE FROM budget_versions WHERE estimate_id=$1", [estimateId])).rejects.toThrow("histórico");
+    await expect(query("UPDATE budget_versions SET id=id+1000000, firmado_at=NOW(), firma='{}'::jsonb WHERE estimate_id=$1", [estimateId])).rejects.toThrow("inmutable");
+    await expect(query("TRUNCATE budget_versions")).rejects.toThrow("truncar");
+  });
+  it("keeps audit entries append-only", async () => {
+    const row = (await query("SELECT id FROM audit_entries LIMIT 1")).rows[0] as { id: string };
+    expect(row).toBeTruthy();
+    await expect(query("UPDATE audit_entries SET payload='{}'::jsonb WHERE id=$1", [row.id])).rejects.toThrow("inmutable");
+    await expect(query("DELETE FROM audit_entries WHERE id=$1", [row.id])).rejects.toThrow("inmutable");
+    await expect(query("TRUNCATE audit_entries")).rejects.toThrow("inmutable");
   });
   it("will not retry an ambiguous email after its idempotency window", async () => {
     const store = new PostgresNoticeStore(pool),

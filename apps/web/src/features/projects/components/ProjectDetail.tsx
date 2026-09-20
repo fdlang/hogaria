@@ -10,7 +10,7 @@
  */
 
 import { useState } from "react";
-import { ProjectsApi } from "../api/projects.api";
+import { ProjectsApi, type ProjectDTO } from "../api/projects.api";
 import { UsersApi } from "@/features/users/api/users.api";
 import { useProject, useProgressUpdater, useMilestoneToggler } from "../hooks/useProjects";
 import { useUsers } from "@/features/users/hooks/useUsers";
@@ -43,6 +43,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const [editingProgress, setEditingProgress] = useState<number | null>(null);
   const [selectedProfessional, setSelectedProfessional] = useState("");
   const [assigning, setAssigning] = useState(false);
+  const [transitioning, setTransitioning] = useState<ProjectDTO["estado"] | null>(null);
 
   const handleProgressSave = async () => {
     if (editingProgress === null) return;
@@ -74,6 +75,14 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
     if (!ok) return;
     try { await apis.projects.unassign(projectId, userId); await project.refresh(); push("Profesional desasignado", "success"); }
     catch (e) { push((e as { message?: string }).message ?? "No se pudo desasignar", "error"); }
+  };
+
+  const handleTransition = async (estado: ProjectDTO["estado"]) => {
+    const ok = await confirm({ title: "Cambiar estado de la obra", message: `La obra pasará a ${estado.replace("_", " ")}.`, confirmLabel: "Confirmar" });
+    if (!ok) return;
+    try { setTransitioning(estado); await apis.projects.update(projectId, { estado, revision: project.data?.revision ?? 0 }); await project.refresh(); push("Estado actualizado", "success"); }
+    catch (e) { push((e as { message?: string }).message ?? "No se pudo actualizar el estado", "error"); }
+    finally { setTransitioning(null); }
   };
 
   const handleFileUpload = async (file: File, sensitive: boolean, classification?: "publico" | "tecnico" | "contrato" | "factura" | "reservado") => {
@@ -116,6 +125,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const canManageProject  = can("project.update");
   const canUploadFiles    = can("project.read", { project: p as never });
   const assignableProfessionals = (professionals.data ?? []).filter(item => item.activo && item.profesion && !p.profesionalesAsignados.some(assignment => assignment.userId === item.id));
+  const nextStates: Record<ProjectDTO["estado"], ProjectDTO["estado"][]> = { planificacion: ["en_curso"], en_curso: ["pausado", "finalizado"], pausado: ["en_curso", "finalizado"], finalizado: [] };
 
   return (
     <section>
@@ -128,6 +138,10 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
         subtitle={`${p.direccion} · ${p.tipo}`}
         actions={<ProjectStatusBadge estado={p.estado} />}
       />
+      {isAdmin && nextStates[p.estado].length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+        {nextStates[p.estado].map(estado => <Button key={estado} small variant="ghost" loading={transitioning === estado} disabled={transitioning !== null || (estado === "finalizado" && p.progreso !== 100)} onClick={() => void handleTransition(estado)}>{estado === "en_curso" ? "Iniciar/Reanudar obra" : estado === "pausado" ? "Pausar obra" : "Finalizar obra"}</Button>)}
+        {nextStates[p.estado].includes("finalizado") && p.progreso !== 100 && <p style={{ width: "100%", color: "#71685e", fontSize: 12 }}>Completa el progreso al 100 % para finalizar la obra.</p>}
+      </div>}
 
       <div className="project-detail-layout" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24, alignItems: "flex-start" }}>
         {/* ─── MAIN ──────────────────────────────────── */}

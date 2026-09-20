@@ -3,7 +3,7 @@ import { Email } from "@reformapro/domain/value-objects";
 import { ForbiddenError, NotFoundError } from "@reformapro/domain/errors";
 import { InMemoryUserRepository, InMemoryProjectRepository, InMemoryOpportunityRepository, InMemoryEstimateRepository, InMemoryChangeOrderRepository } from "../../infrastructure/database/inMemoryRepositories.js";
 import { InMemoryEventEmitter } from "../../infrastructure/events/inMemoryEventEmitter.js";
-import { ChangeOrderUseCases, EstimateUseCases } from "./sales.use-cases.js";
+import { ChangeOrderUseCases, EstimateUseCases, OpportunityUseCases } from "./sales.use-cases.js";
 import { PermissionPolicy } from "@reformapro/domain/services";
 import { Money, Percentage } from "@reformapro/domain/value-objects";
 
@@ -21,8 +21,8 @@ async function setup() {
   const opportunities = new InMemoryOpportunityRepository();
   const estimates = new InMemoryEstimateRepository();
   const estimateUseCases = new EstimateUseCases(users, opportunities, estimates, new InMemoryProjectRepository(), new InMemoryEventEmitter(), cryptoPort);
-  const opportunityA = await opportunities.save({ clienteId: clientA.id, nombre: "A", email: null, telefono: null, direccion: "Calle A", tipo: "Reforma", descripcion: "", estado: "nueva", fechaVisita: null, notasInternas: "" });
-  const opportunityB = await opportunities.save({ clienteId: clientB.id, nombre: "B", email: null, telefono: null, direccion: "Calle B", tipo: "Reforma", descripcion: "", estado: "nueva", fechaVisita: null, notasInternas: "" });
+  const opportunityA = await opportunities.save({ clienteId: clientA.id, nombre: "A", email: null, telefono: null, direccion: "Calle A", tipo: "Reforma", descripcion: "", estado: "en_estudio", fechaVisita: null, notasInternas: "" });
+  const opportunityB = await opportunities.save({ clienteId: clientB.id, nombre: "B", email: null, telefono: null, direccion: "Calle B", tipo: "Reforma", descripcion: "", estado: "en_estudio", fechaVisita: null, notasInternas: "" });
   const estimateA = await estimates.save({ oportunidadId: opportunityA.id, clienteId: clientA.id, numero: "HOG-A", titulo: draft.titulo, estado: "enviado", versionActual: 1, borrador: draft });
   const estimateB = await estimates.save({ oportunidadId: opportunityB.id, clienteId: clientB.id, numero: "HOG-B", titulo: draft.titulo, estado: "enviado", versionActual: 1, borrador: draft });
   for (const estimate of [estimateA, estimateB]) await estimates.saveVersion({ estimateId: estimate.id, version: 1, snapshot: { ...draft, notasInternas: "", partidas: draft.partidas.map(({ costeUnitario: _, notaInterna: __, ...line }) => ({ ...line, costeUnitario: null })) }, enviadoAt: new Date(), firmadoAt: null, firma: null });
@@ -35,8 +35,11 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     await estimates.update(estimateA.id,{estado:"en_revision",versionActual:2,titulo:"Secret draft",borrador:{...draft,titulo:"Secret draft"}});
     const visible = await estimateUseCases.publicGet(clientA.id,estimateA.id);
     expect(visible.versionActual).toBe(1);
+    expect(visible.estado).toBe("actualizando");
     expect(JSON.stringify(visible)).not.toContain("Secret draft");
     expect((await estimateUseCases.publicList(clientA.id)).some(item => item.id===estimateA.id)).toBe(true);
+    expect((await estimateUseCases.publicList(clientA.id, { status: "enviado" })).some(item => item.id===estimateA.id)).toBe(false);
+    expect((await estimateUseCases.publicList(clientA.id, { status: "actualizando" })).some(item => item.id===estimateA.id)).toBe(true);
     const history = await estimateUseCases.history(clientA.id,estimateA.id);
     expect(history).toHaveLength(1);
     expect(JSON.stringify(history)).not.toContain("costeUnitario");
@@ -80,6 +83,58 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     const invalidCrypto = { ...cryptoPort, verifySignatureToken: async () => false };
     const service = new EstimateUseCases(users, opportunities, estimates, new InMemoryProjectRepository(), new InMemoryEventEmitter(), invalidCrypto);
     await expect(service.publicGet(clientA.id, estimateA.id)).rejects.toThrow("integridad");
+  });
+
+  it("recomputes the signed snapshot hash before returning a signed proposal", async () => {
+    const { users, clientA, estimateA, estimates, opportunities } = await setup();
+    const signedAt = new Date("2026-09-20T10:00:00.000Z");
+    await estimates.signVersion(estimateA.id, 1, { token: "valid", fechaFirma: signedAt.toISOString(), hash: "sha256:original" }, signedAt);
+    const integrityCrypto = {
+      ...cryptoPort,
+      hashDocument: async () => ({ value: "sha256:tampered" }),
+      verifySignatureToken: async () => true,
+    };
+    const service = new EstimateUseCases(users, opportunities, estimates, new InMemoryProjectRepository(), new InMemoryEventEmitter(), integrityCrypto);
+
+    await expect(service.publicGet(clientA.id, estimateA.id)).rejects.toThrow("integridad");
+  });
+
+  it("verifies signature integrity again before converting a proposal into a project", async () => {
+    const { users, estimateA, estimates, opportunities } = await setup();
+    const admin = await users.save({ id: 0, email: Email.of("convert@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const signedAt = new Date("2026-09-20T10:00:00.000Z");
+    await estimates.signVersion(estimateA.id, 1, { token: "valid", fechaFirma: signedAt.toISOString(), hash: "sha256:original" }, signedAt);
+    await estimates.update(estimateA.id, { estado: "firmado" });
+    const service = new EstimateUseCases(users, opportunities, estimates, new InMemoryProjectRepository(), new InMemoryEventEmitter(), { ...cryptoPort, hashDocument: async () => ({ value: "sha256:tampered" }) });
+
+    await expect(service.accept(admin.id, estimateA.id, { ip: "test", userAgent: "test" })).rejects.toThrow("integridad");
+  });
+
+  it.each(["descartada", "ganada"] as const)("does not convert a signed proposal after its opportunity is %s", async (estado) => {
+    const { users, estimateA, opportunityA, estimates, opportunities } = await setup();
+    const admin = await users.save({ id: 0, email: Email.of("discarded-conversion@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const signedAt = new Date("2026-09-20T10:00:00.000Z");
+    await estimates.signVersion(estimateA.id, 1, { token: "valid", fechaFirma: signedAt.toISOString(), hash: "sha256:test" }, signedAt);
+    await estimates.update(estimateA.id, { estado: "firmado" });
+    await opportunities.update(opportunityA.id, { estado });
+    const service = new EstimateUseCases(users, opportunities, estimates, new InMemoryProjectRepository(), new InMemoryEventEmitter(), cryptoPort);
+
+    await expect(service.accept(admin.id, estimateA.id, { ip: "test", userAgent: "test" })).rejects.toThrow("abierta");
+  });
+
+  it("converts a legacy signed proposal whose active opportunity predates automatic study state", async () => {
+    const { users, estimateA, opportunityA, estimates, opportunities } = await setup();
+    const admin = await users.save({ id: 0, email: Email.of("legacy-conversion@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const signedAt = new Date("2026-09-20T10:00:00.000Z");
+    await estimates.signVersion(estimateA.id, 1, { token: "valid", fechaFirma: signedAt.toISOString(), hash: "sha256:test" }, signedAt);
+    await estimates.update(estimateA.id, { estado: "firmado" });
+    await opportunities.update(opportunityA.id, { estado: "contactada" });
+    const service = new EstimateUseCases(users, opportunities, estimates, new InMemoryProjectRepository(), new InMemoryEventEmitter(), cryptoPort);
+
+    const project = await service.accept(admin.id, estimateA.id, { ip: "test", userAgent: "test" });
+
+    expect(project.estimateId).toBe(estimateA.id);
+    expect((await opportunities.findById(opportunityA.id))?.estado).toBe("ganada");
   });
 
   it.each(["borrador", "en_revision"] as const)("never lists an internal draft (%s) in the client portal", async (estado) => {
@@ -127,6 +182,18 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     expect((await estimateUseCases.publicGet(clientA.id, estimateA.id)).estado).toBe("caducado");
   });
 
+  it.each(["descartada", "ganada"] as const)("does not permit signing after the opportunity is %s", async (estado) => {
+    const { clientA, estimateA, opportunityA, opportunities, estimateUseCases } = await setup();
+    await opportunities.update(opportunityA.id, { estado });
+
+    await expect(estimateUseCases.sign(clientA.id, estimateA.id, {
+      version: 1,
+      password: "hash",
+      canvasSignature: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAoAAAAAAAAAAAA",
+      consentimiento: "Acepto",
+    }, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("abierta");
+  });
+
   it("allows a client to read only their own project", async () => {
     const { clientA, clientB } = await setup();
     const project = { id: 1, estimateId: 1, nombre: "Obra", descripcion: "", clienteId: clientA.id, direccion: "Calle A", tipo: "Reforma", estado: "planificacion" as const, progreso: { value: 0 }, presupuesto: { amount: 0 }, fechaInicio: new Date(), fechaFinPrevista: new Date(), profesionalesAsignados: [], hitos: [], createdAt: new Date() };
@@ -155,5 +222,44 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     expect(JSON.stringify(ownOrders)).not.toContain("Proveedor preferente");
     expect(JSON.stringify(ownOrders)).not.toContain("costeUnitario");
     await expect(useCases.list(clientB.id, project.id)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("OpportunityUseCases — governed pipeline", () => {
+  it("accepts only forward commercial transitions and keeps terminal states closed", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("pipeline@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const opportunities = new InMemoryOpportunityRepository();
+    const service = new OpportunityUseCases(users, opportunities, new InMemoryEventEmitter());
+    const opportunity = await service.create(admin.id, { clienteId: null, nombre: "Reforma", email: null, telefono: null, direccion: "Madrid", tipo: "Integral", descripcion: "", estado: "nueva", fechaVisita: null, notasInternas: "" }, { ip: "test", userAgent: "test" });
+
+    await expect(service.update(admin.id, opportunity.id, { estado: "ganada" })).rejects.toThrow("Transición");
+    await service.update(admin.id, opportunity.id, { estado: "contactada" });
+    await service.update(admin.id, opportunity.id, { estado: "en_estudio" });
+    await service.update(admin.id, opportunity.id, { estado: "ganada" });
+    await expect(service.update(admin.id, opportunity.id, { estado: "contactada" })).rejects.toThrow("Transición");
+  });
+
+  it("does not create proposals for a terminal opportunity", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("terminal-admin@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const client = await users.save({ id: 0, email: Email.of("terminal-client@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: true, createdAt: new Date() }, "hash");
+    const opportunities = new InMemoryOpportunityRepository();
+    const opportunity = await opportunities.save({ clienteId: client.id, nombre: "Cerrada", email: null, telefono: null, direccion: "Madrid", tipo: "Integral", descripcion: "", estado: "descartada", fechaVisita: null, notasInternas: "" });
+    const service = new EstimateUseCases(users, opportunities, new InMemoryEstimateRepository(), new InMemoryProjectRepository(), new InMemoryEventEmitter(), cryptoPort);
+    await expect(service.create(admin.id, opportunity.id, draft, { ip: "test", userAgent: "test" })).rejects.toThrow("cerrada");
+  });
+
+  it("moves a new opportunity into study atomically when its proposal is created", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("study-admin@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const client = await users.save({ id: 0, email: Email.of("study-client@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: true, createdAt: new Date() }, "hash");
+    const opportunities = new InMemoryOpportunityRepository();
+    const opportunity = await opportunities.save({ clienteId: client.id, nombre: "Nueva", email: null, telefono: null, direccion: "Madrid", tipo: "Integral", descripcion: "", estado: "nueva", fechaVisita: null, notasInternas: "" });
+    const service = new EstimateUseCases(users, opportunities, new InMemoryEstimateRepository(), new InMemoryProjectRepository(), new InMemoryEventEmitter(), cryptoPort);
+
+    await service.create(admin.id, opportunity.id, draft, { ip: "test", userAgent: "test" });
+
+    expect((await opportunities.findById(opportunity.id))?.estado).toBe("en_estudio");
   });
 });

@@ -14,7 +14,7 @@ const restoreProject = (id: number, p: any): Project => ({ ...p, id, progreso: P
 
 export class PostgresUserRepository implements IUserRepository {
   constructor(private readonly pool: pg.Pool | pg.PoolClient, private readonly hasher: PasswordHasher) {}
-  private map(r: Row): User { return { id: Number(r.id), email: Email.of(r.email), nombre: r.nombre, rol: r.rol as UserRole, activo: r.activo, createdAt: date(r.created_at), ...(r.profesion ? { profesion: r.profesion } : {}), ...(r.telefono ? { telefono: r.telefono } : {}) }; }
+  private map(r: Row): User { return { id: Number(r.id), email: Email.of(r.email), nombre: r.nombre, rol: r.rol as UserRole, activo: r.activo, sessionVersion: Number(r.session_version ?? 0), createdAt: date(r.created_at), ...(r.profesion ? { profesion: r.profesion } : {}), ...(r.telefono ? { telefono: r.telefono } : {}) }; }
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM users WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async findByEmail(email: string) { const r = await this.pool.query("SELECT * FROM users WHERE lower(email)=lower($1)", [email]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async findAll() { return (await this.pool.query("SELECT * FROM users ORDER BY id")).rows.map(r => this.map(r)); }
@@ -35,7 +35,8 @@ export class PostgresUserRepository implements IUserRepository {
         const other = await client.query("SELECT id FROM users WHERE rol='admin' AND activo=true AND id<>$1 LIMIT 1", [id]);
         if (!other.rows.length) throw new ConflictError("Debe quedar un administrador activo");
       }
-      const result = await client.query("UPDATE users SET nombre=$2,rol=$3,profesion=$4,telefono=$5,activo=$6,password_hash=COALESCE($7,password_hash) WHERE id=$1 RETURNING *", [id,next.nombre,next.rol,next.profesion ?? null,next.telefono ?? null,next.activo,passwordHash ?? null]);
+      const revokeSessions = changes.activo === false || passwordHash !== undefined || changes.rol !== undefined;
+      const result = await client.query("UPDATE users SET nombre=$2,rol=$3,profesion=$4,telefono=$5,activo=$6,password_hash=COALESCE($7,password_hash),session_version=session_version+$8 WHERE id=$1 RETURNING *", [id,next.nombre,next.rol,next.profesion ?? null,next.telefono ?? null,next.activo,passwordHash ?? null,revokeSessions ? 1 : 0]);
       if (changes.activo === false || passwordHash !== undefined || changes.rol !== undefined) await client.query("DELETE FROM account_activation_tokens WHERE user_id=$1", [id]);
       if (ownsConnection) await client.query("COMMIT");
       return this.map(result.rows[0]);

@@ -10,8 +10,8 @@ import { DocumentHash } from "@reformapro/domain/value-objects";
 
 /** Cryptographic operations used to seal a proposal version. */
 export interface ISignatureCrypto {
-  generateSignatureToken(documentId: number, userId: number, timestamp: number): Promise<string>;
-  verifySignatureToken(token: string, documentId: number, userId: number, timestamp: number): Promise<boolean>;
+  generateSignatureToken(documentId: number, userId: number, timestamp: number, documentHash: string): Promise<string>;
+  verifySignatureToken(token: string, documentId: number, userId: number, timestamp: number, documentHash: string): Promise<boolean>;
   hashDocument(serialized: string): Promise<DocumentHash>;
 }
 
@@ -45,14 +45,14 @@ export class HMACKeyProvider {
 export class WebCryptoTokenService implements ITokenService {
   constructor(private readonly keys: HMACKeyProvider) {}
 
-  async sign(payload: { userId: number; email: string; rol: string; exp: number }): Promise<string> {
+  async sign(payload: { userId: number; email: string; rol: string; exp: number; sessionVersion: number }): Promise<string> {
     const key  = await this.keys.getKey();
     const body = btoa(JSON.stringify(payload));
     const sig  = await crypto.subtle.sign("HMAC", key, enc.encode(body));
     return `${body}.${bytesToBase64(sig)}`;
   }
 
-  async verify(token: string): Promise<{ userId: number; email: string; rol: string; exp: number } | null> {
+  async verify(token: string): Promise<{ userId: number; email: string; rol: string; exp: number; sessionVersion: number } | null> {
     try {
       const [body, sigB64] = token.split(".");
       if (!body || !sigB64) return null;
@@ -62,6 +62,7 @@ export class WebCryptoTokenService implements ITokenService {
       if (!ok) return null;
       const payload = JSON.parse(atob(body));
       if (Date.now() > payload.exp) return null;
+      if (!Number.isSafeInteger(payload.sessionVersion) || payload.sessionVersion < 0) return null;
       return payload;
     } catch { return null; }
   }
@@ -70,21 +71,22 @@ export class WebCryptoTokenService implements ITokenService {
 export class WebCryptoSignatureService implements ISignatureCrypto {
   constructor(private readonly keys: HMACKeyProvider) {}
 
-  async generateSignatureToken(docId: number, userId: number, timestamp: number): Promise<string> {
+  async generateSignatureToken(docId: number, userId: number, timestamp: number, documentHash: string): Promise<string> {
     const key  = await this.keys.getKey();
-    const raw  = `${docId}::${userId}::${timestamp}`;
+    const raw  = `${docId}::${userId}::${timestamp}::${documentHash}`;
     const sig  = await crypto.subtle.sign("HMAC", key, enc.encode(raw));
-    return `rp-sig-${toHex(sig).slice(0, 32)}`;
+    return `rp-sig-v2-${toHex(sig).slice(0, 32)}`;
   }
 
   // Timing-safe: uses crypto.subtle.verify internally, then a final equality
   // check on a derived value the attacker cannot influence.
-  async verifySignatureToken(token: string, docId: number, userId: number, timestamp: number): Promise<boolean> {
+  async verifySignatureToken(token: string, docId: number, userId: number, timestamp: number, documentHash: string): Promise<boolean> {
     try {
       const key  = await this.keys.getKey();
-      const raw  = `${docId}::${userId}::${timestamp}`;
+      const legacy = token.startsWith("rp-sig-") && !token.startsWith("rp-sig-v2-");
+      const raw  = legacy ? `${docId}::${userId}::${timestamp}` : `${docId}::${userId}::${timestamp}::${documentHash}`;
       const sig  = await crypto.subtle.sign("HMAC", key, enc.encode(raw));
-      const expected = `rp-sig-${toHex(sig).slice(0, 32)}`;
+      const expected = `${legacy ? "rp-sig-" : "rp-sig-v2-"}${toHex(sig).slice(0, 32)}`;
       return token === expected;
     } catch { return false; }
   }

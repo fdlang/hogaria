@@ -45,8 +45,10 @@ describe("AccountActivationUseCases", () => {
     await useCases.invite(admin.id, professional.id, { ip: "127.0.0.1", userAgent: "vitest" });
     expect(delivered).toBe(true);
     const token = new URLSearchParams(url.split("?")[1]).get("token")!;
+    const previousSessionVersion = (await users.findById(professional.id))?.sessionVersion ?? 0;
     await useCases.activate(token, "ClaveSegura2026");
     expect((await users.verifyPassword(professional.email.value,"ClaveSegura2026"))?.id).toBe(professional.id);
+    expect((await users.findById(professional.id))?.sessionVersion).toBe(previousSessionVersion + 1);
     await expect(useCases.activate(token,"OtraClaveSegura2026")).rejects.toThrow();
   });
 });

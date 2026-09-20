@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterEstimates } from "./estimate-search";
+import { estimateStatus, filterEstimates } from "./estimate-search";
 import type { EstimateDTO } from "./api/sales.api";
 const items = [
   {
@@ -27,5 +27,8 @@ describe("estimate search", () => {
   it("preserves order and original data when filters are cleared", () => {
     expect(filterEstimates(items, "", "")).toEqual(items);
     expect(items).toHaveLength(2);
+  });
+  it("labels an internal revision as a non-actionable client update", () => {
+    expect(estimateStatus("actualizando")).toBe("Actualización en preparación");
   });
 });

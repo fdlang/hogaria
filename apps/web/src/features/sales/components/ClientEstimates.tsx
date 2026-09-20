@@ -15,7 +15,7 @@ import {
   EstimateDocuments,
   EstimateSearch,
 } from "./EstimateContent";
-import { filterEstimates } from "../estimate-search";
+import { estimateStatus, filterEstimates } from "../estimate-search";
 import { EstimateHistory } from "./EstimateHistory";
 
 const consent =
@@ -174,6 +174,7 @@ export function ClientEstimates({
         <EstimateSearch
           query={query}
           status={status}
+          statuses={["actualizando", "enviado", "firmado", "aceptado", "rechazado", "caducado"]}
         onQuery={value => { setPage(0); setQuery(value); }}
         onStatus={value => { setPage(0); setStatus(value); }}
         />
@@ -348,7 +349,7 @@ function ProposalCard({
       <div>
         <strong>{item.titulo}</strong>
         <p style={{ margin: "6px 0", color: "#71685e" }}>
-          {item.numero} · versión {item.versionActual} · {item.estado}
+          {item.numero} · versión {item.versionActual} · {estimateStatus(item.estado)}
         </p>
         {item.propuesta && (
           <strong>{formatMoney(item.propuesta.totalConIva)}</strong>

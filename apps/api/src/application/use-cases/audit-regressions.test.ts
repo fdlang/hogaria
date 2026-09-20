@@ -75,14 +75,12 @@ describe("Audit: strict DTOs", () => {
   it("converts wire values to domain values", () => {
     const result = projectChanges({
       progreso: 50,
-      presupuesto: 1250,
       fechaInicio: "2026-09-01",
       hitos: [
         { id: "h1", nombre: "Obra", completado: false, fecha: "2026-09-02" },
       ],
     });
     expect(result.progreso?.value).toBe(50);
-    expect(result.presupuesto?.amount).toBe(1250);
     expect(result.fechaInicio).toBeInstanceOf(Date);
     expect(result.hitos?.[0]?.fecha).toBeInstanceOf(Date);
   });

@@ -1,4 +1,4 @@
-import type { ChangeOrder, Estimate, EstimateVersion, Opportunity } from "@reformapro/domain/entities";
+import type { ChangeOrder, Estimate, Opportunity } from "@reformapro/domain/entities";
 import { OpportunityUseCases, EstimateUseCases, ChangeOrderUseCases, type PublicChangeOrder } from "../../application/use-cases/sales.use-cases.js";
 import { toHttpError } from "./errorMiddleware.js";
 import type { HttpRequest, HttpResponse } from "./authController.js";
@@ -6,7 +6,6 @@ import type { HttpRequest, HttpResponse } from "./authController.js";
 const dateOrNull = (value: unknown) => value ? new Date(String(value)) : null;
 const opportunityDTO = (o: Opportunity) => ({ ...o, fechaVisita: o.fechaVisita?.toISOString() ?? null, createdAt: o.createdAt.toISOString(), updatedAt: o.updatedAt.toISOString() });
 const estimateDTO = (e: Estimate) => ({ ...e, createdAt: e.createdAt.toISOString(), updatedAt: e.updatedAt.toISOString() });
-const estimateVersionDTO = (v: EstimateVersion) => ({ ...v, enviadoAt: v.enviadoAt?.toISOString() ?? null, firmadoAt: v.firmadoAt?.toISOString() ?? null, createdAt: v.createdAt.toISOString() });
 const changeOrderDTO = (c: ChangeOrder) => ({ ...c, aprobadoAt: c.aprobadoAt?.toISOString() ?? null, createdAt: c.createdAt.toISOString() });
 const publicChangeOrderDTO = (c: PublicChangeOrder) => ({ ...c, aprobadoAt: c.aprobadoAt?.toISOString() ?? null, createdAt: c.createdAt.toISOString() });
 const isPublicChangeOrder = (change: ChangeOrder | PublicChangeOrder): change is PublicChangeOrder => "propuesta" in change;
@@ -31,7 +30,6 @@ export function salesController(deps: { opportunities: OpportunityUseCases; esti
     async rejectEstimate(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> { try { const body = req.body as { motivo?: string }; const estimate = await deps.estimates.reject(req.actorId, Number(req.params.id), body.motivo ?? "", ctx(req)); return { status: 200, body: await deps.estimates.publicGet(req.actorId, estimate.id) }; } catch (e) { return toHttpError(e); } },
     async reviseEstimate(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> { try { return { status: 200, body: estimateDTO(await deps.estimates.createRevision(req.actorId, Number(req.params.id))) }; } catch (e) { return toHttpError(e); } },
     async acceptEstimate(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> { try { const project = await deps.estimates.accept(req.actorId, Number(req.params.id), ctx(req)); return { status: 201, body: { id: project.id, estimateId: project.estimateId } }; } catch (e) { return toHttpError(e); } },
-    async versions(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> { try { return { status: 200, body: (await deps.estimates.versions(req.actorId, Number(req.params.id))).map(estimateVersionDTO) }; } catch (e) { return toHttpError(e); } },
     async listChanges(req: HttpRequest & { actorId: number; params: { projectId: string } }): Promise<HttpResponse> { try { return { status: 200, body: (await deps.changes.list(req.actorId, Number(req.params.projectId))).map(change => isPublicChangeOrder(change) ? publicChangeOrderDTO(change) : changeOrderDTO(change)) }; } catch (e) { return toHttpError(e); } },
     async createChange(req: HttpRequest & { actorId: number; params: { projectId: string } }): Promise<HttpResponse> { try { return { status: 201, body: changeOrderDTO(await deps.changes.create(req.actorId, Number(req.params.projectId), (req.body as { borrador: unknown }).borrador as never)) }; } catch (e) { return toHttpError(e); } },
   };

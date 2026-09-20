@@ -47,7 +47,7 @@ export function authController(deps: {
         const payload = await deps.tokens.verify(bearer);
         if (!payload) throw new UnauthorizedError();
         const user = await deps.users.findById(payload.userId);
-        if (!user || !user.activo) throw new UnauthorizedError();
+        if (!user || !user.activo || (user.sessionVersion ?? 0) !== payload.sessionVersion) throw new UnauthorizedError();
         return { status: 200, body: toUserDTO(user) };
       } catch (e) { const { status, body } = toHttpError(e); return { status, body }; }
     },
@@ -62,7 +62,7 @@ export function requireAuth(tokens: import("../../application/use-cases/auth.use
       const payload = await tokens.verify(bearer);
       if (!payload) return { status: 401, body: { code: "UNAUTHORIZED", message: "Token inválido o expirado" } };
       const user = await users.findById(payload.userId);
-      if (!user || !user.activo) return { status: 401, body: { code: "UNAUTHORIZED", message: "Sesión no disponible" } };
+      if (!user || !user.activo || (user.sessionVersion ?? 0) !== payload.sessionVersion) return { status: 401, body: { code: "UNAUTHORIZED", message: "Sesión no disponible" } };
       return { actorId: payload.userId };
     } catch { return { status: 401, body: { code: "UNAUTHORIZED", message: "Token inválido" } }; }
   };
