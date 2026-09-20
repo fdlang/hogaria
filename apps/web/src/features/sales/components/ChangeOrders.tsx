@@ -23,11 +23,12 @@ export function ChangeOrders({ api, projectId, admin, onChanged }: { api: Projec
     catch (cause) { setError((cause as Error).message || "No se pudo completar la acción"); }
     finally { setBusy(false); }
   };
-  return <section className="sales-card" aria-label="Órdenes de cambio">
-    <h2>Órdenes de cambio</h2><p>Las ampliaciones no modifican el presupuesto firmado. Solo se suman al importe de la obra tras la aprobación del cliente.</p>
-    {error && <p role="alert">{error}</p>}
+  return <section className={`sales-card project-change-orders${admin ? " project-change-orders--admin" : " project-change-orders--client"}`} aria-label="Órdenes de cambio">
+    <header className="project-change-orders__header"><div><p className="eyebrow">Control de alcance</p><h2>Órdenes de cambio</h2><p>Las ampliaciones no modifican el presupuesto firmado. Solo se suman al importe de la obra tras la aprobación del cliente.</p></div>
     <Button small variant="ghost" disabled={busy} onClick={() => void run(reload)}>Actualizar órdenes</Button>
-    {admin && <form onSubmit={event => { event.preventDefault(); void run(async () => {
+    </header>
+    {error && <p className="project-change-orders__alert" role="alert">{error}</p>}
+    {admin && <form className="project-change-orders__form" onSubmit={event => { event.preventDefault(); void run(async () => {
       const draft = { titulo: description.trim(), validezDias: 30, condicionesPago: conditions, garantia: "", notasCliente: "", notasInternas: "", partidas: [{ id: crypto.randomUUID(), categoria: "Ampliación", descripcion: description.trim(), cantidad: 1, unidad: "global", precioVentaUnitario: Number(price), costeUnitario: null, descuento: 0, iva: vat }] };
       if (editing) await api.editChange(projectId, editing.id, draft); else await api.createChange(projectId, draft);
       setDescription(""); setPrice(""); setConditions(""); setEditing(null);
@@ -43,26 +44,26 @@ export function ChangeOrders({ api, projectId, admin, onChanged }: { api: Projec
     {items.map(item => {
       const proposal = item.propuesta ?? item.payload;
       const total = proposal?.partidas.reduce((sum,line) => sum + line.cantidad*line.precioVentaUnitario*(1-line.descuento/100)*(1+line.iva/100),0) ?? 0;
-      return <article key={item.id} style={{ marginTop: 20, overflowWrap: "anywhere" }}>
-        <h3>{proposal?.titulo}</h3><p>{item.numero} · {item.estado}</p>
+      return <article className="project-change-order" key={item.id}>
+        <p className="project-change-order__reference">{item.numero} · {item.estado}</p><h3>{proposal?.titulo}</h3>
         {proposal?.partidas.map(line => <p key={line.id}>{line.descripcion} · {formatMoney(line.cantidad * line.precioVentaUnitario * (1-line.descuento/100))} sin IVA · IVA {line.iva}%</p>)}
         <p>{proposal?.condicionesPago}</p>
         <p><strong>Total de la ampliación con IVA: {formatMoney(total)}</strong></p>
-        {admin && item.estado === "borrador" && <>
+        {admin && item.estado === "borrador" && <div className="project-change-order__actions">
           {item.payload?.partidas.length === 1 && <Button variant="ghost" disabled={busy} onClick={() => {
             const payload = item.payload!; const line = payload.partidas[0]!;
             setEditing(item); setDescription(payload.titulo); setPrice(String(line.cantidad*line.precioVentaUnitario*(1-line.descuento/100))); setConditions(payload.condicionesPago); setVat(line.iva);
           }}>Editar borrador</Button>}
           <Button disabled={busy || editing?.id === item.id} onClick={() => void run(() => api.decideChange(projectId, item.id, "enviado"))}>Publicar para aprobación</Button>
-        </>}
-        {!admin && item.estado === "enviado" && <>
+        </div>}
+        {!admin && item.estado === "enviado" && <div className="project-change-order__actions">
           <Button small variant="ghost" disabled={busy} onClick={() => { setSelected(item.id); setPassword(""); }}>Revisar decisión</Button>
-          {selected === item.id && <div><label>Confirma tu contraseña<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></label>
+          {selected === item.id && <div className="project-change-order__decision"><label>Confirma tu contraseña<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></label>
             <p>Al aprobar aceptas el alcance y el importe indicado, que se añadirá a tu obra.</p>
             <Button disabled={busy || !password} onClick={() => void run(() => api.decideChange(projectId, item.id, "aprobado", password))}>Aceptar ampliación</Button>
             <Button variant="ghost" disabled={busy || !password} onClick={() => void run(() => api.decideChange(projectId, item.id, "rechazado", password))}>Rechazar</Button>
           </div>}
-        </>}
+        </div>}
       </article>;
     })}
   </section>;

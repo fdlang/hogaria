@@ -162,7 +162,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
 
       <div className="project-detail-layout" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24, alignItems: "flex-start" }}>
         {/* ─── MAIN ──────────────────────────────────── */}
-        <div>
+        <div className="project-detail__main">
           {/* Progress */}
           <section className="project-detail__section" style={{ marginBottom: 30 }}>
             <h2 style={sectionTitle}>Progreso</h2>
@@ -195,9 +195,9 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
             <h2 style={sectionTitle}>Hitos ({p.hitos.filter(h => h.completado).length}/{p.hitos.length})</h2>
             {p.hitos.length === 0
               ? <p style={{ fontSize: 12, color: "#71685e" }}>No hay hitos definidos.</p>
-              : <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
+              : <ul className="project-milestone-list" style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
                   {p.hitos.map(h => (
-                    <li key={h.id}
+                    <li className="project-milestone-item" key={h.id}
                       style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, background: h.completado ? "#34d39908" : "#fffaf4", border: `1px solid ${h.completado ? "#34d399" : "#d8c4ad"}`, borderRadius: 8 }}>
                       <input type="checkbox" checked={h.completado} disabled={!canEditMilestones || projectSaving}
                         onChange={() => handleMilestoneToggle(h.id)}
@@ -224,7 +224,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                 ? <div role="alert" style={{ color: "#b5483f" }}><p>{files.error}</p><Button small variant="ghost" onClick={() => void files.refresh()}>Reintentar</Button></div>
               : files.data.length === 0
               ? <EmptyState icon="📄" title="Sin documentos" hint={isAdmin ? "Sube planos, fotos, contratos o facturas" : isCliente ? "Comparte fotos o documentos generales" : "Sube fotos o documentación técnica"} />
-              : <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
+              : <ul className="project-file-list" style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
                   {files.data.map(f => (
                     <li className="project-file-item" key={f.id}
                       style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 10, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 8 }}>
@@ -289,7 +289,7 @@ const sectionTitle = { fontSize: 12, fontWeight: 700, color: "#c17248", textTran
 
 function Meta({ k, v }: { k: string; v: string }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 8, borderBottom: "1px solid #decdb8" }}>
+    <div className="project-detail__meta" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 8, borderBottom: "1px solid #decdb8" }}>
       <dt style={{ color: "#71685e" }}>{k}</dt>
       <dd style={{ color: "#302d29", fontWeight: 600 }}>{v}</dd>
     </div>

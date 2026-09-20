@@ -178,13 +178,8 @@ export function ClientEstimates({
       </header>
       {error && (
         <div
+          className="client-estimates__alert"
           role="alert"
-          style={{
-            color: "#a43c32",
-            border: "1px solid #e7b8b1",
-            padding: 12,
-            marginBottom: 16,
-          }}
         >
           {error}{" "}
           <Button small variant="ghost" onClick={() => void refresh()}>
@@ -319,6 +314,7 @@ export function ClientEstimates({
         onClose={closeChanges}
         title="Solicitar cambios"
         width={600}
+        className="client-area-modal"
       >
         <p>
           Describe qué quieres revisar. El equipo recibirá el mensaje junto a
@@ -366,6 +362,7 @@ export function ClientEstimates({
         onClose={() => setReceipt(null)}
         title="Propuesta firmada"
         width={560}
+        className="client-area-modal"
       >
         <h2>Firma registrada correctamente</h2>
         <p>Tu aceptación ha quedado sellada. Conserva esta referencia.</p>
