@@ -50,9 +50,14 @@ export function ProfesionalDashboard({ apis, onOpenProject, onOpenWork }: Props)
             subtitle={profInfo?.desc}
           />
         </div>
-        <Button className="professional-work-cta" small onClick={onOpenWork}>
-          Registrar trabajo
-        </Button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Button small variant="ghost" loading={projects.loading} onClick={() => void projects.refresh()}>
+            Actualizar obras
+          </Button>
+          <Button className="professional-work-cta" small onClick={onOpenWork}>
+            Registrar trabajo
+          </Button>
+        </div>
       </header>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 30 }}>

@@ -328,10 +328,7 @@ export class EstimateUseCases {
     const page = query.page ?? 0;
     if (!Number.isSafeInteger(page) || page < 0 || page > 100000) throw new ValidationError("Página no válida");
     const requestedStatus = query.status ?? "";
-    const repositoryStatus = actor.rol === "cliente" && requestedStatus === "actualizando"
-      ? "en_revision"
-      : requestedStatus;
-    const all = await this.estimates.findPage({ ...(actor.rol === "cliente" ? { clientId: actor.id } : {}), page, limit: 20, search: (query.search ?? "").trim().slice(0,200), status: repositoryStatus });
+    const all = await this.estimates.findPage({ ...(actor.rol === "cliente" ? { clientId: actor.id } : {}), page, limit: 20, search: (query.search ?? "").trim().slice(0,200), status: requestedStatus });
     // A proposal does not belong to the client portal until the business has
     // explicitly moved it beyond the internal draft state. This keeps titles,
     // numbers and workflow state of work-in-progress private as well.
@@ -340,7 +337,8 @@ export class EstimateUseCases {
         ? all
         : all.filter(
             (estimate) =>
-              estimate.clienteId === actor.id && estimate.estado !== "borrador",
+              estimate.clienteId === actor.id &&
+              !["borrador", "en_revision"].includes(estimate.estado),
           );
     const clientNames = actor.rol === "admin"
       ? new Map((await this.users.findByRole("cliente")).map(client => [client.id, client.nombre]))
@@ -355,7 +353,10 @@ export class EstimateUseCases {
     const estimate = await this.get(actorId, id);
     // Do not turn a known numeric identifier into a way of inspecting a
     // proposal that has not been shared with its owner yet.
-    if (actor.rol === "cliente" && estimate.estado === "borrador")
+    if (
+      actor.rol === "cliente" &&
+      ["borrador", "en_revision"].includes(estimate.estado)
+    )
       throw new NotFoundError("Presupuesto");
     return this.clientVisibleView(
       actor,
@@ -371,11 +372,6 @@ export class EstimateUseCases {
     let view;
     if (actor.rol === "admin" && ["borrador", "en_revision"].includes(estimate.estado)) {
       view = this.draftPreview(estimate);
-    } else if (actor.rol === "cliente" && estimate.estado === "en_revision") {
-      const published = (await this.estimates.findVersions(estimate.id)).filter(item => item.enviadoAt).sort((a,b) => b.version-a.version)[0];
-      if (!published) throw new NotFoundError("Presupuesto");
-      const visible = await this.publicView({ ...estimate, titulo: published.snapshot.titulo, motivoRechazo: null }, published);
-      view = { ...visible, estado: "actualizando" };
     } else {
       view = await this.publicView(estimate);
     }
@@ -511,7 +507,10 @@ export class EstimateUseCases {
     const actor = await this.users.findById(actorId);
     if (!actor?.activo || !["admin", "cliente"].includes(actor.rol)) throw new ForbiddenError();
     const estimate = await this.get(actorId, id);
-    if (actor.rol === "cliente" && estimate.estado === "borrador") throw new NotFoundError("Presupuesto");
+    if (
+      actor.rol === "cliente" &&
+      ["borrador", "en_revision"].includes(estimate.estado)
+    ) throw new NotFoundError("Presupuesto");
     const versions = (await this.estimates.findVersions(id)).filter(version => version.enviadoAt !== null);
     const clientName = (await this.users.findById(estimate.clienteId))?.nombre ??
       "Cliente no disponible";
@@ -733,6 +732,7 @@ export class EstimateUseCases {
         await opportunities.update(opportunity.id, { estado: "ganada" });
         return created;
       },
+      id,
     );
     await this.events.emit({
       type: "EstimateAccepted",

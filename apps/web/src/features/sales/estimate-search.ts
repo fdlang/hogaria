@@ -3,7 +3,6 @@ export const estimateStatus = (state: string) =>
   ({
     borrador: "Borrador",
     en_revision: "En revisión",
-    actualizando: "Actualización en preparación",
     enviado: "Enviado",
     firmado: "Firmado",
     aceptado: "Convertido en proyecto",

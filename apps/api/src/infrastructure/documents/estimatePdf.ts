@@ -21,8 +21,29 @@ async function brand() {
   throw new Error("No se encuentra el recurso de marca del PDF");
 }
 export class PdfEstimateRenderer implements EstimatePdfRenderer {
+  private readonly documents = new Map<string, Promise<Uint8Array>>();
+  private logoBytes: Promise<Uint8Array> | undefined;
+
   constructor(private readonly logo: () => Promise<Uint8Array> = brand) {}
   async render(d: EstimateDocument) {
+    const key = `${d.id}:${d.versionActual}:${new Date(d.updatedAt).getTime()}:${d.propuesta?.hash ?? ""}`;
+    const cached = this.documents.get(key);
+    if (cached) return cached;
+
+    const document = this.create(d).catch(error => {
+      this.documents.delete(key);
+      throw error;
+    });
+    this.documents.set(key, document);
+    while (this.documents.size > 8) {
+      const oldest = this.documents.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      this.documents.delete(oldest);
+    }
+    return document;
+  }
+
+  private async create(d: EstimateDocument) {
     const p = d.propuesta;
     if (!p) throw new ValidationError("No hay propuesta publicada");
     if (p.partidas.length > 1000 || JSON.stringify(p).length > 500_000)
@@ -37,7 +58,11 @@ export class PdfEstimateRenderer implements EstimatePdfRenderer {
     pdf.setModificationDate(issued);
     const regular = await pdf.embedFont(StandardFonts.Helvetica),
       bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-    const logo = await pdf.embedPng(await this.logo());
+    this.logoBytes ??= this.logo().catch(error => {
+      this.logoBytes = undefined;
+      throw error;
+    });
+    const logo = await pdf.embedPng(await this.logoBytes);
     let page: PDFPage,
       y = 0;
     const addPage = () => {
@@ -97,11 +122,19 @@ export class PdfEstimateRenderer implements EstimatePdfRenderer {
       }
       y -= 5;
     };
-    const money = (n: number) =>
-      new Intl.NumberFormat("es-ES", {
+    const euro = new Intl.NumberFormat("es-ES", {
         style: "currency",
         currency: "EUR",
-      }).format(n);
+        useGrouping: false,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    const money = (n: number) => euro
+      .formatToParts(n)
+      .map(part => part.type === "integer"
+        ? part.value.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+        : part.value)
+      .join("");
     const date = (date: Date | null) =>
       date
         ? new Date(date).toLocaleDateString("es-ES", {
@@ -155,6 +188,6 @@ export class PdfEstimateRenderer implements EstimatePdfRenderer {
         { x: 42, y: 30, size: 9, font: regular, color: rgb(0.4, 0.36, 0.32) },
       ),
     );
-    return pdf.save({ useObjectStreams: false });
+    return pdf.save({ useObjectStreams: true });
   }
 }

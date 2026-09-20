@@ -163,12 +163,12 @@ export class InMemoryEstimateRepository implements IEstimateRepository {
   async findPage(query: import("@reformapro/domain/repositories").EstimatePageQuery) {
     const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     return (await this.findAll()).filter(item => {
-      const version = this.versions.filter(v => v.estimateId === item.id && v.enviadoAt && (v.version === item.versionActual || item.estado === "en_revision")).sort((a,b) => b.version-a.version)[0];
+      const version = this.versions.find(v => v.estimateId === item.id && v.enviadoAt && v.version === item.versionActual);
       const state = item.estado === "enviado" && version?.enviadoAt && version.enviadoAt.getTime()+version.snapshot.validezDias*86400000<Date.now() ? "caducado" : item.estado;
       const labels: Record<string,string> = { en_revision:"En revisión",aceptado:"Convertido en proyecto",rechazado:"Cambios solicitados" };
-      const title = query.clientId !== undefined && item.estado === "en_revision" ? version?.snapshot.titulo ?? "" : item.titulo;
+      const title = item.titulo;
       const text = normalize(`${item.numero} ${title} ${version?.snapshot.referencia ?? ""} ${labels[state] ?? state}`);
-      return (query.clientId === undefined || (item.clienteId === query.clientId && item.estado !== "borrador" && (item.estado !== "en_revision" || !!version))) && (!query.status || state === query.status) && normalize(query.search).trim().split(/\s+/).every(word => text.includes(word));
+      return (query.clientId === undefined || (item.clienteId === query.clientId && !["borrador", "en_revision"].includes(item.estado))) && (!query.status || state === query.status) && normalize(query.search).trim().split(/\s+/).every(word => text.includes(word));
     })
       .sort((a,b) => b.updatedAt.getTime()-a.updatedAt.getTime() || b.id-a.id).slice(query.page*query.limit,(query.page+1)*query.limit);
   }

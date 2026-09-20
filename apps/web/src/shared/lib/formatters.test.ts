@@ -3,7 +3,9 @@ import { formatBytes, formatDate, formatDateTime, formatMoney } from "./formatte
 
 describe("formatters", () => {
   it("formats money in Spanish euros and handles absent values", () => {
-    expect(formatMoney(1234.5)).toMatch(/1234,50\s*€/);
+    expect(formatMoney(1234.5)).toMatch(/1\.234,50\s*€/);
+    expect(formatMoney(4276.65)).toMatch(/4\.276,65\s*€/);
+    expect(formatMoney(20365)).toMatch(/20\.365,00\s*€/);
     expect(formatMoney(null)).toBe("—");
     expect(formatMoney(Number.NaN)).toBe("—");
   });

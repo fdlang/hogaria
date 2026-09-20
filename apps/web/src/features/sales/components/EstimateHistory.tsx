@@ -3,7 +3,7 @@ import { Button } from "@/shared/ui";
 import { SalesApi, type EstimateDTO } from "../api/sales.api";
 import { EstimateDocuments } from "./EstimateContent";
 
-export function EstimateHistory({ api, id }: { api: SalesApi; id: number }) {
+export function EstimateHistory({ api, id, reusePdf = true }: { api: SalesApi; id: number; reusePdf?: boolean }) {
   const [items, setItems] = useState<EstimateDTO[] | null>(null);
   const [selected, setSelected] = useState<EstimateDTO | null>(null);
   const [busy, setBusy] = useState(false);
@@ -21,6 +21,6 @@ export function EstimateHistory({ api, id }: { api: SalesApi; id: number }) {
       {items.length === 0 && <p>Aún no hay versiones publicadas.</p>}
       {items.map(item => <Button key={item.versionActual} small variant="ghost" onClick={() => setSelected(item)}>Versión {item.versionActual}</Button>)}
     </>}
-    {selected && <div><h3>Versión {selected.versionActual} · consulta histórica</h3><EstimateDocuments api={api} item={selected} /></div>}
+    {selected && <div><h3>Versión {selected.versionActual} · consulta histórica</h3><EstimateDocuments api={api} item={selected} reusePdf={reusePdf} /></div>}
   </section>;
 }

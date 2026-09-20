@@ -2,11 +2,23 @@
  * Locale-aware presentation helpers.
  */
 
-const euro = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
+const euro = new Intl.NumberFormat("es-ES", {
+  style: "currency",
+  currency: "EUR",
+  useGrouping: false,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const groupThousands = (digits: string) =>
+  digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
 export function formatMoney(amount: number | null | undefined): string {
   if (amount == null || !Number.isFinite(amount)) return "—";
-  return euro.format(amount);
+  return euro
+    .formatToParts(amount)
+    .map(part => part.type === "integer" ? groupThousands(part.value) : part.value)
+    .join("");
 }
 
 export function formatDate(iso: string | Date | null | undefined): string {

@@ -6,6 +6,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import { formatMoney } from "@/shared/lib/formatters";
 function message(error: unknown) {
   return (
     (error as { message?: string })?.message ??
@@ -113,10 +114,7 @@ export function Field({
 }
 export const val = (data: FormData, key: string) => String(data.get(key) ?? "");
 export const num = (data: FormData, key: string) => Number(val(data, key));
-export const money = (cents: number) =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(
-    cents / 100,
-  );
+export const money = (cents: number) => formatMoney(cents / 100);
 export const when = (iso: string) => new Date(iso).toLocaleString("es-ES");
 export function localDate(iso: string) {
   const d = new Date(iso);

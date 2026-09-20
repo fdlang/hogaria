@@ -3,12 +3,25 @@
  * Optimistic updates for the mutation hooks.
  */
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { ProjectsApi, ProjectDTO } from "../api/projects.api";
 import { useResource, withOptimistic } from "@/shared/hooks/useResource";
 
 export function useProjects(api: ProjectsApi) {
-  return useResource<ProjectDTO[]>(() => api.list(), [api]);
+  const resource = useResource<ProjectDTO[]>(() => api.list(), [api]);
+  useEffect(() => {
+    const refresh = () => { void resource.refresh(); };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [resource.refresh]);
+  return resource;
 }
 
 export function useProject(api: ProjectsApi, id: number | null) {

@@ -4,6 +4,7 @@ import { ForbiddenError, NotFoundError } from "@reformapro/domain/errors";
 import { InMemoryUserRepository, InMemoryProjectRepository, InMemoryOpportunityRepository, InMemoryEstimateRepository, InMemoryChangeOrderRepository } from "../../infrastructure/database/inMemoryRepositories.js";
 import { InMemoryEventEmitter } from "../../infrastructure/events/inMemoryEventEmitter.js";
 import { ChangeOrderUseCases, EstimateUseCases, OpportunityUseCases } from "./sales.use-cases.js";
+import { AssignProjectProfessionalUseCase, ListProjectsUseCase } from "./project.use-cases.js";
 import { PermissionPolicy } from "@reformapro/domain/services";
 import { Money, Percentage } from "@reformapro/domain/value-objects";
 
@@ -20,13 +21,14 @@ async function setup() {
   const clientB = await users.save({ id: 0, email: Email.of("b@hogaria.test"), nombre: "Cliente B", rol: "cliente", activo: true, createdAt: new Date() }, "hash");
   const opportunities = new InMemoryOpportunityRepository();
   const estimates = new InMemoryEstimateRepository();
-  const estimateUseCases = new EstimateUseCases(users, opportunities, estimates, new InMemoryProjectRepository(), new InMemoryEventEmitter(), cryptoPort);
+  const projects = new InMemoryProjectRepository();
+  const estimateUseCases = new EstimateUseCases(users, opportunities, estimates, projects, new InMemoryEventEmitter(), cryptoPort);
   const opportunityA = await opportunities.save({ clienteId: clientA.id, nombre: "A", email: null, telefono: null, direccion: "Calle A", tipo: "Reforma", descripcion: "", estado: "en_estudio", fechaVisita: null, notasInternas: "" });
   const opportunityB = await opportunities.save({ clienteId: clientB.id, nombre: "B", email: null, telefono: null, direccion: "Calle B", tipo: "Reforma", descripcion: "", estado: "en_estudio", fechaVisita: null, notasInternas: "" });
   const estimateA = await estimates.save({ oportunidadId: opportunityA.id, clienteId: clientA.id, numero: "HOG-A", titulo: draft.titulo, estado: "enviado", versionActual: 1, borrador: draft });
   const estimateB = await estimates.save({ oportunidadId: opportunityB.id, clienteId: clientB.id, numero: "HOG-B", titulo: draft.titulo, estado: "enviado", versionActual: 1, borrador: draft });
   for (const estimate of [estimateA, estimateB]) await estimates.saveVersion({ estimateId: estimate.id, version: 1, snapshot: { ...draft, notasInternas: "", partidas: draft.partidas.map(({ costeUnitario: _, notaInterna: __, ...line }) => ({ ...line, costeUnitario: null })) }, enviadoAt: new Date(), firmadoAt: null, firma: null });
-  return { users, clientA, clientB, opportunityA, opportunityB, estimateA, estimateB, estimates, estimateUseCases, opportunities };
+  return { users, clientA, clientB, opportunityA, opportunityB, estimateA, estimateB, estimates, estimateUseCases, opportunities, projects };
 }
 
 describe("EstimateUseCases — client privacy and authorization", () => {
@@ -46,19 +48,13 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     await expect(estimateUseCases.publicGet(clientA.id, pending.id)).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("keeps published history readable during a revision without exposing draft data", async () => {
+  it("hides the complete proposal while a new revision remains internal", async () => {
     const {clientA,clientB,estimateA,estimates,estimateUseCases} = await setup();
     await estimates.update(estimateA.id,{estado:"en_revision",versionActual:2,titulo:"Secret draft",borrador:{...draft,titulo:"Secret draft"}});
-    const visible = await estimateUseCases.publicGet(clientA.id,estimateA.id);
-    expect(visible.versionActual).toBe(1);
-    expect(visible.estado).toBe("actualizando");
-    expect(JSON.stringify(visible)).not.toContain("Secret draft");
-    expect((await estimateUseCases.publicList(clientA.id)).some(item => item.id===estimateA.id)).toBe(true);
-    expect((await estimateUseCases.publicList(clientA.id, { status: "enviado" })).some(item => item.id===estimateA.id)).toBe(false);
-    expect((await estimateUseCases.publicList(clientA.id, { status: "actualizando" })).some(item => item.id===estimateA.id)).toBe(true);
-    const history = await estimateUseCases.history(clientA.id,estimateA.id);
-    expect(history).toHaveLength(1);
-    expect(JSON.stringify(history)).not.toContain("costeUnitario");
+
+    expect((await estimateUseCases.publicList(clientA.id)).some(item => item.id===estimateA.id)).toBe(false);
+    await expect(estimateUseCases.publicGet(clientA.id,estimateA.id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(estimateUseCases.history(clientA.id,estimateA.id)).rejects.toBeInstanceOf(NotFoundError);
     await expect(estimateUseCases.history(clientB.id,estimateA.id)).rejects.toThrow();
   });
   it("requires the owning client's decision and applies changes only once", async () => {
@@ -86,6 +82,35 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     expect(results[0]?.id).toBe(estimateA.id);
     expect(results[0]?.clienteNombre).toBe("Cliente A");
     expect(results[0]?.id).not.toBe(estimateB.id);
+  });
+
+  it("never exposes proposals to a professional account", async () => {
+    const { users, estimateA, estimateUseCases } = await setup();
+    const professional = await users.save({ id: 0, email: Email.of("estimate-worker@hogaria.test"), nombre: "Profesional", rol: "profesional", profesion: "reformista", activo: true, createdAt: new Date() }, "hash");
+
+    await expect(estimateUseCases.publicList(professional.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(estimateUseCases.publicGet(professional.id, estimateA.id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(estimateUseCases.history(professional.id, estimateA.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("shows a converted project to its client and only to assigned professionals", async () => {
+    const { users, clientA, clientB, estimateA, estimates, estimateUseCases, projects } = await setup();
+    const admin = await users.save({ id: 0, email: Email.of("project-admin@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const assigned = await users.save({ id: 0, email: Email.of("assigned@hogaria.test"), nombre: "Asignado", rol: "profesional", profesion: "reformista", activo: true, createdAt: new Date() }, "hash");
+    const unassigned = await users.save({ id: 0, email: Email.of("unassigned@hogaria.test"), nombre: "No asignado", rol: "profesional", profesion: "pintor", activo: true, createdAt: new Date() }, "hash");
+    const signedAt = new Date("2026-09-20T10:00:00.000Z");
+    await estimates.signVersion(estimateA.id, 1, { token: "valid", fechaFirma: signedAt.toISOString(), hash: "sha256:test" }, signedAt);
+    await estimates.update(estimateA.id, { estado: "firmado" });
+
+    const project = await estimateUseCases.accept(admin.id, estimateA.id, { ip: "test", userAgent: "test" });
+    await new AssignProjectProfessionalUseCase(users, projects).execute({ actorId: admin.id, projectId: project.id, userId: assigned.id });
+    const list = new ListProjectsUseCase(users, projects);
+
+    expect((await list.execute({ actorId: clientA.id })).map(item => item.id)).toEqual([project.id]);
+    expect(await list.execute({ actorId: clientB.id })).toEqual([]);
+    expect((await list.execute({ actorId: assigned.id })).map(item => item.id)).toEqual([project.id]);
+    expect(await list.execute({ actorId: unassigned.id })).toEqual([]);
+    expect((await estimates.findById(estimateA.id))?.estado).toBe("aceptado");
   });
 
   it("hides another client's proposal behind a not-found response", async () => {

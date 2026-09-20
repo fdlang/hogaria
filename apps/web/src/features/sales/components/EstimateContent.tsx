@@ -57,9 +57,11 @@ export function EstimateSearch({
 export function EstimateDocuments({
   api,
   item,
+  reusePdf = true,
 }: {
   api: SalesApi;
   item: EstimateDTO;
+  reusePdf?: boolean;
 }) {
   const [documentUrl, setDocumentUrl] = useState(""),
     [busy, setBusy] = useState(true),
@@ -74,7 +76,7 @@ export function EstimateDocuments({
     setBusy(true);
     setError("");
     setDocumentUrl("");
-    void api.downloadPdf(item.id, item.versionActual)
+    void api.downloadPdf(item.id, item.versionActual, item.updatedAt, { reuse: reusePdf })
       .then(blob => {
         if (!active) return;
         url = URL.createObjectURL(blob);
@@ -89,7 +91,7 @@ export function EstimateDocuments({
       active = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [api, item.id, item.versionActual, retry]);
+  }, [api, item.id, item.updatedAt, item.versionActual, retry, reusePdf]);
 
   function download() {
     if (!documentUrl || lock.current) return;

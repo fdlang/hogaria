@@ -131,10 +131,10 @@ export class PostgresEstimateRepository implements IEstimateRepository {
   async findPage(query: import("@reformapro/domain/repositories").EstimatePageQuery) {
     const words = query.search.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().split(/\s+/).filter(Boolean);
     const rows = await this.pool.query(`WITH visible AS (
-      SELECT e.id,e.oportunidad_id,e.cliente_id,e.numero,e.estado,e.version_actual,e.borrador,e.motivo_rechazo,e.created_at,e.updated_at,CASE WHEN $1::bigint IS NOT NULL AND e.estado='en_revision' THEN v.snapshot->>'titulo' ELSE e.titulo END titulo,COALESCE(v.snapshot->>'referencia','') reference,
+      SELECT e.id,e.oportunidad_id,e.cliente_id,e.numero,e.estado,e.version_actual,e.borrador,e.motivo_rechazo,e.created_at,e.updated_at,e.titulo,COALESCE(v.snapshot->>'referencia','') reference,
       CASE WHEN e.estado='enviado' AND v.enviado_at+(v.snapshot->>'validezDias')::int*interval '1 day'<now() THEN 'caducado' ELSE e.estado END effective_state
-      FROM estimates e LEFT JOIN LATERAL (SELECT * FROM budget_versions b WHERE b.estimate_id=e.id AND b.enviado_at IS NOT NULL AND (b.version=e.version_actual OR e.estado='en_revision') ORDER BY b.version DESC LIMIT 1) v ON true
-      WHERE ($1::bigint IS NULL OR (e.cliente_id=$1 AND e.estado<>'borrador' AND (e.estado<>'en_revision' OR v.id IS NOT NULL)))
+      FROM estimates e LEFT JOIN LATERAL (SELECT * FROM budget_versions b WHERE b.estimate_id=e.id AND b.enviado_at IS NOT NULL AND b.version=e.version_actual ORDER BY b.version DESC LIMIT 1) v ON true
+      WHERE ($1::bigint IS NULL OR (e.cliente_id=$1 AND e.estado NOT IN ('borrador','en_revision')))
     ) SELECT * FROM visible WHERE ($3='' OR effective_state=$3)
       AND NOT EXISTS (SELECT 1 FROM unnest($2::text[]) word WHERE strpos(translate(lower(numero||' '||titulo||' '||reference||' '||CASE effective_state WHEN 'borrador' THEN 'Borrador' WHEN 'en_revision' THEN 'En revisión' WHEN 'enviado' THEN 'Enviado' WHEN 'firmado' THEN 'Firmado' WHEN 'aceptado' THEN 'Convertido en proyecto' WHEN 'rechazado' THEN 'Cambios solicitados' ELSE effective_state END),'áéíóúüñ','aeiouun'),word)=0)
       ORDER BY updated_at DESC,id DESC LIMIT $4 OFFSET $5`, [query.clientId ?? null,words,query.status,query.limit,query.page*query.limit]);

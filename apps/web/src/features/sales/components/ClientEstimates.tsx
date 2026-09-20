@@ -31,6 +31,7 @@ export function ClientEstimates({
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(0);
   const filtered = filterEstimates(items, query, status);
+  const hasSignedProposal = items.some((item) => item.estado === "firmado");
   const [projects, setProjects] = useState<ProjectDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -73,6 +74,18 @@ export function ClientEstimates({
   useEffect(() => {
     const timer = setTimeout(() => { void refresh(); }, 200);
     return () => { clearTimeout(timer); requestId.current++; };
+  }, [refresh]);
+  useEffect(() => {
+    const refreshArea = () => { void refresh(); };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshArea();
+    };
+    window.addEventListener("focus", refreshArea);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshArea);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [refresh]);
   const closeProposal = () => {
     setSelected(null);
@@ -175,7 +188,7 @@ export function ClientEstimates({
         <EstimateSearch
           query={query}
           status={status}
-          statuses={["actualizando", "enviado", "firmado", "aceptado", "rechazado", "caducado"]}
+          statuses={["enviado", "firmado", "aceptado", "rechazado", "caducado"]}
         onQuery={value => { setPage(0); setQuery(value); }}
         onStatus={value => { setPage(0); setStatus(value); }}
         />
@@ -189,6 +202,7 @@ export function ClientEstimates({
             <ProposalCard
               key={item.id}
               item={item}
+              onPrepare={() => { if (item.propuesta) void api.downloadPdf(item.id, item.versionActual, item.updatedAt, { reuse: false }).catch(() => undefined); }}
               onOpen={() => setSelected(item)}
             />
           ))
@@ -202,7 +216,12 @@ export function ClientEstimates({
       </section>
       <nav aria-label="Páginas de presupuestos"><Button small variant="ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button><span>Página {page + 1}</span><Button small variant="ghost" disabled={items.length < 20 || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>
       <section aria-labelledby="client-projects" style={{ marginTop: 36 }}>
-        <h2 id="client-projects">Mis proyectos</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+          <h2 id="client-projects">Mis proyectos</h2>
+          <Button small variant="ghost" loading={loading} onClick={() => void refresh()}>
+            Actualizar proyectos
+          </Button>
+        </div>
         {loading ? (
           <p>Cargando proyectos…</p>
         ) : projects.length ? (
@@ -227,7 +246,9 @@ export function ClientEstimates({
           ))
         ) : (
           <p>
-            Cuando una propuesta firmada se convierta en obra, aparecerá aquí.
+            {hasSignedProposal
+              ? "Tu propuesta está firmada. La obra aparecerá aquí cuando Hogaria complete su alta como proyecto."
+              : "Cuando una propuesta firmada se convierta en obra, aparecerá aquí."}
           </p>
         )}
       </section>
@@ -243,9 +264,10 @@ export function ClientEstimates({
             key={`${selected.id}-${selected.versionActual}`}
             api={api}
             item={selected}
+            reusePdf={false}
           />
         )}
-        {selected && <EstimateHistory key={selected.id} api={api} id={selected.id} />}
+        {selected && <EstimateHistory key={selected.id} api={api} id={selected.id} reusePdf={false} />}
         <ProposalDetail
           item={selected}
           canvas={canvas}
@@ -340,9 +362,11 @@ export function ClientEstimates({
 
 function ProposalCard({
   item,
+  onPrepare,
   onOpen,
 }: {
   item: EstimateDTO;
+  onPrepare: () => void;
   onOpen: () => void;
 }) {
   return (
@@ -360,13 +384,18 @@ function ProposalCard({
             Cambios solicitados: {item.motivoRechazo}
           </p>
         )}
+        {item.estado === "firmado" && (
+          <p style={{ color: "#71685e" }}>
+            Firma completada · pendiente de alta como obra por Hogaria
+          </p>
+        )}
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Button small variant="ghost" onClick={onOpen}>
+        <Button small variant="ghost" onMouseEnter={onPrepare} onFocus={onPrepare} onPointerDown={onPrepare} onClick={onOpen}>
           Ver propuesta
         </Button>
         {item.estado === "enviado" && (
-          <Button small onClick={onOpen}>
+          <Button small onMouseEnter={onPrepare} onFocus={onPrepare} onPointerDown={onPrepare} onClick={onOpen}>
             Revisar y firmar
           </Button>
         )}

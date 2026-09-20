@@ -8,6 +8,7 @@ function createHttp() {
     post: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn(),
+    download: vi.fn(),
   } as unknown as ApiClient;
 }
 
@@ -46,5 +47,36 @@ describe("SalesApi", () => {
     expect(http.post).toHaveBeenNthCalledWith(1, "/estimates/7/sign", expect.objectContaining({ password: "clave" }));
     expect(http.post).toHaveBeenNthCalledWith(2, "/estimates/7/reject", { motivo: "Revisar la distribución del baño" });
     expect(http.post).toHaveBeenNthCalledWith(3, "/estimates/7/accept");
+  });
+
+  it("reuses a PDF while its estimate revision remains unchanged", async () => {
+    const http = createHttp();
+    const blob = new Blob(["pdf"], { type: "application/pdf" });
+    vi.mocked(http.download).mockResolvedValue(blob);
+    const api = new SalesApi(http);
+
+    const first = api.downloadPdf(7, 2, "2026-09-20T20:00:00.000Z");
+    const simultaneous = api.downloadPdf(7, 2, "2026-09-20T20:00:00.000Z");
+    expect(await first).toBe(blob);
+    expect(await simultaneous).toBe(blob);
+    expect(await api.downloadPdf(7, 2, "2026-09-20T20:00:00.000Z")).toBe(blob);
+    expect(http.download).toHaveBeenCalledTimes(1);
+
+    await api.downloadPdf(7, 2, "2026-09-20T20:01:00.000Z");
+    expect(http.download).toHaveBeenCalledTimes(2);
+  });
+
+  it("revalidates client PDF access after an in-flight request finishes", async () => {
+    const http = createHttp();
+    vi.mocked(http.download).mockResolvedValue(new Blob(["pdf"]));
+    const api = new SalesApi(http);
+
+    const first = api.downloadPdf(7, 2, "revision", { reuse: false });
+    const simultaneous = api.downloadPdf(7, 2, "revision", { reuse: false });
+    await Promise.all([first, simultaneous]);
+    expect(http.download).toHaveBeenCalledTimes(1);
+
+    await api.downloadPdf(7, 2, "revision", { reuse: false });
+    expect(http.download).toHaveBeenCalledTimes(2);
   });
 });

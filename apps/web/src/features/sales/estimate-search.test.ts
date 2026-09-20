@@ -30,7 +30,4 @@ describe("estimate search", () => {
     expect(filterEstimates(items, "", "")).toEqual(items);
     expect(items).toHaveLength(2);
   });
-  it("labels an internal revision as a non-actionable client update", () => {
-    expect(estimateStatus("actualizando")).toBe("Actualización en preparación");
-  });
 });

@@ -786,7 +786,14 @@ function RecentEstimates({
                   {["borrador", "en_revision"].includes(estimate.estado) ? "Editar borrador" : "Crear revisión"}
                 </Button>
               )}
-              <Button small variant="ghost" onClick={() => onPreview(estimate)}>
+              <Button
+                small
+                variant="ghost"
+                onMouseEnter={() => { if (estimate.propuesta) void api.downloadPdf(estimate.id, estimate.versionActual, estimate.updatedAt).catch(() => undefined); }}
+                onFocus={() => { if (estimate.propuesta) void api.downloadPdf(estimate.id, estimate.versionActual, estimate.updatedAt).catch(() => undefined); }}
+                onPointerDown={() => { if (estimate.propuesta) void api.downloadPdf(estimate.id, estimate.versionActual, estimate.updatedAt).catch(() => undefined); }}
+                onClick={() => onPreview(estimate)}
+              >
                 Ver presupuesto
               </Button>
               {(estimate.estado === "borrador" ||

@@ -11,6 +11,9 @@ export type AdminEstimateDTO = { id: number; oportunidadId: number; estado: stri
 export type ChangeOrderDTO = { id: number; numero: string; estado: string; payload?: EstimateDraftDTO; propuesta?: Pick<PublicProposalDTO, "titulo" | "partidas" | "condicionesPago"> };
 
 export class SalesApi {
+  private readonly pdfCache = new Map<string, Blob>();
+  private readonly pendingPdfs = new Map<string, Promise<Blob>>();
+
   constructor(private readonly http: ApiClient) {}
   opportunities() { return this.http.get<OpportunityDTO[]>("/opportunities"); }
   updateOpportunity(id: number, input: Partial<OpportunityDTO>) { return this.http.patch<OpportunityDTO>(`/opportunities/${id}`, input); }
@@ -25,7 +28,44 @@ export class SalesApi {
   draft(id: number) { return this.http.get<AdminEstimateDTO>(`/estimates/${id}/draft`); }
   updateEstimate(id: number, borrador: EstimateDraftDTO) { return this.http.patch<EstimateDTO>(`/estimates/${id}`, { borrador }); }
   reviseEstimate(id: number) { return this.http.post<AdminEstimateDTO>(`/estimates/${id}/revise`); }
-  downloadPdf(id:number,version:number) { return this.http.download(`/estimates/${id}/pdf?version=${version}`); }
+  downloadPdf(
+    id: number,
+    version: number,
+    revision = "",
+    options: { reuse?: boolean } = {},
+  ) {
+    const key = `${id}:${version}:${revision}`;
+    if (options.reuse === false) {
+      const pending = this.pendingPdfs.get(`fresh:${key}`);
+      if (pending) return pending;
+      const request = this.http.download(`/estimates/${id}/pdf?version=${version}`)
+        .finally(() => this.pendingPdfs.delete(`fresh:${key}`));
+      this.pendingPdfs.set(`fresh:${key}`, request);
+      return request;
+    }
+    const cached = this.pdfCache.get(key);
+    if (cached) {
+      this.pdfCache.delete(key);
+      this.pdfCache.set(key, cached);
+      return Promise.resolve(cached);
+    }
+    const pending = this.pendingPdfs.get(key);
+    if (pending) return pending;
+
+    const request = this.http.download(`/estimates/${id}/pdf?version=${version}`)
+      .then(blob => {
+        this.pdfCache.set(key, blob);
+        while (this.pdfCache.size > 8) {
+          const oldest = this.pdfCache.keys().next().value as string | undefined;
+          if (oldest === undefined) break;
+          this.pdfCache.delete(oldest);
+        }
+        return blob;
+      })
+      .finally(() => this.pendingPdfs.delete(key));
+    this.pendingPdfs.set(key, request);
+    return request;
+  }
   createEstimate(oportunidadId: number, borrador: EstimateDraftDTO) { return this.http.post<EstimateDTO>("/estimates", { oportunidadId, borrador }); }
   sendEstimate(id: number) { return this.http.post<EstimateDTO>(`/estimates/${id}/send`); }
   signEstimate(id: number, input: { password: string; canvasSignature: string; consentimiento: string; version: number }) { return this.http.post<{ estimate: EstimateDTO; hash: string; fechaFirma: string }>(`/estimates/${id}/sign`, input); }
