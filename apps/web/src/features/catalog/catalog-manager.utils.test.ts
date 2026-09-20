@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogItemDTO } from "@/features/sales/api/sales.api";
-import { catalogCategories, filterCatalogItems, groupCatalogItems } from "./catalog-manager.utils";
+import { catalogCategories, filterCatalogItems, groupCatalogItems, validateCatalogForm } from "./catalog-manager.utils";
 
 const items: CatalogItemDTO[] = [
   { id: 1, reference: "BAN-002", category: "Baño", description: "Mampara de vidrio", unit: "ud", salePrice: 950, vatRate: 21, active: true, updatedAt: "2026-01-01" },
@@ -26,5 +26,10 @@ describe("catalog manager utilities", () => {
     const groups = groupCatalogItems([items[2], items[0], items[1]]);
     expect(groups.map((group) => group.category)).toEqual(["Albañilería", "Baño"]);
     expect(groups[1].items.map((item) => item.reference)).toEqual(["BAN-002", "BAN-003"]);
+  });
+
+  it("does not treat an empty required price as zero", () => {
+    expect(validateCatalogForm({ reference: "DEM-1", category: "Demoliciones", description: "Trabajo", unit: "ud", salePrice: "", vatRate: "21" })).toHaveProperty("salePrice");
+    expect(validateCatalogForm({ reference: "DEM-1", category: "Demoliciones", description: "Trabajo", unit: "ud", salePrice: "0", vatRate: "21" })).toEqual({});
   });
 });

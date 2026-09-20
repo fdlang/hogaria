@@ -5,6 +5,19 @@ export type CatalogGroup = {
   items: CatalogItemDTO[];
 };
 
+export type CatalogFormValues = { reference: string; category: string; description: string; unit: string; salePrice: string; vatRate: string };
+
+export function validateCatalogForm(form: CatalogFormValues): Partial<Record<keyof CatalogFormValues, string>> {
+  const errors: Partial<Record<keyof CatalogFormValues, string>> = {};
+  if (!form.reference.trim()) errors.reference = "La referencia es obligatoria";
+  if (!form.category.trim()) errors.category = "La categoría es obligatoria";
+  if (!form.description.trim()) errors.description = "La descripción es obligatoria";
+  if (!form.unit.trim()) errors.unit = "La unidad es obligatoria";
+  if (!form.salePrice.trim() || !Number.isFinite(Number(form.salePrice)) || Number(form.salePrice) < 0) errors.salePrice = "Indica un precio válido";
+  if (!form.vatRate.trim() || !Number.isInteger(Number(form.vatRate)) || Number(form.vatRate) < 0 || Number(form.vatRate) > 100) errors.vatRate = "Indica un IVA válido";
+  return errors;
+}
+
 function searchable(value: string) {
   return value
     .normalize("NFD")

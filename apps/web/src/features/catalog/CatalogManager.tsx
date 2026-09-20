@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/shared/ui";
 import { formatMoney } from "@/shared/lib/formatters";
 import { SalesApi, type CatalogItemDTO } from "@/features/sales/api/sales.api";
-import { catalogCategories, filterCatalogItems, groupCatalogItems } from "./catalog-manager.utils";
+import { catalogCategories, filterCatalogItems, groupCatalogItems, validateCatalogForm } from "./catalog-manager.utils";
 
 import { useCatalog } from "./useCatalog";
 import { CatalogLoadState } from "./CatalogLoadState";
@@ -18,6 +18,8 @@ export function CatalogManager({ api }: { api: SalesApi }) {
   const groups = useMemo(() => groupCatalogItems(displayedItems), [displayedItems]);
   const set = (field: keyof Form, value: string) => setForm(current => ({ ...current, [field]: value }));
   const submit = async () => {
+    const validation = validateCatalogForm(form);
+    if (Object.keys(validation).length) { setError(Object.values(validation)[0] ?? "Revisa los campos obligatorios"); return; }
     const payload = { reference: form.reference, category: form.category, description: form.description, unit: form.unit, salePrice: Number(form.salePrice), vatRate: Number(form.vatRate) };
     try { setSaving(true); setError(""); if (editing == null) await api.createCatalogItem(payload); else await api.updateCatalogItem(editing, payload); setForm(blank()); setEditing(null); await load(); } catch (cause) { setError((cause as { message?: string }).message ?? "No se pudo guardar la partida"); } finally { setSaving(false); }
   };
