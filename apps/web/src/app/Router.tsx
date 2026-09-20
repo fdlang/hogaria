@@ -15,13 +15,18 @@ export interface Route {
 }
 
 export function matchRoute(routes: Route[], currentPath: string): Route | null {
-  const path = currentPath.split(/[?#]/)[0] || "/";
-  const exact = routes.find(route => route.path.replace(/^#/, "") === path);
+  const rawPath = currentPath.split(/[?#]/)[0] || "/";
+  const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, "") : rawPath;
+  const exact = routes.find(route => {
+    const candidate = route.path.replace(/^#/, "");
+    return !candidate.endsWith("/") && candidate === path;
+  });
   if (exact) return exact;
   const candidates = routes
     .filter(route => {
       const candidate = route.path.replace(/^#/, "");
-      return candidate !== "/" && candidate.endsWith("/") && path.startsWith(candidate) && path.length > candidate.length;
+      if (candidate === "/" || !candidate.endsWith("/") || !path.startsWith(candidate)) return false;
+      return /^\d+$/.test(path.slice(candidate.length));
     })
     .sort((left, right) => right.path.length - left.path.length);
   return candidates[0] ?? null;
