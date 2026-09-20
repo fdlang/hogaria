@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateEstimateTotals } from "./financial";
+import { calculateEstimateTotals } from "./financial.js";
 
 describe("calculateEstimateTotals", () => {
   it("rounds each line and its tax to euro cents", () => {

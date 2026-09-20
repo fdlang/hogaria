@@ -246,6 +246,16 @@ export class OpportunityUseCases {
     for (const field of ["nombre", "direccion", "tipo"] as const) {
       const value = changes[field];
       if (value !== undefined && (typeof value !== "string" || !value.trim())) throw new ValidationError("Campo obligatorio", field);
+      if (typeof value === "string") changes[field] = value.trim();
+    }
+    if (changes.email !== undefined) {
+      if (changes.email === null || !changes.email.trim()) changes.email = null;
+      else changes.email = Email.of(changes.email).value;
+    }
+    if (changes.telefono !== undefined) {
+      if (changes.telefono === null || !changes.telefono.trim()) changes.telefono = null;
+      else if (!isValidSpanishPhone(changes.telefono)) throw new ValidationError("Teléfono no válido", "telefono");
+      else changes.telefono = changes.telefono.trim();
     }
     if (changes.clienteId !== undefined && changes.clienteId !== current.clienteId) {
       if (current.clienteId !== null) throw new ConflictError("No se puede cambiar el cliente de una oportunidad vinculada");

@@ -25,6 +25,7 @@ export interface ProjectFile {
   storageKey: string;  // S3 key
   sensitive: boolean;
   classification?: "publico" | "tecnico" | "contrato" | "factura" | "reservado";
+  deleting?: boolean;
   uploadedAt: Date;
 }
 
@@ -32,6 +33,7 @@ export interface IFileRepository {
   save(f: Omit<ProjectFile, "id">): Promise<ProjectFile>;
   findById(id: number): Promise<ProjectFile | null>;
   findByProject(projectId: number): Promise<ProjectFile[]>;
+  markDeleting(id: number): Promise<void>;
   delete(id: number): Promise<void>;
 }
 
@@ -157,6 +159,7 @@ export class DeleteFileUseCase {
     if (file.sensitive && actor.rol !== "admin") throw new ForbiddenError();
     if (!file.sensitive && actor.rol !== "admin" && file.uploadedBy !== actor.id) throw new ForbiddenError();
 
+    await this.files.markDeleting(file.id);
     await this.storage.delete(file.storageKey);
     await this.files.delete(file.id);
   }
@@ -179,7 +182,7 @@ export class ListFilesUseCase {
 
     const all = await this.files.findByProject(cmd.projectId);
 
-    return all.filter(file => canReadFile(file, actor.rol));
+    return all.filter(file => !file.deleting && canReadFile(file, actor.rol));
   }
 }
 
@@ -194,7 +197,7 @@ export class DownloadFileUseCase {
     const actor = await this.users.findById(cmd.actorId);
     if (!actor?.activo) throw new ForbiddenError();
     const file = await this.files.findById(cmd.fileId);
-    if (!file) throw new NotFoundError("Archivo");
+    if (!file || file.deleting) throw new NotFoundError("Archivo");
     const project = await this.projects.findById(file.projectId);
     if (!project) throw new NotFoundError("Proyecto");
     if (!PermissionPolicy.can(actor, "project.read", { project })) throw new NotFoundError("Archivo");

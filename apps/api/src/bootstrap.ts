@@ -95,6 +95,11 @@ class InMemoryFileRepository implements IFileRepository {
   async findByProject(projectId: number): Promise<ProjectFile[]> {
     return this.files.filter(f => f.projectId === projectId);
   }
+  async markDeleting(id: number): Promise<void> {
+    const file = this.files.find(f => f.id === id);
+    if (!file) throw new NotFoundError("Archivo");
+    file.deleting = true;
+  }
   async delete(id: number): Promise<void> {
     const idx = this.files.findIndex(f => f.id === id);
     if (idx === -1) throw new NotFoundError("Archivo");

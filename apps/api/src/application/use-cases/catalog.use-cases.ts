@@ -29,9 +29,15 @@ export class CatalogUseCases {
   }
   async update(actorId: number, id: number, input: CatalogPatch) {
     assertAdmin(await this.users.findById(actorId)); const current = await this.catalog.findById(id); if (!current) throw new NotFoundError("Partida de catálogo");
+    if (input.active !== undefined && typeof input.active !== "boolean") throw new ValidationError("Estado no válido", "active");
     const candidate = normalize({ reference: input.reference ?? current.reference, category: input.category ?? current.category, description: input.description ?? current.description, unit: input.unit ?? current.unit, salePrice: input.salePrice ?? current.salePrice, vatRate: input.vatRate ?? current.vatRate });
     if (candidate.reference !== current.reference) { const existing = await this.catalog.findByReference(candidate.reference); if (existing && existing.id !== id) throw new ConflictError("Ya existe una partida con esa referencia"); }
-    return this.catalog.update(id, { ...candidate, ...(input.active === undefined ? {} : { active: input.active }) });
+    const changes: CatalogPatch = {};
+    for (const key of ["reference", "category", "description", "unit", "salePrice", "vatRate"] as const) {
+      if (input[key] !== undefined) changes[key] = candidate[key] as never;
+    }
+    if (input.active !== undefined) changes.active = input.active;
+    return this.catalog.update(id, changes);
   }
   async archive(actorId: number, id: number) { assertAdmin(await this.users.findById(actorId)); if (!(await this.catalog.findById(id))) throw new NotFoundError("Partida de catálogo"); return this.catalog.update(id, { active: false }); }
 }

@@ -119,26 +119,53 @@ describe("Security and integrity regressions", () => {
   });
   it("checks project access before deleting an owned upload", async () => {
     const { users, client } = await setup();
-    const removeBlob = vi.fn(), removeFile = vi.fn();
-    const files = { findById: async () => ({ id: 1, projectId: 999, uploadedBy: client.id, sensitive: false, storageKey: "file" }), delete: removeFile };
+    const removeBlob = vi.fn(), removeFile = vi.fn(), markDeleting = vi.fn();
+    const files = { findById: async () => ({ id: 1, projectId: 999, uploadedBy: client.id, sensitive: false, storageKey: "file" }), markDeleting, delete: removeFile };
     const service = new DeleteFileUseCase(users, new InMemoryProjectRepository(), files as never, { delete: removeBlob } as never);
     await expect(service.execute({ actorId: client.id, fileId: 1 })).rejects.toThrow();
     expect(removeBlob).not.toHaveBeenCalled();
+    expect(markDeleting).not.toHaveBeenCalled();
     expect(removeFile).not.toHaveBeenCalled();
+  });
+  it("requires the one-time link to activate an inactive account", async () => {
+    const { admin, client, update } = await setup();
+    await expect(update.execute({ actorId: admin.id, userId: client.id, changes: { activo: true }, ctx })).rejects.toThrow("enlace");
   });
   it("keeps file metadata when storage deletion fails so deletion can be retried", async () => {
     const { users, admin } = await setup();
     const projects = new InMemoryProjectRepository();
     const project = await projects.save({ id: 0, estimateId: 1, nombre: "Obra", descripcion: "", clienteId: 2, direccion: "Madrid", tipo: "Reforma", estado: "en_curso", progreso: { value: 0 }, presupuesto: { amount: 0 }, fechaInicio: new Date(), fechaFinPrevista: new Date(), profesionalesAsignados: [], hitos: [], createdAt: new Date() } as never);
     const removeFile = vi.fn(async () => undefined);
+    const markDeleting = vi.fn(async () => undefined);
     const files = {
       findById: async () => ({ id: 1, projectId: project.id, uploadedBy: admin.id, sensitive: false, storageKey: "file" }),
+      markDeleting,
       delete: removeFile,
     };
     const service = new DeleteFileUseCase(users, projects, files as never, { delete: async () => { throw new Error("blob unavailable"); } } as never);
 
     await expect(service.execute({ actorId: admin.id, fileId: 1 })).rejects.toThrow("blob unavailable");
+    expect(markDeleting).toHaveBeenCalledWith(1);
     expect(removeFile).not.toHaveBeenCalled();
+  });
+  it("keeps a failed metadata deletion hidden and retryable after removing the blob", async () => {
+    const { users, admin } = await setup();
+    const projects = new InMemoryProjectRepository();
+    const project = await projects.save({ id: 0, estimateId: 1, nombre: "Obra", descripcion: "", clienteId: 2, direccion: "Madrid", tipo: "Reforma", estado: "en_curso", progreso: { value: 0 }, presupuesto: { amount: 0 }, fechaInicio: new Date(), fechaFinPrevista: new Date(), profesionalesAsignados: [], hitos: [], createdAt: new Date() } as never);
+    const file = { id: 1, projectId: project.id, uploadedBy: admin.id, nombre: "plano.pdf", tipo: "application/pdf", tamaño: 10, sensitive: false, storageKey: "file", uploadedAt: new Date(), deleting: false };
+    const files = {
+      findById: async () => file,
+      findByProject: async () => [file],
+      markDeleting: async () => { file.deleting = true; },
+      delete: async () => { throw new Error("metadata unavailable"); },
+    };
+    const storage = { delete: vi.fn(async () => undefined), get: vi.fn(async () => new Uint8Array()) };
+    const deletion = new DeleteFileUseCase(users, projects, files as never, storage as never);
+
+    await expect(deletion.execute({ actorId: admin.id, fileId: file.id })).rejects.toThrow("metadata unavailable");
+    expect(await new ListFilesUseCase(users, projects, files as never).execute({ actorId: admin.id, projectId: project.id })).toEqual([]);
+    await expect(new DownloadFileUseCase(users, projects, files as never, storage as never).execute({ actorId: admin.id, fileId: file.id })).rejects.toThrow("Archivo");
+    expect(storage.get).not.toHaveBeenCalled();
   });
   it("rejects active-content office documents before writing to storage", async () => {
     const { users, admin, events } = await setup();

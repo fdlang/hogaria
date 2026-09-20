@@ -239,6 +239,18 @@ describe("OpportunityUseCases — governed pipeline", () => {
     const service = new OpportunityUseCases(users, new InMemoryOpportunityRepository(), new InMemoryEventEmitter());
     await expect(service.create(admin.id, { clienteId: null, nombre: "Obra", direccion: "Madrid", tipo: "Integral", fechaVisita: new Date("invalid") }, { ip: "test", userAgent: "test" })).rejects.toThrow("Fecha");
   });
+  it("applies the same contact validation when updating an opportunity", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("contact-update@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const opportunities = new InMemoryOpportunityRepository();
+    const service = new OpportunityUseCases(users, opportunities, new InMemoryEventEmitter());
+    const opportunity = await service.create(admin.id, { clienteId: null, nombre: "Obra", direccion: "Madrid", tipo: "Integral" }, { ip: "test", userAgent: "test" });
+
+    await expect(service.update(admin.id, opportunity.id, { email: "invalid" })).rejects.toThrow();
+    await expect(service.update(admin.id, opportunity.id, { telefono: "123" })).rejects.toThrow("Teléfono");
+    await service.update(admin.id, opportunity.id, { email: "  cliente@hogaria.test ", telefono: " +34 614 786 341 " });
+    expect(await opportunities.findById(opportunity.id)).toMatchObject({ email: "cliente@hogaria.test", telefono: "+34 614 786 341" });
+  });
   it("accepts only forward commercial transitions and keeps terminal states closed", async () => {
     const users = new InMemoryUserRepository(hasher);
     const admin = await users.save({ id: 0, email: Email.of("pipeline@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
