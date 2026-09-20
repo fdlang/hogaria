@@ -1,6 +1,7 @@
 import type { CatalogItem, User } from "@reformapro/domain/entities";
 import type { ICatalogRepository, IUserRepository } from "@reformapro/domain/repositories";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@reformapro/domain/errors";
+import { hasAtMostTwoDecimals } from "@reformapro/domain";
 
 type CatalogInput = Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate">;
 type CatalogPatch = Partial<CatalogInput & Pick<CatalogItem, "active">>;
@@ -13,7 +14,7 @@ function normalize(input: CatalogInput): CatalogInput {
   if (!category || category.length > 80) throw new ValidationError("Categoría obligatoria", "category");
   if (!description || description.length > 280) throw new ValidationError("Descripción obligatoria", "description");
   if (!unit || unit.length > 20) throw new ValidationError("Unidad obligatoria", "unit");
-  if (!Number.isFinite(input.salePrice) || input.salePrice < 0) throw new ValidationError("Precio de venta inválido", "salePrice");
+  if (!Number.isFinite(input.salePrice) || input.salePrice < 0 || input.salePrice > 999_999_999.99 || !hasAtMostTwoDecimals(input.salePrice)) throw new ValidationError("Precio de venta inválido", "salePrice");
   if (!Number.isInteger(input.vatRate) || input.vatRate < 0 || input.vatRate > 100) throw new ValidationError("IVA inválido", "vatRate");
   return { reference, category, description, unit, salePrice: input.salePrice, vatRate: input.vatRate };
 }

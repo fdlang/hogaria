@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFPage } from "pdf-lib";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { ValidationError } from "@reformapro/domain/errors";
+import { calculateEstimateLineTotals } from "@reformapro/domain";
 import type {
   EstimateDocument,
   EstimatePdfRenderer,
@@ -116,8 +117,7 @@ export class PdfEstimateRenderer implements EstimatePdfRenderer {
     for (const [index, line] of p.partidas.entries()) {
       if (y < 155) addPage();
       text(`${index + 1}. ${line.categoria} · ${line.descripcion}`, 11, true);
-      const subtotal =
-        line.cantidad * line.precioVentaUnitario * (1 - line.descuento / 100);
+      const subtotal = calculateEstimateLineTotals(line).totalSinIva;
       text(
         `${line.cantidad} ${line.unidad} × ${money(line.precioVentaUnitario)} · Descuento: ${line.descuento}% · IVA: ${line.iva}%`,
       );

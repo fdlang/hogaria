@@ -27,6 +27,7 @@ import { validateDraft } from "./estimate-validation.js";
 import type { ClientContext } from "./auth.use-cases.js";
 import type { ISolicitudRepository, ICooldownGate } from "./solicitud.use-cases.js";
 import type { ISignatureCrypto } from "../../infrastructure/crypto/crypto.service.js";
+import { calculateEstimateTotals } from "@reformapro/domain";
 
 type OpportunityInput = Pick<
   Opportunity,
@@ -661,14 +662,7 @@ export class EstimateUseCases {
         if (!opportunity) throw new NotFoundError("Oportunidad");
         if (!isOpenOpportunity(opportunity.estado))
           throw new ConflictError("La oportunidad ya no está abierta para conversión");
-        const subtotal = current.snapshot.partidas.reduce(
-          (sum, line) =>
-            sum +
-            line.cantidad *
-              line.precioVentaUnitario *
-              (1 - line.descuento / 100),
-          0,
-        );
+        const subtotal = calculateEstimateTotals(current.snapshot.partidas).totalSinIva;
         const project: Project = {
           id: 0,
           estimateId: estimate.id,
@@ -726,29 +720,7 @@ export class EstimateUseCases {
     const snapshot = version?.snapshot
       ? publicSnapshot(version.snapshot)
       : null;
-    const subtotal = snapshot
-      ? snapshot.partidas.reduce(
-          (sum, line) =>
-            sum +
-            line.cantidad *
-              line.precioVentaUnitario *
-              (1 - line.descuento / 100),
-          0,
-        )
-      : null;
-    const iva =
-      snapshot && subtotal != null
-        ? snapshot.partidas.reduce(
-            (sum, line) =>
-              sum +
-              (line.cantidad *
-                line.precioVentaUnitario *
-                (1 - line.descuento / 100) *
-                line.iva) /
-                100,
-            0,
-          )
-        : null;
+    const totals = snapshot ? calculateEstimateTotals(snapshot.partidas) : null;
     const expired =
       snapshot && version
         ? isExpired(version.enviadoAt, snapshot.validezDias)
@@ -766,9 +738,7 @@ export class EstimateUseCases {
       propuesta: snapshot
         ? {
             ...snapshot,
-            totalSinIva: subtotal,
-            totalIva: iva,
-            totalConIva: subtotal! + iva!,
+            ...totals!,
             enviadoAt: version!.enviadoAt,
             expiresAt: version!.enviadoAt
               ? new Date(

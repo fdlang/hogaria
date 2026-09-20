@@ -11,6 +11,7 @@ import {
 import { CatalogItem, ChangeOrder, Estimate, EstimateVersion, Opportunity, OpportunityStatus, User, Project, AuditEntry, UserRole } from "@reformapro/domain/entities";
 import { NotFoundError, ConflictError } from "@reformapro/domain/errors";
 import { Money } from "@reformapro/domain/value-objects";
+import { calculateEstimateTotals } from "@reformapro/domain";
 
 // Hashes are stored ONLY hashed, never plaintext.
 export interface PasswordHasher {
@@ -189,8 +190,8 @@ export class InMemoryChangeOrderRepository implements IChangeOrderRepository {
       if (next === "aprobado") {
         const project = await this.projects?.findById(projectId);
         if (!project || !this.projects) throw new NotFoundError("Proyecto");
-        const delta = item.payload.partidas.reduce((sum,line) => sum + line.cantidad*line.precioVentaUnitario*(1-line.descuento/100),0);
-        await this.projects.update(projectId, { presupuesto: project.presupuesto.plus(Money.of(Math.round(delta*100)/100)) }, project.revision ?? 0);
+        const delta = calculateEstimateTotals(item.payload.partidas).totalSinIva;
+        await this.projects.update(projectId, { presupuesto: project.presupuesto.plus(Money.of(delta)) }, project.revision ?? 0);
       }
       return this.update(id, { estado: next, aprobadoAt: next === "aprobado" ? new Date() : null });
     } finally { this.changing = false; }

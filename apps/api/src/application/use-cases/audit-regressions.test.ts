@@ -72,6 +72,17 @@ describe("Audit: strict DTOs", () => {
       }),
     ).not.toThrow();
   });
+  it.each([
+    { precioVentaUnitario: 10.005 },
+    { costeUnitario: 2.345 },
+    { descuento: 1.005 },
+    { iva: 21.005 },
+  ])("rejects financial values with more than two decimals %j", (line) => {
+    expect(() => validateDraft({
+      ...draft,
+      partidas: [{ ...draft.partidas[0], ...line }],
+    })).toThrow();
+  });
   it("converts wire values to domain values", () => {
     const result = projectChanges({
       progreso: 50,

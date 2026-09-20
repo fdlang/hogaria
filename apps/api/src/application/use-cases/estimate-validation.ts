@@ -1,5 +1,6 @@
 import { ValidationError } from "@reformapro/domain/errors";
 import type { EstimateDraft } from "@reformapro/domain/entities";
+import { hasAtMostTwoDecimals } from "@reformapro/domain";
 export function validateDraft(value: unknown): asserts value is EstimateDraft {
   const fail = (): never => {
     throw new ValidationError(
@@ -47,6 +48,10 @@ export function validateDraft(value: unknown): asserts value is EstimateDraft {
     number(line.descuento, 0, 100);
     number(line.iva, 0, 100);
     if (line.costeUnitario != null) number(line.costeUnitario, 0, 100_000_000);
+    if (!hasAtMostTwoDecimals(line.precioVentaUnitario as number) ||
+        !hasAtMostTwoDecimals(line.descuento as number) ||
+        !hasAtMostTwoDecimals(line.iva as number) ||
+        (line.costeUnitario != null && !hasAtMostTwoDecimals(line.costeUnitario as number))) fail();
     for (const key of ["notaCliente", "notaInterna"])
       if (line[key] !== undefined) text(line[key], 10000);
     total += (line.cantidad as number) * (line.precioVentaUnitario as number);

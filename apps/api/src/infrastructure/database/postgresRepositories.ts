@@ -6,6 +6,7 @@ import { NotFoundError, ConflictError } from "@reformapro/domain/errors";
 import type { PasswordHasher } from "./inMemoryRepositories.js";
 import type { ProjectFile, IFileRepository } from "../../application/use-cases/file.use-cases.js";
 import type { ISolicitudRepository } from "../../application/use-cases/solicitud.use-cases.js";
+import { calculateEstimateTotals } from "@reformapro/domain";
 
 type Row = Record<string, any>;
 const date = (value: string | Date) => new Date(value);
@@ -141,8 +142,8 @@ export class PostgresChangeOrderRepository implements IChangeOrderRepository {
       if (!result.rows[0]) throw new ConflictError("La orden ha cambiado o ya fue resuelta. Actualiza los datos.");
       if (next === "aprobado") {
         const order = this.map(result.rows[0]);
-        const delta = order.payload.partidas.reduce((sum,line) => sum + line.cantidad * line.precioVentaUnitario * (1-line.descuento/100),0);
-        await client.query("UPDATE projects SET payload=jsonb_set(jsonb_set(payload,'{presupuesto}',to_jsonb((payload->>'presupuesto')::numeric+$2::numeric)),'{revision}',to_jsonb(COALESCE((payload->>'revision')::int,0)+1)) WHERE id=$1",[projectId,Math.round(delta*100)/100]);
+        const delta = calculateEstimateTotals(order.payload.partidas).totalSinIva;
+        await client.query("UPDATE projects SET payload=jsonb_set(jsonb_set(payload,'{presupuesto}',to_jsonb((payload->>'presupuesto')::numeric+$2::numeric)),'{revision}',to_jsonb(COALESCE((payload->>'revision')::int,0)+1)) WHERE id=$1",[projectId,delta]);
       }
       await client.query("COMMIT");
       return this.map(result.rows[0]);
