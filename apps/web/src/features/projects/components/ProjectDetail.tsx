@@ -137,8 +137,8 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const nextStates: Record<ProjectDTO["estado"], ProjectDTO["estado"][]> = { planificacion: ["en_curso"], en_curso: ["pausado", "finalizado"], pausado: ["en_curso", "finalizado"], finalizado: [] };
 
   return (
-    <section>
-      <nav style={{ marginBottom: 20 }}>
+    <section className="project-detail">
+      <nav className="project-detail__back" style={{ marginBottom: 20 }}>
         <Button variant="ghost" small onClick={onBack}>← Volver</Button>
       </nav>
 
@@ -163,9 +163,9 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
         {/* ─── MAIN ──────────────────────────────────── */}
         <div>
           {/* Progress */}
-          <section style={{ marginBottom: 30 }}>
+          <section className="project-detail__section" style={{ marginBottom: 30 }}>
             <h2 style={sectionTitle}>Progreso</h2>
-            <div style={{ padding: 20, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 10 }}>
+            <div className="project-detail__progress-card" style={{ padding: 20, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 10 }}>
               {editingProgress === null ? (
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -190,7 +190,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           </section>
 
           {/* Milestones */}
-          <section style={{ marginBottom: 30 }}>
+          <section className="project-detail__section" style={{ marginBottom: 30 }}>
             <h2 style={sectionTitle}>Hitos ({p.hitos.filter(h => h.completado).length}/{p.hitos.length})</h2>
             {p.hitos.length === 0
               ? <p style={{ fontSize: 12, color: "#71685e" }}>No hay hitos definidos.</p>
@@ -212,7 +212,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           </section>
 
           {/* Files */}
-          <section>
+          <section className="project-detail__section">
             <div className="project-documents-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <h2 style={sectionTitle}>Documentos ({files.data.length})</h2>
               {canUploadFiles && <FileUploadButton onUpload={handleFileUpload} canMarkSensitive={canManageProject} />}
@@ -244,8 +244,8 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
         </div>
 
         {/* ─── SIDEBAR ───────────────────────────────── */}
-        <aside>
-          <div style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, marginBottom: 14 }}>
+        <aside className="project-detail__sidebar">
+          <div className="project-detail__aside-card" style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, marginBottom: 14 }}>
             <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Detalles</h3>
             <dl style={{ display: "grid", gap: 10, fontSize: 12 }}>
               {(isAdmin || isCliente) && p.presupuesto !== undefined && <Meta k="Presupuesto" v={formatMoney(p.presupuesto)} />}
@@ -256,7 +256,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           </div>
 
           {(p.profesionalesAsignados.length > 0 || canManageProject) && (
-            <div style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10 }}>
+            <div className="project-detail__aside-card" style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10 }}>
               <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Equipo ({p.profesionalesAsignados.length})</h3>
               <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
                 {p.profesionalesAsignados.map(a => (

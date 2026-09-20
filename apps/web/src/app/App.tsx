@@ -90,10 +90,10 @@ export function App({ apis }: { apis: AllApis }) {
     : <EmptyState icon="◎" title="Página no encontrada" hint="Usa el menú para navegar" />;
 
   return (
-    <div className={user ? "app-shell app-shell--private" : "app-shell"} style={{ minHeight: "100vh", background: "var(--marble-light)", color: "var(--ink)" }}>
+    <div className={user ? `app-shell app-shell--private app-shell--${user.rol}` : "app-shell"} style={{ minHeight: "100vh", background: "var(--marble-light)", color: "var(--ink)" }}>
       <Router routes={routes} fallback={fallback} layout={(content) => <>
         {user && <TopBar user={user} onSignOut={signOut} />}
-        <main className={user ? "private-main" : undefined} style={user ? { maxWidth: 1200, margin: "0 auto", padding: 32 } : undefined}>
+        <main className={user ? `private-main private-main--${user.rol}` : undefined} style={user ? { maxWidth: 1200, margin: "0 auto", padding: 32 } : undefined}>
           {content}
         </main>
       </>} />

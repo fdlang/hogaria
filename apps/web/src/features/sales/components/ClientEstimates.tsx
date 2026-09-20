@@ -142,13 +142,29 @@ export function ClientEstimates({
 
   return (
     <section className="client-estimates">
-      <header className="private-page-header" style={{ marginBottom: 24 }}>
-        <p className="eyebrow">Área cliente</p>
-        <h1>Tu proyecto con Hogaria</h1>
-        <p style={{ color: "#71685e" }}>
-          Consulta propuestas, solicita cambios con claridad y sigue el avance
-          de tu obra.
-        </p>
+      <header className="client-estimates__hero">
+        <div className="client-estimates__intro">
+          <p className="eyebrow">Área cliente</p>
+          <h1>Tu proyecto con <em>Hogaria</em></h1>
+          <p>
+            Consulta tus propuestas, revisa cada decisión y sigue el avance de
+            tu obra desde un único lugar.
+          </p>
+        </div>
+        <dl className="client-estimates__summary" aria-label="Resumen de tu cuenta">
+          <div>
+            <dt>Propuestas</dt>
+            <dd>{items.length}</dd>
+          </div>
+          <div>
+            <dt>Obras activas</dt>
+            <dd>{projects.length}</dd>
+          </div>
+          <div>
+            <dt>Próximo paso</dt>
+            <dd>{items.some(item => item.estado === "enviado") ? "Revisar propuesta" : projects.length ? "Seguir la obra" : "Sin acciones"}</dd>
+          </div>
+        </dl>
       </header>
       {error && (
         <div
@@ -166,16 +182,13 @@ export function ClientEstimates({
           </Button>
         </div>
       )}
-      <section aria-labelledby="client-proposals">
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-            alignItems: "center",
-          }}
-        >
-          <h2 id="client-proposals">Propuestas</h2>
+      <section className="client-estimates__section" aria-labelledby="client-proposals">
+        <div className="client-estimates__section-heading">
+          <div>
+            <p className="eyebrow">Documentación comercial</p>
+            <h2 id="client-proposals">Propuestas</h2>
+            <p>Consulta el detalle y el estado de cada versión enviada.</p>
+          </div>
           <Button
             small
             variant="ghost"
@@ -192,7 +205,7 @@ export function ClientEstimates({
         onQuery={value => { setPage(0); setQuery(value); }}
         onStatus={value => { setPage(0); setStatus(value); }}
         />
-        <p role="status">
+        <p className="client-estimates__results" role="status">
           {filtered.length} de {items.length} propuestas
         </p>
         {loading ? (
@@ -214,10 +227,14 @@ export function ClientEstimates({
           </p>
         )}
       </section>
-      <nav aria-label="Páginas de presupuestos"><Button small variant="ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button><span>Página {page + 1}</span><Button small variant="ghost" disabled={items.length < 20 || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>
-      <section aria-labelledby="client-projects" style={{ marginTop: 36 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <h2 id="client-projects">Mis proyectos</h2>
+      <nav className="client-estimates__pagination" aria-label="Páginas de presupuestos"><Button small variant="ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button><span>Página {page + 1}</span><Button small variant="ghost" disabled={items.length < 20 || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>
+      <section className="client-estimates__section client-estimates__section--projects" aria-labelledby="client-projects">
+        <div className="client-estimates__section-heading">
+          <div>
+            <p className="eyebrow">Ejecución y seguimiento</p>
+            <h2 id="client-projects">Mis proyectos</h2>
+            <p>Revisa el estado actual y accede al detalle de cada obra.</p>
+          </div>
           <Button small variant="ghost" loading={loading} onClick={() => void refresh()}>
             Actualizar proyectos
           </Button>
@@ -228,13 +245,16 @@ export function ClientEstimates({
           projects.map((project) => (
             <article
               key={project.id}
-              className="private-action-card client-row"
+              className="private-action-card client-row client-project-card"
             >
               <div>
+                <span className="client-project-card__status">Obra en curso</span>
                 <strong>{project.nombre}</strong>
-                <p style={{ margin: "6px 0", color: "#71685e" }}>
-                  {project.direccion} · {project.progreso}% completado
-                </p>
+                <p>{project.direccion}</p>
+                <div className="client-project-card__progress" aria-label={`${project.progreso}% completado`}>
+                  <span style={{ width: `${Math.min(100, Math.max(0, project.progreso))}%` }} />
+                </div>
+                <small>{project.progreso}% completado</small>
               </div>
               <a
                 className="ui-button ui-button--ghost"
@@ -370,11 +390,12 @@ function ProposalCard({
   onOpen: () => void;
 }) {
   return (
-    <article className="private-action-card client-row">
+    <article className={`private-action-card client-row client-proposal-card client-proposal-card--${item.estado}`}>
       <div>
+        <span className="client-proposal-card__status">{estimateStatus(item.estado)}</span>
         <strong>{item.titulo}</strong>
-        <p style={{ margin: "6px 0", color: "#71685e" }}>
-          {item.numero} · versión {item.versionActual} · {estimateStatus(item.estado)}
+        <p>
+          {item.numero} · versión {item.versionActual}
         </p>
         {item.propuesta && (
           <strong>{formatMoney(item.propuesta.totalConIva)}</strong>

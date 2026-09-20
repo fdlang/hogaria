@@ -86,6 +86,20 @@ async function fixture(page: Page, role: string) {
   }
   return emails;
 }
+for (const width of [320, 390, 768, 1440]) {
+  test(`client dashboard keeps its editorial layout at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await fixture(page, "cliente");
+    await expect(page.getByRole("heading", { name: "Tu proyecto con Hogaria" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Propuestas" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Mis proyectos" })).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBe(true);
+  });
+}
 for (const state of ["borrador", "en_revision", "rechazado"]) {
   test(`admin resumes ${state} and saves the same estimate`, async ({ page }) => {
     await fixture(page, "admin");
