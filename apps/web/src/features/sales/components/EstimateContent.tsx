@@ -1,6 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/shared/ui";
-import { formatDate, formatMoney } from "@/shared/lib/formatters";
 import type { EstimateDTO, SalesApi } from "../api/sales.api";
 import { estimateStatus } from "../estimate-search";
 import "../estimates.css";
@@ -55,113 +54,6 @@ export function EstimateSearch({
     </div>
   );
 }
-export function EstimateContent({ item }: { item: EstimateDTO | null }) {
-  if (!item) return null;
-  const p = item.propuesta;
-  if (!p)
-    return (
-      <p>
-        Este presupuesto es un borrador interno. Publica una versión para
-        consultar la propuesta y su PDF.
-      </p>
-    );
-  return (
-    <div className="estimate-document">
-      <h2>{p.titulo}</h2>
-      <p>
-        {item.numero} · Versión {item.versionActual} ·{" "}
-        {estimateStatus(item.estado)}
-      </p>
-      {p.referencia && <p>Referencia: {p.referencia}</p>}
-      <p>
-        Enviado: {p.enviadoAt ? formatDate(p.enviadoAt) : "—"}
-        {p.expiresAt ? ` · Válido hasta: ${formatDate(p.expiresAt)}` : ""}
-      </p>
-      <table className="estimate-document__lines">
-        <thead>
-          <tr>
-            <th>Partida</th>
-            <th>Cantidad</th>
-            <th>Precio unitario</th>
-            <th>Descuento</th>
-            <th>IVA</th>
-            <th>Importe sin IVA</th>
-          </tr>
-        </thead>
-        <tbody>
-          {p.partidas.map((line) => (
-            <tr key={line.id}>
-              <td data-label="Partida">
-                <strong>{line.descripcion}</strong>
-                <small>{line.categoria}</small>
-                {line.notaCliente && <p>{line.notaCliente}</p>}
-              </td>
-              <td data-label="Cantidad">
-                {line.cantidad} {line.unidad}
-              </td>
-              <td data-label="Precio unitario">
-                {formatMoney(line.precioVentaUnitario)}
-              </td>
-              <td data-label="Descuento">{line.descuento}%</td>
-              <td data-label="IVA">{line.iva}%</td>
-              <td data-label="Importe sin IVA">
-                {formatMoney(
-                  line.cantidad *
-                    line.precioVentaUnitario *
-                    (1 - line.descuento / 100),
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <dl className="estimate-document__totals">
-        <div>
-          <dt>Base imponible</dt>
-          <dd>{formatMoney(p.totalSinIva)}</dd>
-        </div>
-        <div>
-          <dt>IVA</dt>
-          <dd>{formatMoney(p.totalIva)}</dd>
-        </div>
-        <div>
-          <dt>Total</dt>
-          <dd>{formatMoney(p.totalConIva)}</dd>
-        </div>
-      </dl>
-      {[
-        ["Condiciones de pago", p.condicionesPago],
-        ["Garantía", p.garantia],
-        ["Observaciones", p.notasCliente],
-      ].map(
-        ([title, body]) =>
-          body && (
-            <section key={title}>
-              <h3>{title}</h3>
-              <p className="estimate-document__text">{body}</p>
-            </section>
-          ),
-      )}
-      {item.motivoRechazo && (
-        <section>
-          <h3>Cambios solicitados</h3>
-          <p>{item.motivoRechazo}</p>
-        </section>
-      )}
-      {p.firmadoAt && (
-        <p>
-          Aceptación registrada: {formatDate(p.firmadoAt)}
-          {p.hash && (
-            <>
-              {" "}
-              · Huella: <code>{p.hash}</code>
-            </>
-          )}
-        </p>
-      )}
-    </div>
-  );
-}
 export function EstimateDocuments({
   api,
   item,
@@ -169,49 +61,73 @@ export function EstimateDocuments({
   api: SalesApi;
   item: EstimateDTO;
 }) {
-  const [busy, setBusy] = useState(false),
+  const [documentUrl, setDocumentUrl] = useState(""),
+    [busy, setBusy] = useState(true),
     [error, setError] = useState(""),
-    [notice, setNotice] = useState("");
+    [retry, setRetry] = useState(0);
   const lock = useRef(false);
-  if (!item.propuesta) return null;
-  async function download() {
-    if (lock.current) return;
-    lock.current = true;
+  const filename = `presupuesto-${item.numero.replace(/[^a-zA-Z0-9_-]/g, "-")}-v${item.versionActual}.pdf`;
+
+  useEffect(() => {
+    let active = true;
+    let url = "";
     setBusy(true);
     setError("");
-    setNotice("");
-    try {
-      const blob = await api.downloadPdf(item.id, item.versionActual),
-        url = URL.createObjectURL(blob),
-        a = document.createElement("a");
-      a.href = url;
-      a.download = `presupuesto-${item.numero.replace(/[^a-zA-Z0-9_-]/g, "-")}-v${item.versionActual}.pdf`;
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-      setNotice("PDF preparado para descargar.");
-    } catch (e) {
-      setError(
-        (e as { message?: string })?.message ?? "No se pudo descargar el PDF.",
-      );
-    } finally {
-      lock.current = false;
-      setBusy(false);
-    }
+    setDocumentUrl("");
+    void api.downloadPdf(item.id, item.versionActual)
+      .then(blob => {
+        if (!active) return;
+        url = URL.createObjectURL(blob);
+        setDocumentUrl(url);
+      })
+      .catch(e => {
+        if (!active) return;
+        setError((e as { message?: string })?.message ?? "No se pudo cargar el PDF.");
+      })
+      .finally(() => { if (active) setBusy(false); });
+    return () => {
+      active = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [api, item.id, item.versionActual, retry]);
+
+  function download() {
+    if (!documentUrl || lock.current) return;
+    lock.current = true;
+    const link = document.createElement("a");
+    link.href = documentUrl;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    lock.current = false;
   }
+
+  if (!item.propuesta) return <p>Este presupuesto todavía no tiene contenido disponible.</p>;
   return (
     <section className="estimate-document-actions" aria-label="Documento PDF">
-      <Button
-        variant="ghost"
-        loading={busy}
-        disabled={busy}
-        onClick={() => void download()}
-      >
-        Descargar PDF
-      </Button>
-      {error && <p role="alert">{error}</p>}
-      {notice && <p role="status">{notice}</p>}
+      <header className="estimate-document-actions__heading">
+        <div>
+          <span>Preparado para</span>
+          <strong>{item.clienteNombre}</strong>
+          <small>{item.numero} · Versión {item.versionActual} · {estimateStatus(item.estado)}</small>
+        </div>
+        <Button variant="ghost" disabled={!documentUrl} onClick={download}>
+          Descargar PDF
+        </Button>
+      </header>
+      {busy && <p role="status">Preparando la vista previa del PDF…</p>}
+      {error && <div className="estimate-document-actions__error">
+        <p role="alert">{error}</p>
+        <Button small variant="ghost" onClick={() => setRetry(value => value + 1)}>Reintentar</Button>
+      </div>}
+      {documentUrl && (
+        <iframe
+          className="estimate-pdf-viewer"
+          src={documentUrl}
+          title="Vista previa del presupuesto en PDF"
+        />
+      )}
     </section>
   );
 }

@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Modal } from "@/shared/ui";
-import {
-  EstimateContent,
-  EstimateDocuments,
-  EstimateSearch,
-} from "./EstimateContent";
+import { EstimateDocuments, EstimateSearch } from "./EstimateContent";
 import { filterEstimates } from "../estimate-search";
 import { EstimateHistory } from "./EstimateHistory";
 import { formatDate, formatMoney } from "@/shared/lib/formatters";
@@ -233,14 +229,16 @@ export function SalesPipeline({
     setError("");
     try {
       setSaving(true);
-      if (editingId !== null) await api.updateEstimate(editingId, draft);
-      else await api.createEstimate(selected, draft);
+      const saved = editingId !== null
+        ? await api.updateEstimate(editingId, draft)
+        : await api.createEstimate(selected, draft);
       setEditingId(null);
       setStep(0);
       setSelected(null);
       setDraft(blankDraft());
       setShowEditor(false);
       await refresh();
+      setPreview(saved);
     } catch (cause) {
       setError(
         (cause as { message?: string }).message ??
@@ -684,7 +682,7 @@ export function SalesPipeline({
       <Modal
         open={preview !== null}
         onClose={() => setPreview(null)}
-        title={preview?.numero ?? "Propuesta"}
+        title={preview ? `Presupuesto de ${preview.clienteNombre}` : "Presupuesto"}
         width={820}
         className="estimate-modal"
       >
@@ -695,7 +693,6 @@ export function SalesPipeline({
             item={preview}
           />
         )}
-        <EstimateContent item={preview} />
         {preview && <EstimateHistory key={preview.id} api={api} id={preview.id} />}
       </Modal>
     </section>
@@ -773,6 +770,7 @@ function RecentEstimates({
           <article key={estimate.id}>
             <div className="estimate-list__summary">
               <strong>{estimate.numero}</strong>
+              <small className="estimate-list__client">Cliente: {estimate.clienteNombre}</small>
               <span>{estimate.titulo}</span>
               <small>
                 v{estimate.versionActual} · {statusLabel(estimate.estado)} ·

@@ -342,7 +342,12 @@ export class EstimateUseCases {
             (estimate) =>
               estimate.clienteId === actor.id && estimate.estado !== "borrador",
           );
-    return Promise.all(items.map((item) => this.clientVisibleView(actor, item)));
+    const clientNames = actor.rol === "admin"
+      ? new Map((await this.users.findByRole("cliente")).map(client => [client.id, client.nombre]))
+      : new Map([[actor.id, actor.nombre]]);
+    return Promise.all(items.map((item) =>
+      this.clientVisibleView(actor, item, clientNames.get(item.clienteId)),
+    ));
   }
   async publicGet(actorId: number, id: number) {
     const actor = await this.users.findById(actorId);
@@ -352,19 +357,32 @@ export class EstimateUseCases {
     // proposal that has not been shared with its owner yet.
     if (actor.rol === "cliente" && estimate.estado === "borrador")
       throw new NotFoundError("Presupuesto");
-    return this.clientVisibleView(actor, estimate);
+    return this.clientVisibleView(
+      actor,
+      estimate,
+      actor.rol === "cliente" ? actor.nombre : undefined,
+    );
   }
-  private async clientVisibleView(actor: User, estimate: Estimate) {
+  private async clientVisibleView(
+    actor: User,
+    estimate: Estimate,
+    knownClientName?: string,
+  ) {
+    let view;
     if (actor.rol === "admin" && ["borrador", "en_revision"].includes(estimate.estado)) {
-      return this.draftPreview(estimate);
-    }
-    if (actor.rol === "cliente" && estimate.estado === "en_revision") {
+      view = this.draftPreview(estimate);
+    } else if (actor.rol === "cliente" && estimate.estado === "en_revision") {
       const published = (await this.estimates.findVersions(estimate.id)).filter(item => item.enviadoAt).sort((a,b) => b.version-a.version)[0];
       if (!published) throw new NotFoundError("Presupuesto");
       const visible = await this.publicView({ ...estimate, titulo: published.snapshot.titulo, motivoRechazo: null }, published);
-      return { ...visible, estado: "actualizando" };
+      view = { ...visible, estado: "actualizando" };
+    } else {
+      view = await this.publicView(estimate);
     }
-    return this.publicView(estimate);
+    const clientName = knownClientName ??
+      (await this.users.findById(estimate.clienteId))?.nombre ??
+      "Cliente no disponible";
+    return { ...view, clienteNombre: clientName };
   }
   async get(actorId: number, id: number) {
     const actor = await this.users.findById(actorId);
@@ -379,11 +397,10 @@ export class EstimateUseCases {
     return this.require(id);
   }
   async adminPreview(actorId: number, id: number) {
-    assertAdmin(await this.users.findById(actorId));
+    const actor = await this.users.findById(actorId);
+    assertAdmin(actor);
     const estimate = await this.require(id);
-    return ["borrador", "en_revision"].includes(estimate.estado)
-      ? this.draftPreview(estimate)
-      : this.publicView(estimate);
+    return this.clientVisibleView(actor, estimate);
   }
   async create(
     actorId: number,
@@ -496,7 +513,12 @@ export class EstimateUseCases {
     const estimate = await this.get(actorId, id);
     if (actor.rol === "cliente" && estimate.estado === "borrador") throw new NotFoundError("Presupuesto");
     const versions = (await this.estimates.findVersions(id)).filter(version => version.enviadoAt !== null);
-    return Promise.all(versions.map(version => this.publicView({ ...estimate, titulo: version.snapshot.titulo, motivoRechazo: version.version === estimate.versionActual ? estimate.motivoRechazo : null, estado: version.version === estimate.versionActual ? estimate.estado : "sustituido" }, version)));
+    const clientName = (await this.users.findById(estimate.clienteId))?.nombre ??
+      "Cliente no disponible";
+    return Promise.all(versions.map(async version => ({
+      ...(await this.publicView({ ...estimate, titulo: version.snapshot.titulo, motivoRechazo: version.version === estimate.versionActual ? estimate.motivoRechazo : null, estado: version.version === estimate.versionActual ? estimate.estado : "sustituido" }, version)),
+      clienteNombre: clientName,
+    })));
   }
   async publicVersion(actorId: number, id: number, number: number) {
     const history = await this.history(actorId, id);

@@ -109,6 +109,7 @@ export class PdfEstimateRenderer implements EstimatePdfRenderer {
           })
         : "—";
     text(`PRESUPUESTO ${d.numero} · Versión ${d.versionActual}`, 14, true);
+    text(`Cliente: ${d.clienteNombre}`, 11, true);
     text(p.titulo, 16, true);
     if (p.referencia) text(`Referencia: ${p.referencia}`);
     text(

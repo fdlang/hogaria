@@ -37,6 +37,7 @@ describe("EstimateUseCases — client privacy and authorization", () => {
 
     const preview = await estimateUseCases.publicGet(admin.id, pending.id);
 
+    expect(preview.clienteNombre).toBe("Cliente A");
     expect(preview.propuesta?.titulo).toBe(draft.titulo);
     expect(preview.propuesta?.totalConIva).toBe(242);
     expect(JSON.stringify(preview)).not.toContain("costeUnitario");
@@ -83,6 +84,7 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     const results = await estimateUseCases.publicList(clientA.id);
     expect(results).toHaveLength(1);
     expect(results[0]?.id).toBe(estimateA.id);
+    expect(results[0]?.clienteNombre).toBe("Cliente A");
     expect(results[0]?.id).not.toBe(estimateB.id);
   });
 

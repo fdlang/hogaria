@@ -10,11 +10,7 @@ import type {
 } from "@/features/projects/api/projects.api";
 import { formatMoney } from "@/shared/lib/formatters";
 import { SalesApi, type EstimateDTO } from "../api/sales.api";
-import {
-  EstimateContent,
-  EstimateDocuments,
-  EstimateSearch,
-} from "./EstimateContent";
+import { EstimateDocuments, EstimateSearch } from "./EstimateContent";
 import { estimateStatus, filterEstimates } from "../estimate-search";
 import { EstimateHistory } from "./EstimateHistory";
 
@@ -238,8 +234,8 @@ export function ClientEstimates({
       <Modal
         open={selected !== null && !changeOpen}
         onClose={closeProposal}
-        title={selected?.titulo ?? "Propuesta"}
-        width={760}
+        title={selected ? `Propuesta para ${selected.clienteNombre}` : "Propuesta"}
+        width={900}
         className="estimate-modal"
       >
         {selected && (
@@ -409,7 +405,6 @@ function ProposalDetail({
   if (!item?.propuesta) return <p>Esta propuesta aún no ha sido enviada.</p>;
   return (
     <>
-      <EstimateContent item={item} />
       {item.estado === "enviado" && (
         <>
           <h3>Firma</h3>

@@ -3,6 +3,7 @@ const proposal = {
   id: 1,
   numero: "HOG-2026-001",
   titulo: "Reforma de baño Pinto",
+  clienteNombre: "María García",
   estado: "enviado",
   versionActual: 1,
   motivoRechazo: null,
@@ -104,7 +105,7 @@ for (const state of ["borrador", "en_revision", "rechazado"]) {
       expect(route.request().method()).toBe("PATCH");
       expect(route.request().postDataJSON().borrador.titulo).toBe("Título corregido");
       saved = true;
-      return route.fulfill({ json: { id: 1 } });
+      return route.fulfill({ json: { ...proposal, titulo: "Título corregido", estado: "borrador" } });
     });
     await page.reload();
     await page.getByRole("button", { name: "Mostrar propuestas" }).click();
@@ -116,6 +117,7 @@ for (const state of ["borrador", "en_revision", "rechazado"]) {
     await page.getByRole("button", { name: "Continuar", exact: true }).click();
     await page.getByRole("button", { name: "Revisar propuesta" }).click();
     await page.getByRole("button", { name: "Guardar como borrador" }).click();
+    await expect(page.getByRole("dialog", { name: /Presupuesto de María García/ })).toBeVisible();
     await expect(page.getByLabel("Buscar presupuestos")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Nueva oportunidad" })).toBeHidden();
     expect(saved).toBe(true);
@@ -138,7 +140,8 @@ for (const role of ["admin", "cliente"])
         })
         .click();
       const dialog = page.getByRole("dialog");
-      await expect(dialog.getByText("Acabado mate")).toBeVisible();
+      await expect(dialog.getByText("María García", { exact: true })).toBeVisible();
+      await expect(dialog.getByTitle("Vista previa del presupuesto en PDF")).toBeVisible();
       expect(
         await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
       ).toBe(true);

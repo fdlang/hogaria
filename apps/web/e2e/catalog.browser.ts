@@ -55,6 +55,7 @@ for (const fail of [false, true]) test("estimate never falls back to static pric
   const state = { fail, items: [] as typeof item[] };
   await setup(page, state);
   await page.goto("/admin/budgets");
+  await page.getByRole("button", { name: "Nuevo presupuesto" }).click();
   await page.getByLabel("Cliente existente").selectOption("2");
   await page.getByLabel("Nombre de la oportunidad").fill("Reforma prueba");
   await page.getByRole("textbox", { name: "Dirección *", exact: true }).fill("Dirección de prueba");

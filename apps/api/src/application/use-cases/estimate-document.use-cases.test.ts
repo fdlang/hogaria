@@ -218,6 +218,7 @@ describe("Download-only budget PDF", () => {
     const f = await documents();
     await f.service.download(f.clientA.id, f.estimateA.id, 1);
     const v = JSON.stringify(f.pdf.render.mock.calls[0]);
+    expect(v).toContain("Cliente A");
     expect(v).not.toContain("costeUnitario");
     expect(v).not.toContain("notaInterna");
     expect(v).not.toContain("Margen reservado");

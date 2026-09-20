@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/shared/ui";
 import { SalesApi, type EstimateDTO } from "../api/sales.api";
-import { EstimateContent, EstimateDocuments } from "./EstimateContent";
+import { EstimateDocuments } from "./EstimateContent";
 
 export function EstimateHistory({ api, id }: { api: SalesApi; id: number }) {
   const [items, setItems] = useState<EstimateDTO[] | null>(null);
@@ -21,6 +21,6 @@ export function EstimateHistory({ api, id }: { api: SalesApi; id: number }) {
       {items.length === 0 && <p>Aún no hay versiones publicadas.</p>}
       {items.map(item => <Button key={item.versionActual} small variant="ghost" onClick={() => setSelected(item)}>Versión {item.versionActual}</Button>)}
     </>}
-    {selected && <div><h3>Versión {selected.versionActual} · consulta histórica</h3><EstimateDocuments api={api} item={selected} /><EstimateContent item={selected} /></div>}
+    {selected && <div><h3>Versión {selected.versionActual} · consulta histórica</h3><EstimateDocuments api={api} item={selected} /></div>}
   </section>;
 }
