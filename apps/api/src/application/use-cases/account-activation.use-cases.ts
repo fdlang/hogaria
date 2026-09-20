@@ -32,9 +32,7 @@ export class AccountActivationUseCases {
   async invite(actorId: number, userId: number, context: ClientContext) {
     this.ensureConfigured(); const actor = await this.users.findById(actorId); if (!actor || actor.rol !== "admin") throw new ForbiddenError();
     const user = await this.users.findById(userId);
-    if (!user || (user.rol !== "cliente" && user.rol !== "profesional")) {
-      throw new ValidationError("Solo se pueden invitar cuentas de cliente o profesional", "userId");
-    }
+    if (!user) throw new ValidationError("La cuenta no existe", "userId");
     // Clients cannot receive a second activation once active. For professionals,
     // an admin may re-send the secure access link to recover accounts created
     // before the invitation flow existed.
@@ -50,7 +48,7 @@ export class AccountActivationUseCases {
     if (typeof password !== "string" || encoder.encode(password).length > 72 || password.length < 12 || !/[a-z]/i.test(password) || !/\d/.test(password)) throw new ValidationError("Usa al menos 12 caracteres, incluyendo letras y números", "password");
     const hash = await tokenHash(token); const record = await this.tokens.findValid(hash, new Date());
     if (!record) throw new ConflictError("El enlace ha caducado, ya se utilizó o no es válido");
-    const user = await this.users.findById(record.userId); if (!user || !["cliente", "profesional"].includes(user.rol)) throw new ConflictError("La invitación ya no está disponible");
+    const user = await this.users.findById(record.userId); if (!user) throw new ConflictError("La invitación ya no está disponible");
     const passwordHash = await bcryptHash(password);
     await this.tokens.complete(hash, passwordHash);
   }

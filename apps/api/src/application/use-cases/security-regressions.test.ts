@@ -3,7 +3,8 @@ import { Email } from "@reformapro/domain/value-objects";
 import { InMemoryUserRepository, InMemoryProjectRepository, InMemoryOpportunityRepository } from "../../infrastructure/database/inMemoryRepositories.js";
 import { InMemoryActivationTokenRepository } from "../../infrastructure/database/activationTokenRepositories.js";
 import { InMemoryEventEmitter } from "../../infrastructure/events/inMemoryEventEmitter.js";
-import { UpdateUserUseCase, DeleteUserUseCase } from "./user.use-cases.js";
+import { CreateUserUseCase, UpdateUserUseCase, DeleteUserUseCase } from "./user.use-cases.js";
+import { AccountActivationUseCases } from "./account-activation.use-cases.js";
 import { DeleteFileUseCase, DownloadFileUseCase, ListFilesUseCase, UploadFileUseCase } from "./file.use-cases.js";
 import { OpportunityUseCases } from "./sales.use-cases.js";
 import { EstimateUseCases } from "./sales.use-cases.js";
@@ -22,6 +23,55 @@ async function setup() {
 }
 
 describe("Security and integrity regressions", () => {
+  it("creates every administrator inactive and sends a one-time activation invitation", async () => {
+    const { users, admin, events } = await setup();
+    const tokens = new InMemoryActivationTokenRepository(users);
+    const sendActivation = vi.fn(async () => undefined);
+    const activation = new AccountActivationUseCases(
+      users,
+      tokens,
+      { isConfigured: () => true, sendActivation },
+      "https://hogaria.test",
+    );
+    const create = new CreateUserUseCase(users, hasher, () => "unused-temporary-password", events, activation);
+
+    const result = await create.execute({
+      actorId: admin.id,
+      email: "new-admin@hogaria.test",
+      nombre: "Nueva administradora",
+      rol: "admin",
+      ctx,
+    });
+
+    expect(result.user.activo).toBe(false);
+    expect(result.invitationSent).toBe(true);
+    expect(sendActivation).toHaveBeenCalledOnce();
+  });
+  it("rejects professions outside the domain catalogue on create and update", async () => {
+    const { users, admin, client, events, update } = await setup();
+    const activation = new AccountActivationUseCases(
+      users,
+      new InMemoryActivationTokenRepository(users),
+      { isConfigured: () => true, sendActivation: async () => undefined },
+      "https://hogaria.test",
+    );
+    const create = new CreateUserUseCase(users, hasher, () => "temporary", events, activation);
+
+    await expect(create.execute({
+      actorId: admin.id,
+      email: "invalid-profession@hogaria.test",
+      nombre: "Profesional",
+      rol: "profesional",
+      profesion: "administrador" as never,
+      ctx,
+    })).rejects.toThrow(/profesi/i);
+    await expect(update.execute({
+      actorId: admin.id,
+      userId: client.id,
+      changes: { profesion: "administrador" as never },
+      ctx,
+    })).rejects.toThrow(/profesi/i);
+  });
   it("never exposes the admin draft endpoint to a client", async () => {
     const { users, client, events } = await setup();
     const service = new EstimateUseCases(users, new InMemoryOpportunityRepository(), new InMemoryEstimateRepository(), new InMemoryProjectRepository(), events, {} as never);

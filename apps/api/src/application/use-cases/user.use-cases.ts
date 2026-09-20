@@ -11,6 +11,10 @@ import { ValidationError, ForbiddenError, NotFoundError, ConflictError } from "@
 import { ClientContext } from "./auth.use-cases.js";
 import { PasswordHasher } from "../../infrastructure/database/inMemoryRepositories.js";
 import { AccountActivationUseCases } from "./account-activation.use-cases.js";
+import { PROFESIONES } from "@reformapro/domain";
+
+const isProfesion = (value: unknown): value is Profesion =>
+  typeof value === "string" && Object.prototype.hasOwnProperty.call(PROFESIONES, value);
 
 export interface CreateUserCommand {
   actorId: number;
@@ -36,18 +40,19 @@ export class CreateUserUseCase {
     if (!actor || actor.rol !== "admin") throw new ForbiddenError();
 
     if (!cmd.nombre?.trim()) throw new ValidationError("Nombre obligatorio", "nombre");
-    if (cmd.rol === "profesional" && !cmd.profesion) {
+    if (cmd.rol === "profesional" && !isProfesion(cmd.profesion)) {
       throw new ValidationError("La profesión es obligatoria para profesionales", "profesion");
+    }
+    if (cmd.rol !== "profesional" && cmd.profesion !== undefined) {
+      throw new ValidationError("La profesión solo corresponde a profesionales", "profesion");
     }
 
     const email = Email.of(cmd.email); // throws ValidationError if malformed
     const existing = await this.users.findByEmail(email.value);
     if (existing) throw new ConflictError("Ya existe un usuario con ese email");
     const activation = this.activation;
-    if (cmd.rol === "cliente" || cmd.rol === "profesional") {
-      if (!activation) throw new ConflictError("El servicio de invitaciones no está configurado");
-      activation.ensureConfigured();
-    }
+    if (!activation) throw new ConflictError("El servicio de invitaciones no está configurado");
+    activation.ensureConfigured();
 
     // A client never receives this random placeholder. They set their own password
     // through the one-time activation link.
@@ -57,14 +62,14 @@ export class CreateUserUseCase {
     const user: User = {
       id: 0, // repository assigns
       email, nombre: cmd.nombre.trim(), rol: cmd.rol,
-      // Both external roles set their own password through a one-time link.
-      activo: cmd.rol === "cliente" || cmd.rol === "profesional" ? false : true, createdAt: new Date(),
+      // Every account sets its own password through a one-time link.
+      activo: false, createdAt: new Date(),
       ...(cmd.profesion !== undefined ? { profesion: cmd.profesion } : {}),
       ...(cmd.telefono  !== undefined ? { telefono:  cmd.telefono  } : {}),
     };
     const saved = await this.users.save(user, passwordHash);
     try {
-      if (saved.rol === "cliente" || saved.rol === "profesional") await activation!.invite(actor.id, saved.id, cmd.ctx);
+      await activation.invite(actor.id, saved.id, cmd.ctx);
     } catch (error) {
       // No related records exist yet: compensate a failed invitation so the admin
       // can retry creation instead of inheriting a silent, inactive account.
@@ -77,7 +82,7 @@ export class CreateUserUseCase {
       ip: cmd.ctx.ip, userAgent: cmd.ctx.userAgent,
       userId: saved.id, role: cmd.rol,
     });
-    return { user: saved, invitationSent: saved.rol === "cliente" || saved.rol === "profesional" };
+    return { user: saved, invitationSent: true };
   }
 }
 
@@ -105,6 +110,7 @@ export class UpdateUserUseCase {
     const { newPassword, ...fields } = cmd.changes;
     if (fields.activo !== undefined && typeof fields.activo !== "boolean") throw new ValidationError("Estado no válido", "activo");
     if (fields.nombre !== undefined && (typeof fields.nombre !== "string" || !fields.nombre.trim())) throw new ValidationError("Nombre obligatorio", "nombre");
+    if (fields.profesion !== undefined && (target.rol !== "profesional" || !isProfesion(fields.profesion))) throw new ValidationError("Profesión no válida", "profesion");
     if (cmd.actorId === cmd.userId && fields.activo === false) throw new ValidationError("No puedes desactivar tu propia cuenta");
     if (newPassword !== undefined && (typeof newPassword !== "string" || newPassword.length < 12 || new TextEncoder().encode(newPassword).length > 72 || !/[a-z]/i.test(newPassword) || !/\d/.test(newPassword))) throw new ValidationError("Usa al menos 12 caracteres, incluyendo letras y números", "newPassword");
     const passwordHash = newPassword === undefined ? undefined : await this.hasher.hash(newPassword);

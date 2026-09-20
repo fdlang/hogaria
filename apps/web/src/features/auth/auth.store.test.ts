@@ -52,6 +52,21 @@ describe("AuthStore", () => {
     expect(store.getState().error).toBe("El email o la contraseña no son correctos.");
   });
 
+  it("fully clears a previous session when a new login attempt fails", async () => {
+    const api = createApi();
+    const storage = createStorage("previous-token");
+    vi.mocked(api.get).mockResolvedValue(user);
+    const store = new AuthStore(api, storage);
+    await store.restore();
+    vi.mocked(api.post).mockRejectedValue({ status: 401 });
+
+    await store.signIn("other@hogaria.design", "incorrecta");
+
+    expect(api.setToken).toHaveBeenLastCalledWith(null);
+    expect(storage.removeItem).toHaveBeenCalledWith("rp_token");
+    expect(store.getState()).toMatchObject({ status: "unauthenticated", user: null, token: null });
+  });
+
   it("removes an expired persisted session during restore", async () => {
     const api = createApi();
     const storage = createStorage("expired-token");

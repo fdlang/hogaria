@@ -57,6 +57,8 @@ export class AuthStore {
       const msg = authError.status === 401
         ? "El email o la contraseña no son correctos."
         : authError.message ?? "No se ha podido iniciar sesión. Inténtalo de nuevo.";
+      this.storage.removeItem("rp_token");
+      this.api.setToken(null);
       this.setState({ status: "unauthenticated", user: null, token: null, error: msg });
       return null;
     }

@@ -100,7 +100,7 @@ export class PostgresActivationTokenRepository
       );
       if (result.rowCount !== 1) throw invalid();
       const updated = await client.query(
-        "UPDATE users SET password_hash=$2,activo=true,session_version=session_version+1 WHERE id=$1 AND rol IN ('cliente','profesional') RETURNING id",
+        "UPDATE users SET password_hash=$2,activo=true,session_version=session_version+1 WHERE id=$1 AND rol IN ('admin','cliente','profesional') RETURNING id",
         [result.rows[0].user_id, passwordHash],
       );
       if (updated.rowCount !== 1) throw invalid();
