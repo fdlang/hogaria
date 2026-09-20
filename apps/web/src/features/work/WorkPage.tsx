@@ -68,8 +68,8 @@ export function WorkPage({
     setFilters((f) => ({ ...f, ...next, page: 0 }));
   if (!isAdmin && !isProfesional) return null;
   return (
-    <section className="work-page">
-      <header>
+    <section className="work-page private-page">
+      <header className="work-page__header">
         <h1>{isAdmin ? "Jornadas y costes" : "Mi trabajo"}</h1>
         <p>
           {isAdmin

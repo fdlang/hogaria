@@ -23,7 +23,7 @@ export function AdminActivity({ api }: Props) {
   const hiddenTechnical = (log.page?.items.length ?? 0) - visibleEntries.length;
 
   return (
-    <section className="audit-page">
+    <section className="audit-page private-page">
       <header className="audit-page__header">
         <div>
           <p className="eyebrow">Administración</p>

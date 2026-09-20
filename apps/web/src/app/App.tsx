@@ -197,7 +197,11 @@ function LoginRoute() {
 function AdminHome() {
   return (
     <section className="admin-home">
-      <h1 style={{ fontSize: 38, fontWeight: 700, color: "#302d29", marginBottom: 24 }}>Panel de administración</h1>
+      <header className="admin-home__hero">
+        <p className="eyebrow">Gestión integral</p>
+        <h1>Panel de administración</h1>
+        <p>Organiza la actividad comercial, las obras y los recursos desde un único espacio.</p>
+      </header>
       {adminNavigation.slice(1).map((group) => (
         <AdminHomeGroup key={group.label} label={group.label} hint={group.hint}>
           {group.links.map((link) => <Tile key={link.to} icon={link.icon} href={link.to} title={link.label} subtitle={link.subtitle ?? ""} />)}

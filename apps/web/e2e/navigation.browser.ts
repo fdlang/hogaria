@@ -12,6 +12,8 @@ for (const width of [390, 768, 1024, 1440, 1920]) {
     }));
     await page.goto("/admin");
     await expect(page.getByRole("heading", { name: "Panel de administración" })).toBeVisible();
+    await expect(page.locator(".admin-home__hero")).toBeVisible();
+    await expect(page.locator(".app-shell--private")).toHaveCSS("background-image", /gradient/);
     await expect(page.locator(".admin-home-group > header h2")).toHaveText(["Comercial", "Obras", "Recursos", "Administración"]);
     await expect(page.locator(".admin-home-grid a")).toHaveText([
       /Solicitudes/, /Presupuestos/, /Proyectos/, /Jornadas y costes/, /Profesionales/, /Catálogo/, /Usuarios y accesos/, /Registro de actividad/,

@@ -61,7 +61,7 @@ export function AdminProjects({ api, onOpenProject }: Props) {
   ];
 
   return (
-    <section>
+    <section className="private-page">
       <PageHeader
         title="Proyectos"
         subtitle={`${projects.data?.length ?? 0} proyectos totales`}

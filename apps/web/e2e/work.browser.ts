@@ -189,6 +189,7 @@ for (const width of [390, 1440])
     await expect(
       page.getByRole("heading", { name: "Mi trabajo", exact: true }),
     ).toBeVisible();
+    await expect(page.locator(".work-page__header")).toBeVisible();
     await page.getByLabel("Obra asignada").selectOption("1");
     await page
       .getByRole("button", { name: "Registrar entrada", exact: true })

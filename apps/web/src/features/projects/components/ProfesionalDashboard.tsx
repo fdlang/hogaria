@@ -41,7 +41,7 @@ export function ProfesionalDashboard({ apis, onOpenProject, onOpenWork }: Props)
   const proj = projects.data ?? [];
 
   return (
-    <section>
+    <section className="private-page professional-dashboard">
       <header className="professional-dashboard-header" style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 30 }}>
         {profInfo && <div style={{ width: 56, height: 56, borderRadius: "50%", background: `${profInfo.color}18`, color: profInfo.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>{profInfo.icon}</div>}
         <div style={{ flex: 1 }}>

@@ -70,7 +70,7 @@ export function AdminSolicitudes({ api }: Props) {
   const pending = items.filter(i => i.estado === "pendiente");
 
   return (
-    <section>
+    <section className="private-page private-requests">
       <header className="private-page-header" style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 38, fontWeight: 700, color: "#302d29" }}>Solicitudes</h1>

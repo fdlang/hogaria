@@ -346,7 +346,7 @@ export function SalesPipeline({
   };
 
   return (
-    <section>
+    <section className="private-page sales-pipeline">
       <header className="sales-page-header">
         <div>
           <p className="eyebrow">Ventas y propuestas</p>

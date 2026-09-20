@@ -94,7 +94,7 @@ export function AdminUsers({ api }: Props) {
   ];
 
   return (
-    <section>
+    <section className="private-page">
       <PageHeader
         title="Usuarios"
         subtitle={`${users.data?.length ?? 0} usuarios · ${(users.data ?? []).filter(u => u.activo).length} activos`}

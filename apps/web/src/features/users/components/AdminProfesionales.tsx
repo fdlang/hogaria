@@ -30,7 +30,7 @@ export function AdminProfesionales({ apis }: Props) {
   const userList = (users.data ?? []).filter(user => accountStatusOf(user) !== "archived");
   const totalAssignments = (projects.data ?? []).reduce((total, project) => total + (project.profesionalesAsignados ?? []).length, 0);
 
-  return <section>
+  return <section className="private-page private-professionals">
     <PageHeader title="Profesionales" subtitle={`${userList.length} profesionales · ${userList.filter(user => user.activo).length} activos · ${totalAssignments} asignaciones totales`} />
     <p><a href="#/admin/work">Gestionar jornadas, partes y tarifas internas</a></p>
     <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 30 }}>

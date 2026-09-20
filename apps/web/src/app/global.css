@@ -242,6 +242,145 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 
 /* Private area: tablet-first structure. Inline layout values are intentionally
    overridden here so screens with a keyboard-width viewport never compress. */
+.app-shell--private {
+  background-color: var(--marble-light) !important;
+  background-image:
+    radial-gradient(ellipse at 6% 2%, rgba(255,255,255,.92), transparent 32%),
+    radial-gradient(ellipse at 96% 24%, rgba(221,190,164,.18), transparent 30%),
+    linear-gradient(125deg, transparent 0 52%, rgba(84,80,72,.025) 52.2%, transparent 52.6%) !important;
+}
+.private-main {
+  width: 100%;
+  max-width: 1240px !important;
+  padding: clamp(40px, 5vw, 64px) 32px !important;
+}
+.private-page { min-width: 0; }
+.private-page-header,
+.sales-page-header,
+.work-page__header,
+.audit-page__header {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 30px;
+  padding: clamp(26px, 3.5vw, 38px);
+  overflow: hidden;
+  border: 1px solid rgba(193,113,72,.2);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(243,233,222,.96), rgba(234,219,207,.9));
+  box-shadow: 0 12px 30px rgba(72,59,44,.075);
+}
+.private-page-header::after,
+.sales-page-header::after,
+.work-page__header::after,
+.audit-page__header::after,
+.admin-home__hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 210px;
+  height: 210px;
+  top: -120px;
+  right: -80px;
+  border: 1px solid rgba(153,86,55,.18);
+  border-radius: 50%;
+  box-shadow: 0 0 0 34px rgba(193,113,72,.03);
+}
+.private-page-header__copy { min-width: 0; }
+.private-page-header h1,
+.sales-page-header h1,
+.work-page__header h1,
+.audit-page__header h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(32px, 4.5vw, 46px);
+  font-weight: 700;
+  letter-spacing: -.045em;
+  line-height: 1;
+}
+.private-page-header__copy > p:not(.eyebrow),
+.sales-page-header p:last-child,
+.work-page__header > p,
+.audit-page__header p:last-child {
+  max-width: 680px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.private-page-header__copy > .eyebrow,
+.sales-page-header .eyebrow,
+.audit-page__header .eyebrow { margin: 0 0 9px; font-size: 10px; }
+.private-page-header__actions { display: flex; flex: 0 0 auto; gap: 8px; flex-wrap: wrap; }
+.private-filter-bar,
+.audit-filters {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255,250,244,.82) !important;
+  box-shadow: 0 8px 22px rgba(72,59,44,.045);
+}
+.data-table-scroll,
+.sales-card,
+.work-card,
+.professional-card,
+.private-action-card,
+.private-project-card,
+.catalog-manager__registered {
+  border-color: var(--line) !important;
+  background: rgba(255,250,244,.82) !important;
+  box-shadow: 0 10px 28px rgba(72,59,44,.06);
+}
+.data-table-scroll { background: rgba(255,253,250,.78) !important; }
+.data-table-scroll thead tr { background: rgba(243,233,222,.76) !important; }
+.private-stat-card {
+  min-width: 180px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--copper);
+  border-radius: 10px;
+  background: rgba(255,250,244,.82);
+  box-shadow: 0 8px 22px rgba(72,59,44,.05);
+}
+.private-stat-card__label { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.private-stat-card__label > span:first-child:not(:last-child) { font-size: 14px; }
+.private-stat-card__label > span:last-child { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.private-stat-card__value { color: var(--ink); font-size: 27px; font-weight: 700; line-height: 1; }
+.private-stat-card__hint { margin-top: 7px; color: var(--muted); font-size: 12px; }
+.admin-home { display: grid; gap: 30px; }
+.admin-home__hero {
+  position: relative;
+  isolation: isolate;
+  padding: clamp(32px, 4.5vw, 52px);
+  overflow: hidden;
+  border: 1px solid rgba(193,113,72,.2);
+  border-radius: 13px;
+  background: linear-gradient(135deg, #f3e9de, #eadbcf);
+  box-shadow: 0 14px 34px rgba(72,59,44,.085);
+}
+.admin-home__hero .eyebrow { margin: 0 0 12px; font-size: 10px; }
+.admin-home__hero h1 { margin: 0; color: var(--ink); font-size: clamp(36px, 5vw, 52px); }
+.admin-home__hero > p:last-child { max-width: 610px; margin: 17px 0 0; color: var(--muted); line-height: 1.65; }
+.admin-home-group {
+  margin-bottom: 0 !important;
+  padding: clamp(24px, 3vw, 32px);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(255,250,244,.76);
+  box-shadow: 0 10px 28px rgba(72,59,44,.055);
+}
+.admin-home-group > header { margin-bottom: 20px; }
+.admin-home-tile { background: rgba(255,253,250,.82); box-shadow: none; }
+.professional-dashboard-header { padding: 0; }
+.professional-dashboard-header .private-page-header { flex: 1; margin: 0; }
+.private-professionals > p { margin: -8px 0 26px; }
+.work-page__header { flex-wrap: wrap; }
+.work-page__header > button { flex: 0 0 auto; }
+.audit-page { max-width: none !important; }
+.audit-timeline { max-width: none !important; padding: 8px 6px !important; }
 .private-table-scroll, .data-table-scroll { -webkit-overflow-scrolling: touch; }
 .private-topbar { display: flex !important; justify-content: space-between !important; gap: 28px; }
 .private-brand { display: flex; align-items: center; gap: 9px; justify-self: start; }
@@ -499,6 +638,32 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}
+
+@media (max-width: 600px) {
+  .private-main { padding: 24px 18px 52px !important; }
+  .private-page-header,
+  .sales-page-header,
+  .work-page__header,
+  .audit-page__header {
+    align-items: flex-start !important;
+    flex-direction: column;
+    gap: 18px !important;
+    margin-bottom: 26px !important;
+    padding: 28px 22px !important;
+    border-radius: 10px;
+  }
+  .private-page-header__actions,
+  .sales-page-header > div:last-child { width: 100%; }
+  .work-page__header > button { align-self: flex-start; width: auto; }
+  .admin-home { gap: 24px; }
+  .admin-home__hero { padding: 32px 24px; border-radius: 11px; }
+  .admin-home-group { padding: 24px 20px; }
+  .private-filter-bar,
+  .audit-filters { padding: 16px; }
+  .private-stat-card { min-width: 0; padding: 18px; }
+  .professional-dashboard-header { align-items: stretch !important; }
+  .professional-dashboard-header .private-page-header { width: 100%; }
 }
 
 @media (max-width: 720px) {
