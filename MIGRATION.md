@@ -135,7 +135,7 @@ reformapro/
 │       ├── src/
 │       │   ├── constants.ts          # PROFESIONES, PROJECT_ESTADOS, BUDGET_ESTADOS, etc.
 │       │   ├── entities/             # User, Project, Budget, BudgetLine, Signature, AuditEntry
-│       │   ├── value-objects/        # Money (cents), IVARate, Percentage, Email, DocumentHash
+│       │   ├── value-objects/        # Money (cents), Percentage, Email, DocumentHash
 │       │   ├── errors/               # DomainError jerarquía
 │       │   ├── services/             # calculateBudget(), PermissionPolicy
 │       │   ├── repositories/         # Interfaces

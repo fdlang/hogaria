@@ -16,12 +16,6 @@ export class InMemoryActivationTokenRepository
     private readonly users: Pick<InMemoryUserRepository, "activateAccount" | "activationRevision">,
   ) {}
   async hasIssued(userId: number) { return this.items.some(token => token.userId === userId); }
-  async replace(token: ActivationToken) {
-    for (const old of this.items) if (old.userId === token.userId) this.revisions.delete(old.tokenHash);
-    this.items = this.items.filter((t) => t.userId !== token.userId);
-    this.items.push(token);
-    this.revisions.set(token.tokenHash, this.users.activationRevision(token.userId));
-  }
   async stage(token: ActivationToken) {
     this.items.push(token);
     this.revisions.set(token.tokenHash, this.users.activationRevision(token.userId));
@@ -72,21 +66,6 @@ export class PostgresActivationTokenRepository
     } finally {
       client.release();
     }
-  }
-  async replace(token: ActivationToken) {
-    await this.transaction(async (client) => {
-      await client.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [
-        token.userId,
-      ]);
-      await client.query(
-        "DELETE FROM account_activation_tokens WHERE user_id=$1",
-        [token.userId],
-      );
-      await client.query(
-        "INSERT INTO account_activation_tokens(user_id,token_hash,expires_at,used_at) VALUES($1,$2,$3,$4)",
-        [token.userId, token.tokenHash, token.expiresAt, token.usedAt],
-      );
-    });
   }
   async stage(token: ActivationToken) {
     await this.pool.query(

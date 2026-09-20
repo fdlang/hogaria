@@ -90,7 +90,6 @@ describe("AccountActivationUseCases", () => {
     const innerTokens = new InMemoryActivationTokenRepository(users);
     let deliveredUrl = "";
     const tokens = {
-      replace: innerTokens.replace.bind(innerTokens),
       hasIssued: innerTokens.hasIssued.bind(innerTokens),
       stage: innerTokens.stage.bind(innerTokens),
       promote: async () => { throw new Error("promotion unavailable"); },

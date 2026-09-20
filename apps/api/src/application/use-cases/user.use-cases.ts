@@ -16,7 +16,7 @@ import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword, PROFESIONES } fr
 const isProfesion = (value: unknown): value is Profesion =>
   typeof value === "string" && Object.prototype.hasOwnProperty.call(PROFESIONES, value);
 
-export interface CreateUserCommand {
+interface CreateUserCommand {
   actorId: number;
   email: string;
   nombre: string;

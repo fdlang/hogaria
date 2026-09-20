@@ -10,7 +10,7 @@ import {
   ValidationError, ConflictError, RateLimitError,
 } from "@reformapro/domain/errors";
 
-export interface HttpErrorResponse {
+interface HttpErrorResponse {
   status: number;
   body: { code: string; message: string; field?: string | undefined };
 }

@@ -6,7 +6,7 @@ const sql = await readFile(new URL("../database/schema.sql", import.meta.url), "
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 try {
   await pool.query(sql);
-  for (const file of ["professional-users.sql", "work-tracking.sql", "client-notifications.sql", "notification-outbox.sql", "commercial-workflow.sql", "durable-audit.sql"])
+  for (const file of ["migrate-rate-limits.sql", "professional-users.sql", "work-tracking.sql", "client-notifications.sql", "notification-outbox.sql", "commercial-workflow.sql", "durable-audit.sql"])
     await pool.query(await readFile(new URL(`../database/${file}`, import.meta.url), "utf8"));
   console.log("[db] schema applied");
 }

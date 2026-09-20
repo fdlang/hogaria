@@ -20,7 +20,7 @@ export interface ClientContext {
   userAgent: string;
 }
 
-export interface LoginResult {
+interface LoginResult {
   user: Omit<User, never> & { password?: never };
   token: string;
   expiresAt: number;

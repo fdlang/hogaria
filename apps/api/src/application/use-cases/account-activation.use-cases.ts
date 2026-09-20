@@ -6,7 +6,6 @@ import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword } from "@reformap
 export interface ActivationToken { userId: number; tokenHash: string; expiresAt: Date; usedAt: Date | null; }
 export interface IActivationTokenRepository {
   hasIssued(userId: number): Promise<boolean>;
-  replace(token: ActivationToken): Promise<void>;
   stage(token: ActivationToken): Promise<void>;
   promote(userId: number, tokenHash: string): Promise<void>;
   discard(tokenHash: string): Promise<void>;

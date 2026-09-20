@@ -122,19 +122,9 @@ class InMemoryProfessionalDocumentRepository implements IProfessionalDocumentRep
 // ─────────────────────────────────────────────────────────────
 // AppDependencies
 // ─────────────────────────────────────────────────────────────
-export interface AppDependencies {
+interface AppDependencies {
   users:        IUserRepository;
-  projects:     IProjectRepository;
-  audit:        IAuditRepository;
-  events:       InMemoryEventEmitter;
   tokens:       WebCryptoTokenService;
-  files:        IFileRepository;
-  solicitudes:  ISolicitudRepository;
-  opportunities: IOpportunityRepository;
-  estimates: IEstimateRepository;
-  changes: IChangeOrderRepository;
-  catalog: ICatalogRepository;
-
   useCases: {
     login:                     LoginUseCase;
     createUser:                CreateUserUseCase;
@@ -254,5 +244,5 @@ export async function buildApp(): Promise<AppDependencies> {
     professionalDocuments: new ProfessionalDocumentUseCases(users, professionalDocuments, fileStorage),
   };
 
-  return { users, projects, audit, events, tokens, files, solicitudes, opportunities, estimates, changes, catalog, useCases };
+  return { users, tokens, useCases };
 }

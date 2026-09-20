@@ -101,7 +101,7 @@ describe("Security and integrity regressions", () => {
   it("revokes outstanding invitations even when the account was already inactive", async () => {
     const { users, admin, client, events } = await setup();
     const tokens = new InMemoryActivationTokenRepository(users);
-    await tokens.replace({ userId: client.id, tokenHash: "token", expiresAt: new Date(Date.now() + 60000), usedAt: null });
+    await tokens.stage({ userId: client.id, tokenHash: "token", expiresAt: new Date(Date.now() + 60000), usedAt: null });
     await new DeleteUserUseCase(users, events).execute({ actorId: admin.id, userId: client.id, ctx });
     await expect(tokens.complete("token", "hash:new")).rejects.toThrow();
     expect((await users.findById(client.id))?.activo).toBe(false);

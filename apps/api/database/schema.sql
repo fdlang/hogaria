@@ -122,6 +122,14 @@ CREATE TABLE IF NOT EXISTS account_activation_tokens (
 );
 CREATE INDEX IF NOT EXISTS account_activation_tokens_user_idx ON account_activation_tokens(user_id);
 
+CREATE TABLE IF NOT EXISTS rate_limit_windows (
+  key TEXT PRIMARY KEY,
+  window_started_at TIMESTAMPTZ NOT NULL,
+  hits INTEGER NOT NULL CHECK (hits > 0)
+);
+CREATE INDEX IF NOT EXISTS rate_limit_windows_started_idx
+  ON rate_limit_windows(window_started_at);
+
 CREATE TABLE IF NOT EXISTS audit_entries (
   id TEXT PRIMARY KEY,
   payload JSONB NOT NULL,

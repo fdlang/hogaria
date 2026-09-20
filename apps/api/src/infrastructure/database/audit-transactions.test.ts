@@ -18,6 +18,7 @@ import { InMemoryEventEmitter } from "../events/inMemoryEventEmitter.js";
 import { Email, Money, Percentage } from "@reformapro/domain/value-objects";
 import { PostgresNoticeStore } from "./clientNoticeStore.js";
 import { auditedPool, requestAudit } from "../audit/request-audit.js";
+import { PostgresCooldownGate } from "./postgresCooldownGate.js";
 describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   const db = new PGlite();
   // PGlite has one connection. Serialize checked-out clients, like a size-one pool.
@@ -103,7 +104,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   afterAll(() => db.close());
   beforeEach(async () => {
     await db.exec(
-      "ALTER TABLE budget_versions DISABLE TRIGGER budget_version_no_truncate; TRUNCATE users CASCADE; ALTER TABLE budget_versions ENABLE TRIGGER budget_version_no_truncate; TRUNCATE client_email_notifications; DROP TRIGGER IF EXISTS test_failure ON estimates; DROP TRIGGER IF EXISTS activation_failure ON users;",
+      "ALTER TABLE budget_versions DISABLE TRIGGER budget_version_no_truncate; TRUNCATE users CASCADE; ALTER TABLE budget_versions ENABLE TRIGGER budget_version_no_truncate; TRUNCATE client_email_notifications; TRUNCATE rate_limit_windows; DROP TRIGGER IF EXISTS test_failure ON estimates; DROP TRIGGER IF EXISTS activation_failure ON users;",
     );
     adminId = (
       await users.save({
@@ -139,9 +140,15 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     });
     estimateId = (await service.create(adminId, opportunity.id, draft, ctx)).id;
   });
+  it("provides the shared rate-limit table in the canonical schema", async () => {
+    const gate = new PostgresCooldownGate(pool);
+    await expect(gate.check("login:test", 2, 60000)).resolves.toBe(true);
+    await expect(gate.check("login:test", 2, 60000)).resolves.toBe(true);
+    await expect(gate.check("login:test", 2, 60000)).resolves.toBe(false);
+  });
   it("revokes activation links when deactivating an account", async () => {
     const tokens = new PostgresActivationTokenRepository(pool);
-    await tokens.replace({ userId: clientId, tokenHash: "revoked", expiresAt: new Date(Date.now() + 60000), usedAt: null });
+    await tokens.stage({ userId: clientId, tokenHash: "revoked", expiresAt: new Date(Date.now() + 60000), usedAt: null });
     await users.update(clientId, { activo: false });
     await expect(tokens.complete("revoked", "new-password")).rejects.toThrow();
     expect((await users.findById(clientId))?.activo).toBe(false);
@@ -222,7 +229,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   });
   it("rolls back profile and password when token revocation fails", async () => {
     const tokens = new PostgresActivationTokenRepository(pool);
-    await tokens.replace({ userId: clientId, tokenHash: "pending", expiresAt: new Date(Date.now() + 60000), usedAt: null });
+    await tokens.stage({ userId: clientId, tokenHash: "pending", expiresAt: new Date(Date.now() + 60000), usedAt: null });
     await db.exec("CREATE FUNCTION fail_revoke() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'revocation failed'; END $$; CREATE TRIGGER revoke_failure BEFORE DELETE ON account_activation_tokens FOR EACH ROW EXECUTE FUNCTION fail_revoke();");
     try {
       await expect(users.update(clientId, { nombre: "Changed" }, "new-password")).rejects.toThrow("revocation failed");
@@ -326,7 +333,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   });
   it("activation restores its token if updating the account fails", async () => {
     const tokens = new PostgresActivationTokenRepository(pool);
-    await tokens.replace({
+    await tokens.stage({
       userId: clientId,
       tokenHash: "token",
       expiresAt: new Date(Date.now() + 60000),
@@ -344,7 +351,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   it("only one concurrent activation wins and expired links cannot be consumed", async () => {
     const tokens = new PostgresActivationTokenRepository(pool);
     const previousSessionVersion = (await users.findById(clientId))?.sessionVersion ?? 0;
-    await tokens.replace({
+    await tokens.stage({
       userId: clientId,
       tokenHash: "token",
       expiresAt: new Date(Date.now() + 60000),
@@ -358,7 +365,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     expect((await users.findById(clientId))?.activo).toBe(true);
     expect((await users.findById(clientId))?.sessionVersion).toBe(previousSessionVersion + 1);
     expect(await tokens.findValid("token", new Date())).toBeNull();
-    await tokens.replace({
+    await tokens.stage({
       userId: clientId,
       tokenHash: "expired",
       expiresAt: new Date(0),
