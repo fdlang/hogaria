@@ -81,7 +81,16 @@ export class PostgresOpportunityRepository implements IOpportunityRepository {
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM opportunities WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async findAll(status?: OpportunityStatus) { const r = await this.pool.query(status ? "SELECT * FROM opportunities WHERE estado=$1 ORDER BY updated_at DESC" : "SELECT * FROM opportunities ORDER BY updated_at DESC", status ? [status] : []); return r.rows.map(row => this.map(row)); }
   async save(o: Omit<Opportunity, "id" | "createdAt" | "updatedAt">) { const r = await this.pool.query("INSERT INTO opportunities(cliente_id,nombre,email,telefono,direccion,tipo,descripcion,estado,fecha_visita,notas_internas) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *", [o.clienteId,o.nombre,o.email,o.telefono,o.direccion,o.tipo,o.descripcion,o.estado,o.fechaVisita,o.notasInternas]); return this.map(r.rows[0]); }
-  async update(id: number, changes: Partial<Omit<Opportunity, "id" | "createdAt" | "updatedAt">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Oportunidad"); const next = { ...old, ...changes }; const r = await this.pool.query("UPDATE opportunities SET cliente_id=$2,nombre=$3,email=$4,telefono=$5,direccion=$6,tipo=$7,descripcion=$8,estado=$9,fecha_visita=$10,notas_internas=$11,updated_at=NOW() WHERE id=$1 RETURNING *", [id,next.clienteId,next.nombre,next.email,next.telefono,next.direccion,next.tipo,next.descripcion,next.estado,next.fechaVisita,next.notasInternas]); return this.map(r.rows[0]); }
+  async update(id: number, changes: Partial<Omit<Opportunity, "id" | "createdAt" | "updatedAt">>) {
+    const columns: Record<string, string> = { clienteId: "cliente_id", nombre: "nombre", email: "email", telefono: "telefono", direccion: "direccion", tipo: "tipo", descripcion: "descripcion", estado: "estado", fechaVisita: "fecha_visita", notasInternas: "notas_internas" };
+    const entries = Object.entries(changes).filter(([, value]) => value !== undefined);
+    if (!entries.length) { const current = await this.findById(id); if (!current) throw new NotFoundError("Oportunidad"); return current; }
+    const values: unknown[] = [id];
+    const assignments = entries.map(([key, value]) => { values.push(value); return `${columns[key]}=$${values.length}`; });
+    const r = await this.pool.query(`UPDATE opportunities SET ${assignments.join(",")},updated_at=NOW() WHERE id=$1 RETURNING *`, values);
+    if (!r.rows[0]) throw new NotFoundError("Oportunidad");
+    return this.map(r.rows[0]);
+  }
 }
 
 export class PostgresCatalogRepository implements ICatalogRepository {
@@ -103,7 +112,16 @@ export class PostgresCatalogRepository implements ICatalogRepository {
   async findById(id: number) { const result = await this.pool.query("SELECT * FROM catalog_items WHERE id=$1", [id]); return result.rows[0] ? this.map(result.rows[0]) : null; }
   async findByReference(reference: string) { const result = await this.pool.query("SELECT * FROM catalog_items WHERE reference=$1", [reference]); return result.rows[0] ? this.map(result.rows[0]) : null; }
   async save(item: Omit<CatalogItem, "id" | "createdAt" | "updatedAt">) { const result = await this.pool.query("INSERT INTO catalog_items(reference,category,description,unit,sale_price,vat_rate,active) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *", [item.reference,item.category,item.description,item.unit,item.salePrice,item.vatRate,item.active]); return this.map(result.rows[0]); }
-  async update(id: number, changes: Partial<Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate" | "active">>) { const current = await this.findById(id); if (!current) throw new NotFoundError("Partida de catálogo"); const next = { ...current, ...changes }; const result = await this.pool.query("UPDATE catalog_items SET reference=$2,category=$3,description=$4,unit=$5,sale_price=$6,vat_rate=$7,active=$8,updated_at=NOW() WHERE id=$1 RETURNING *", [id,next.reference,next.category,next.description,next.unit,next.salePrice,next.vatRate,next.active]); return this.map(result.rows[0]); }
+  async update(id: number, changes: Partial<Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate" | "active">>) {
+    const columns: Record<string, string> = { reference: "reference", category: "category", description: "description", unit: "unit", salePrice: "sale_price", vatRate: "vat_rate", active: "active" };
+    const entries = Object.entries(changes).filter(([, value]) => value !== undefined);
+    if (!entries.length) { const current = await this.findById(id); if (!current) throw new NotFoundError("Partida de catálogo"); return current; }
+    const values: unknown[] = [id];
+    const assignments = entries.map(([key, value]) => { values.push(value); return `${columns[key]}=$${values.length}`; });
+    const result = await this.pool.query(`UPDATE catalog_items SET ${assignments.join(",")},updated_at=NOW() WHERE id=$1 RETURNING *`, values);
+    if (!result.rows[0]) throw new NotFoundError("Partida de catálogo");
+    return this.map(result.rows[0]);
+  }
 }
 
 export class PostgresEstimateRepository implements IEstimateRepository {
@@ -187,6 +205,6 @@ export class PostgresSolicitudRepository implements ISolicitudRepository {
   async save(s: { nombre:string; email:string; telefono:string; tipo:string; descripcion:string; fecha:Date; estado:"pendiente"; ip:string }) { const r = await this.pool.query("INSERT INTO solicitudes(nombre,email,telefono,tipo,descripcion,estado,ip,fecha) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id", [s.nombre,s.email,s.telefono,s.tipo,s.descripcion,s.estado,s.ip,s.fecha]); return { id: Number(r.rows[0].id) }; }
   async findAll() { return (await this.pool.query("SELECT * FROM solicitudes ORDER BY fecha DESC")).rows.map(r => this.map(r)); }
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM solicitudes WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
-  async update(id: number, changes: { estado: "contactado" | "rechazado"; motivo: string | null }) { const r = await this.pool.query("UPDATE solicitudes SET estado=$2,motivo=$3 WHERE id=$1 RETURNING *", [id, changes.estado, changes.motivo]); if (!r.rows[0]) throw new NotFoundError("Solicitud"); return this.map(r.rows[0]); }
+  async update(id: number, changes: { estado: "contactado" | "rechazado"; motivo: string | null }) { const r = await this.pool.query("UPDATE solicitudes SET estado=$2,motivo=$3 WHERE id=$1 AND estado='pendiente' RETURNING *", [id, changes.estado, changes.motivo]); if (!r.rows[0]) throw new ConflictError("La solicitud ya no está pendiente"); return this.map(r.rows[0]); }
 }
 export class PostgresFileRepository implements IFileRepository { constructor(private readonly pool: pg.Pool) {} async save(file: Omit<ProjectFile,"id">) { const r=await this.pool.query("INSERT INTO project_files(project_id,payload,uploaded_at) VALUES($1,$2,$3) RETURNING id",[file.projectId,{...file,uploadedAt:file.uploadedAt.toISOString()},file.uploadedAt]); return { ...file, id:Number(r.rows[0].id) }; } async findById(id:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE id=$1",[id]); return r.rows[0] ? { ...r.rows[0].payload, id:Number(r.rows[0].id), uploadedAt:date(r.rows[0].payload.uploadedAt) } as ProjectFile : null; } async findByProject(projectId:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE project_id=$1 ORDER BY id",[projectId]); return r.rows.map(row=>({ ...row.payload,id:Number(row.id),uploadedAt:date(row.payload.uploadedAt) } as ProjectFile)); } async delete(id:number) { await this.pool.query("DELETE FROM project_files WHERE id=$1",[id]); } }
