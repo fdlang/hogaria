@@ -16,7 +16,7 @@ import type {
   User,
 } from "@reformapro/domain/entities";
 import type { DomainEvent, IEventEmitter } from "@reformapro/domain/events";
-import { Money, Percentage } from "@reformapro/domain/value-objects";
+import { Email, Money, Percentage } from "@reformapro/domain/value-objects";
 import {
   ConflictError,
   ForbiddenError,
@@ -27,7 +27,7 @@ import { validateDraft } from "./estimate-validation.js";
 import type { ClientContext } from "./auth.use-cases.js";
 import type { ISolicitudRepository, ICooldownGate } from "./solicitud.use-cases.js";
 import type { ISignatureCrypto } from "../../infrastructure/crypto/crypto.service.js";
-import { calculateEstimateTotals } from "@reformapro/domain";
+import { calculateEstimateTotals, isValidSpanishPhone } from "@reformapro/domain";
 
 type OpportunityInput = Pick<
   Opportunity,
@@ -205,6 +205,10 @@ export class OpportunityUseCases {
       !input.tipo?.trim()
     )
       throw new ValidationError("Nombre, dirección y tipo son obligatorios");
+    if (input.estado !== undefined && input.estado !== "nueva") throw new ValidationError("Una oportunidad debe crearse en estado nueva", "estado");
+    if (input.fechaVisita !== undefined && input.fechaVisita !== null && (!(input.fechaVisita instanceof Date) || !Number.isFinite(input.fechaVisita.getTime()))) throw new ValidationError("Fecha no válida", "fechaVisita");
+    if (input.email?.trim()) Email.of(input.email);
+    if (input.telefono?.trim() && !isValidSpanishPhone(input.telefono)) throw new ValidationError("Teléfono no válido", "telefono");
     if (input.clienteId != null) {
       const client = await this.users.findById(input.clienteId);
       if (!client || client.rol !== "cliente")
@@ -216,7 +220,7 @@ export class OpportunityUseCases {
       email: input.email?.trim() || null,
       telefono: input.telefono?.trim() || null,
       descripcion: input.descripcion ?? "",
-      estado: input.estado ?? "nueva",
+      estado: "nueva",
       fechaVisita: input.fechaVisita ?? null,
       notasInternas: input.notasInternas ?? "",
     });

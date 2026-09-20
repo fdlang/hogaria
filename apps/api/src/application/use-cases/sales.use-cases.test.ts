@@ -226,6 +226,19 @@ describe("EstimateUseCases — client privacy and authorization", () => {
 });
 
 describe("OpportunityUseCases — governed pipeline", () => {
+  it.each(["ganada", "descartada"] as const)("does not create an opportunity directly as %s", async (estado) => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of(`create-${estado}@hogaria.test`), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const service = new OpportunityUseCases(users, new InMemoryOpportunityRepository(), new InMemoryEventEmitter());
+    await expect(service.create(admin.id, { clienteId: null, nombre: "Obra", direccion: "Madrid", tipo: "Integral", estado }, { ip: "test", userAgent: "test" })).rejects.toThrow();
+  });
+
+  it("rejects an invalid visit date when creating an opportunity", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("invalid-date@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const service = new OpportunityUseCases(users, new InMemoryOpportunityRepository(), new InMemoryEventEmitter());
+    await expect(service.create(admin.id, { clienteId: null, nombre: "Obra", direccion: "Madrid", tipo: "Integral", fechaVisita: new Date("invalid") }, { ip: "test", userAgent: "test" })).rejects.toThrow("Fecha");
+  });
   it("accepts only forward commercial transitions and keeps terminal states closed", async () => {
     const users = new InMemoryUserRepository(hasher);
     const admin = await users.save({ id: 0, email: Email.of("pipeline@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
