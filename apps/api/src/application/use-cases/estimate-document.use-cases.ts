@@ -33,7 +33,15 @@ export class EstimateDocumentUseCases {
     const actor = await this.users.findById(actorId);
     if (!actor?.activo || !["admin", "cliente"].includes(actor.rol))
       throw new ForbiddenError();
-    const document = await this.estimates.publicVersion(actorId, id, version);
+    const estimate = actor.rol === "admin"
+      ? await this.estimates.get(actorId, id)
+      : null;
+    const isCurrentInternalDraft = estimate !== null &&
+      version === estimate.versionActual &&
+      ["borrador", "en_revision"].includes(estimate.estado);
+    const document = isCurrentInternalDraft
+      ? await this.estimates.adminPreview(actorId, id)
+      : await this.estimates.publicVersion(actorId, id, version);
     if (!document.propuesta)
       throw new ConflictError(
         "Publica primero una versión del presupuesto para generar su PDF",

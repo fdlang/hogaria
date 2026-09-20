@@ -47,6 +47,17 @@ const draft = {
 
 async function setup() {
   const users = new InMemoryUserRepository(hasher);
+  const admin = await users.save(
+    {
+      id: 0,
+      email: Email.of("admin@hogaria.test"),
+      nombre: "Admin",
+      rol: "admin",
+      activo: true,
+      createdAt: new Date(),
+    },
+    "hash",
+  );
   const clientA = await users.save(
     {
       id: 0,
@@ -141,8 +152,10 @@ async function setup() {
     });
   return {
     users,
+    admin,
     clientA,
     clientB,
+    opportunityA,
     estimateA,
     estimateB,
     estimates,
@@ -172,6 +185,20 @@ async function documents() {
   };
 }
 describe("Download-only budget PDF", () => {
+  it("lets an administrator download the current internal draft but keeps it hidden from its client", async () => {
+    const f = await documents();
+    const pending = await f.estimates.save({ oportunidadId: f.opportunityA.id, clienteId: f.clientA.id, numero: "HOG-DRAFT", titulo: draft.titulo, estado: "borrador", versionActual: 1, borrador: draft });
+
+    const result = await f.service.download(f.admin.id, pending.id, 1);
+
+    expect(result.filename).toContain("HOG-DRAFT-v1.pdf");
+    const rendered = JSON.stringify(f.pdf.render.mock.calls.at(-1));
+    expect(rendered).toContain("Reforma de vivienda");
+    expect(rendered).not.toContain("costeUnitario");
+    expect(rendered).not.toContain("Margen reservado");
+    await expect(f.service.download(f.clientA.id, pending.id, 1)).rejects.toThrow();
+  });
+
   it("downloads a previously published version while a new revision is internal", async () => {
     const f = await documents();
     await f.estimates.update(f.estimateA.id,{estado:"en_revision",versionActual:2,borrador:{...draft,titulo:"Internal revision"}});
