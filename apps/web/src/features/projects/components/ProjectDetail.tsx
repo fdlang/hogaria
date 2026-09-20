@@ -9,7 +9,7 @@
  * duplication across roles.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ProjectsApi, type ProjectDTO } from "../api/projects.api";
 import { UsersApi } from "@/features/users/api/users.api";
 import { useProject, useProgressUpdater, useMilestoneToggler } from "../hooks/useProjects";
@@ -24,6 +24,7 @@ import { ProjectStatusBadge, ProfesionBadge } from "@/shared/ui/badges";
 import { formatMoney, formatDate, formatBytes } from "@/shared/lib/formatters";
 import { Profesion } from "@reformapro/domain";
 import { ChangeOrders } from "@/features/sales/components/ChangeOrders";
+import { ExclusiveAction } from "@/shared/lib/exclusive-action";
 
 interface Props {
   apis: { projects: ProjectsApi; files: FilesApi; users: UsersApi };
@@ -44,15 +45,23 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const [selectedProfessional, setSelectedProfessional] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [transitioning, setTransitioning] = useState<ProjectDTO["estado"] | null>(null);
+  const projectAction = useRef(new ExclusiveAction());
+  const [projectSaving, setProjectSaving] = useState(false);
+
+  const runProjectAction = (action: () => Promise<unknown>) => projectAction.current.run(async () => {
+    setProjectSaving(true);
+    try { await action(); }
+    finally { setProjectSaving(false); }
+  });
 
   const handleProgressSave = async () => {
     if (editingProgress === null) return;
-    try { await updateProgress(editingProgress); setEditingProgress(null); push("Progreso actualizado", "success"); }
+    try { const ran = await runProjectAction(() => updateProgress(editingProgress)); if (!ran) return; setEditingProgress(null); push("Progreso actualizado", "success"); }
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
   };
 
   const handleMilestoneToggle = async (id: string | number) => {
-    try { await toggleMilestone(id); push("Hito actualizado", "success"); }
+    try { const ran = await runProjectAction(() => toggleMilestone(id)); if (!ran) return; push("Hito actualizado", "success"); }
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
   };
 
@@ -166,8 +175,8 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                     onChange={e => setEditingProgress(parseInt(e.target.value, 10))}
                     style={{ flex: 1 }} />
                   <strong style={{ minWidth: 50, textAlign: "right", color: "#c17248" }}>{editingProgress}%</strong>
-                  <Button small onClick={handleProgressSave}>Guardar</Button>
-                  <Button small variant="ghost" onClick={() => setEditingProgress(null)}>Cancelar</Button>
+                  <Button small loading={projectSaving} disabled={projectSaving} onClick={handleProgressSave}>Guardar</Button>
+                  <Button small variant="ghost" disabled={projectSaving} onClick={() => setEditingProgress(null)}>Cancelar</Button>
                 </div>
               )}
             </div>
@@ -182,7 +191,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                   {p.hitos.map(h => (
                     <li key={h.id}
                       style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, background: h.completado ? "#34d39908" : "#fffaf4", border: `1px solid ${h.completado ? "#34d399" : "#d8c4ad"}`, borderRadius: 8 }}>
-                      <input type="checkbox" checked={h.completado} disabled={!canEditMilestones}
+                      <input type="checkbox" checked={h.completado} disabled={!canEditMilestones || projectSaving}
                         onChange={() => handleMilestoneToggle(h.id)}
                         style={{ cursor: canEditMilestones ? "pointer" : "not-allowed" }} />
                       <div style={{ flex: 1 }}>
