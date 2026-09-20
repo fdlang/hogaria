@@ -14,8 +14,7 @@ export function validateSolicitud(values: SolicitudFormValues): SolicitudFormErr
   if (!values.nombre.trim()) errors.nombre = "Obligatorio";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) errors.email = "Introduce un email válido";
 
-  const phone = values.telefono.replace(/[\s().-]/g, "");
-  if (phone && !/^(?:(?:\+|00)34)?[6789]\d{8}$/.test(phone)) {
+  if (!isValidSpanishPhone(values.telefono)) {
     errors.telefono = "Introduce un teléfono español válido";
   }
 
@@ -24,3 +23,4 @@ export function validateSolicitud(values: SolicitudFormValues): SolicitudFormErr
 
   return errors;
 }
+import { isValidSpanishPhone } from "@reformapro/domain";

@@ -12,6 +12,7 @@ import { Email } from "@reformapro/domain/value-objects";
 import { ForbiddenError, NotFoundError, ValidationError, RateLimitError } from "@reformapro/domain/errors";
 import type { IUserRepository } from "@reformapro/domain/repositories";
 import { ClientContext } from "./auth.use-cases.js";
+import { isValidSpanishPhone } from "@reformapro/domain";
 
 export type SolicitudStatus = "pendiente" | "contactado" | "rechazado";
 export interface Solicitud {
@@ -49,9 +50,10 @@ export class SubmitSolicitudUseCase {
     // Validation
     if (!cmd.nombre?.trim())         throw new ValidationError("Nombre obligatorio", "nombre");
     if (!cmd.tipo?.trim())           throw new ValidationError("Tipo obligatorio", "tipo");
-    if (!cmd.descripcion?.trim() || cmd.descripcion.length < 20) {
+    if (!cmd.descripcion?.trim() || cmd.descripcion.trim().length < 20) {
       throw new ValidationError("La descripción debe tener al menos 20 caracteres", "descripcion");
     }
+    if (!isValidSpanishPhone(cmd.telefono ?? "")) throw new ValidationError("Teléfono no válido", "telefono");
     const email = Email.of(cmd.email); // throws if malformed
 
     // Allowlist + length clamps

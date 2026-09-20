@@ -5,4 +5,5 @@ export * from "./errors/index.js";
 export * from "./services/index.js";
 export * from "./work-tracking.js";
 export * from "./financial.js";
+export * from "./contact.js";
 export * from "./rules/index.js";
