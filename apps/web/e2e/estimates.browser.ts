@@ -95,8 +95,15 @@ for (const width of [320, 390, 768, 1440]) {
     await expect(page.getByRole("heading", { name: "Mis proyectos" })).toBeVisible();
     const hero = await page.locator(".client-estimates__hero").boundingBox();
     const firstSection = await page.locator(".client-estimates__section").first().boundingBox();
+    const logoLocator = page.locator(".client-estimates__brand-logo");
+    const logo = await logoLocator.boundingBox();
+    const introduction = await page.locator(".client-estimates__intro > p:last-child").boundingBox();
     expect(hero).not.toBeNull();
     expect(firstSection).not.toBeNull();
+    expect(logo).not.toBeNull();
+    expect(introduction).not.toBeNull();
+    expect(await logoLocator.evaluate(element => parseFloat(getComputedStyle(element).marginTop))).toBeGreaterThanOrEqual(18);
+    expect(introduction!.y - (logo!.y + logo!.height)).toBeGreaterThanOrEqual(25);
     expect(firstSection!.y - (hero!.y + hero!.height)).toBeGreaterThanOrEqual(28);
     expect(
       await page.evaluate(
