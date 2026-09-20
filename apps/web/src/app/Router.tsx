@@ -14,6 +14,19 @@ export interface Route {
   roles?: Array<"admin" | "cliente" | "profesional">;  // undefined = public
 }
 
+export function matchRoute(routes: Route[], currentPath: string): Route | null {
+  const path = currentPath.split(/[?#]/)[0] || "/";
+  const exact = routes.find(route => route.path.replace(/^#/, "") === path);
+  if (exact) return exact;
+  const candidates = routes
+    .filter(route => {
+      const candidate = route.path.replace(/^#/, "");
+      return candidate !== "/" && candidate.endsWith("/") && path.startsWith(candidate) && path.length > candidate.length;
+    })
+    .sort((left, right) => right.path.length - left.path.length);
+  return candidates[0] ?? null;
+}
+
 interface NavCtx {
   currentPath: string;
   navigate: (path: string) => void;
@@ -55,17 +68,7 @@ export function Router({ routes, fallback, layout = (content) => content }: { ro
     setPath(nextPath);
   }, []);
 
-  const match = useMemo(() => {
-    // Exact match first
-    const exact = routes.find(r => r.path.replace(/^#/, "") === path);
-    if (exact) return exact;
-    // Otherwise, match longest prefix — ensures "#/admin/projects/" beats "#/admin/projects"
-    // when the URL is "#/admin/projects/123"
-    const candidates = routes
-      .filter(r => path.startsWith(r.path.replace(/^#/, "")))
-      .sort((a, b) => b.path.length - a.path.length);
-    return candidates[0] ?? null;
-  }, [routes, path]);
+  const match = useMemo(() => matchRoute(routes, path), [routes, path]);
 
   // Still authenticating? Show nothing (prevents flashing the fallback)
   if (status === "authenticating" || status === "restoring") return null;
