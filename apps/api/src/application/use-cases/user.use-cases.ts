@@ -100,13 +100,17 @@ export class UpdateUserUseCase {
     const target = await this.users.findById(cmd.userId);
     if (!target) throw new NotFoundError("Usuario");
 
+    const allowed = new Set(["nombre", "telefono", "profesion", "activo", "newPassword"]);
+    if (Object.keys(cmd.changes).some(key => !allowed.has(key))) throw new ValidationError("Campo de usuario no permitido");
     const { newPassword, ...fields } = cmd.changes;
-    const updated = await this.users.update(cmd.userId, fields);
+    if (fields.activo !== undefined && typeof fields.activo !== "boolean") throw new ValidationError("Estado no válido", "activo");
+    if (fields.nombre !== undefined && (typeof fields.nombre !== "string" || !fields.nombre.trim())) throw new ValidationError("Nombre obligatorio", "nombre");
+    if (cmd.actorId === cmd.userId && fields.activo === false) throw new ValidationError("No puedes desactivar tu propia cuenta");
+    if (newPassword !== undefined && (typeof newPassword !== "string" || newPassword.length < 12 || new TextEncoder().encode(newPassword).length > 72 || !/[a-z]/i.test(newPassword) || !/\d/.test(newPassword))) throw new ValidationError("Usa al menos 12 caracteres, incluyendo letras y números", "newPassword");
+    const passwordHash = newPassword === undefined ? undefined : await this.hasher.hash(newPassword);
+    const updated = await this.users.update(cmd.userId, fields, passwordHash);
 
     if (newPassword) {
-      if (newPassword.length < 8) throw new ValidationError("Contraseña mínimo 8 caracteres", "newPassword");
-      const hash = await this.hasher.hash(newPassword);
-      await this.users.updatePassword(cmd.userId, hash);
       await this.events.emit({
         type: "UserPasswordReset", eventId: crypto.randomUUID(), occurredAt: new Date(),
         actorId: actor.id, actorName: actor.nombre,

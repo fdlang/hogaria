@@ -55,6 +55,7 @@ import { Email } from "@reformapro/domain/value-objects";
 import { IAuditRepository, ICatalogRepository, IChangeOrderRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
 import { PostgresAuditRepository, PostgresCatalogRepository, PostgresChangeOrderRepository, PostgresEstimateRepository, PostgresFileRepository, PostgresOpportunityRepository, PostgresProjectRepository, PostgresSolicitudRepository, PostgresUserRepository } from "./infrastructure/database/postgresRepositories.js";
 import pg from "pg";
+import { auditedPool } from "./infrastructure/audit/request-audit.js";
 import { PostgresCooldownGate } from "./infrastructure/database/postgresCooldownGate.js";
 import { PostgresCommercialTransaction } from "./infrastructure/database/postgresCommercialTransaction.js";
 
@@ -163,7 +164,7 @@ export async function buildApp(): Promise<AppDependencies> {
   const events    = new InMemoryEventEmitter();
   const memoryCooldown = new InMemoryCooldownGate();
 
-  const pool = databaseUrl ? new pg.Pool({ connectionString: databaseUrl }) : null;
+  const pool = databaseUrl ? auditedPool(new pg.Pool({ connectionString: databaseUrl })) : null;
   const cooldown = pool ? new PostgresCooldownGate(pool) : memoryCooldown;
   const users: IUserRepository = pool ? new PostgresUserRepository(pool, hasher) : new InMemoryUserRepository(hasher);
   const projects: IProjectRepository = pool ? new PostgresProjectRepository(pool) : new InMemoryProjectRepository();
@@ -173,7 +174,7 @@ export async function buildApp(): Promise<AppDependencies> {
   const solicitudes: ISolicitudRepository = pool ? new PostgresSolicitudRepository(pool) : new InMemorySolicitudRepository();
   const opportunities: IOpportunityRepository = pool ? new PostgresOpportunityRepository(pool) : new InMemoryOpportunityRepository();
   const estimates: IEstimateRepository = pool ? new PostgresEstimateRepository(pool) : new InMemoryEstimateRepository();
-  const changes: IChangeOrderRepository = pool ? new PostgresChangeOrderRepository(pool) : new InMemoryChangeOrderRepository();
+  const changes: IChangeOrderRepository = pool ? new PostgresChangeOrderRepository(pool) : new InMemoryChangeOrderRepository(projects);
   const catalog: ICatalogRepository = pool ? new PostgresCatalogRepository(pool) : new InMemoryCatalogRepository();
   const activationTokens: IActivationTokenRepository = pool ? new PostgresActivationTokenRepository(pool) : new InMemoryActivationTokenRepository(users as InMemoryUserRepository);
   configureActivationPasswordHasher(value => hasher.hash(value));
@@ -213,7 +214,7 @@ export async function buildApp(): Promise<AppDependencies> {
     deleteUser:                 new DeleteUserUseCase(users, events),
     listUsers:                  new ListUsersUseCase(users),
     updateProject:              new UpdateProjectUseCase(users, projects, events),
-    deleteProject:              new DeleteProjectUseCase(users, projects, async id => (await workStore.list({projectId:id})).total > 0 || !!await workStore.budget(id)),
+    deleteProject:              new DeleteProjectUseCase(users, projects, async id => (await workStore.list({projectId:id})).total > 0 || !!await workStore.budget(id), async id => (await changes.findByProject(id)).some(order => order.estado !== "borrador")),
     listProjects:               new ListProjectsUseCase(users, projects),
     getProject:                 new GetProjectUseCase(users, projects),
     assignProjectProfessional:  new AssignProjectProfessionalUseCase(users, projects),
@@ -226,10 +227,10 @@ export async function buildApp(): Promise<AppDependencies> {
     deleteFile:                 new DeleteFileUseCase(users, projects, files, fileStorage),
     listFiles:                  new ListFilesUseCase(users, projects, files),
     downloadFile:               new DownloadFileUseCase(users, projects, files, fileStorage),
-    opportunities:              new OpportunityUseCases(users, opportunities, events),
+    opportunities:              new OpportunityUseCases(users, opportunities, events, solicitudes),
     estimates:                  estimateCases,
     estimateDocuments: new EstimateDocumentUseCases(users,estimateCases,new PdfEstimateRenderer(),cooldown),
-    changes:                    new ChangeOrderUseCases(users, projects, changes),
+    changes:                    new ChangeOrderUseCases(users, projects, changes, cooldown),
     catalog:                    new CatalogUseCases(users, catalog),
     activation,
     work: new WorkTrackingUseCases(users, projects, workStore),

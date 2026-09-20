@@ -11,17 +11,20 @@ export class InMemoryActivationTokenRepository
   implements IActivationTokenRepository
 {
   private items: ActivationToken[] = [];
+  private readonly revisions = new Map<string, number>();
   constructor(
-    private readonly users: Pick<InMemoryUserRepository, "activateAccount">,
+    private readonly users: Pick<InMemoryUserRepository, "activateAccount" | "activationRevision">,
   ) {}
   async replace(token: ActivationToken) {
+    for (const old of this.items) if (old.userId === token.userId) this.revisions.delete(old.tokenHash);
     this.items = this.items.filter((t) => t.userId !== token.userId);
     this.items.push(token);
+    this.revisions.set(token.tokenHash, this.users.activationRevision(token.userId));
   }
   async findValid(hash: string, now: Date) {
     return (
       this.items.find(
-        (t) => t.tokenHash === hash && !t.usedAt && t.expiresAt > now,
+        (t) => t.tokenHash === hash && !t.usedAt && t.expiresAt > now && this.revisions.get(hash) === this.users.activationRevision(t.userId),
       ) ?? null
     );
   }
@@ -31,8 +34,10 @@ export class InMemoryActivationTokenRepository
     );
     const token = this.items[index];
     if (!token) throw invalid();
+    if (this.revisions.get(hash) !== this.users.activationRevision(token.userId)) throw invalid();
     this.users.activateAccount(token.userId, passwordHash);
     this.items.splice(index, 1);
+    this.revisions.delete(hash);
   }
 }
 export class PostgresActivationTokenRepository

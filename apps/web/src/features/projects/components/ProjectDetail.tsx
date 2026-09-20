@@ -23,6 +23,7 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { ProjectStatusBadge, ProfesionBadge } from "@/shared/ui/badges";
 import { formatMoney, formatDate, formatBytes } from "@/shared/lib/formatters";
 import { Profesion } from "@reformapro/domain";
+import { ChangeOrders } from "@/features/sales/components/ChangeOrders";
 
 interface Props {
   apis: { projects: ProjectsApi; files: FilesApi; users: UsersApi };
@@ -35,7 +36,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const updateProgress = useProgressUpdater(apis.projects, project);
   const toggleMilestone = useMilestoneToggler(apis.projects, project);
   const files          = useProjectFiles(apis.files, projectId);
-  const { can, isAdmin } = usePermissions();
+  const { can, isAdmin, isCliente } = usePermissions();
   const professionals  = useUsers(apis.users, "profesional", isAdmin);
   const { push }       = useNotifications();
   const confirm        = useConfirm();
@@ -244,6 +245,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           )}
         </aside>
       </div>
+      {(isAdmin || isCliente) && <ChangeOrders api={apis.projects} projectId={projectId} admin={isAdmin} onChanged={project.refresh} />}
     </section>
   );
 }

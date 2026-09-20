@@ -145,6 +145,9 @@ export class DeleteFileUseCase {
     if (!file) throw new NotFoundError("Archivo");
 
     // Only admin can delete sensitive files; users can delete their own uploads
+    const project = await this.projects.findById(file.projectId);
+    if (!project) throw new NotFoundError("Proyecto");
+    PermissionPolicy.authorize(actor, "project.read", { project });
     if (file.sensitive && actor.rol !== "admin") throw new ForbiddenError();
     if (!file.sensitive && actor.rol !== "admin" && file.uploadedBy !== actor.id) throw new ForbiddenError();
 

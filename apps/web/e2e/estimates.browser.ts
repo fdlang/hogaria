@@ -85,6 +85,40 @@ async function fixture(page: Page, role: string) {
   }
   return emails;
 }
+for (const state of ["borrador", "rechazado"]) {
+  test(`admin resumes ${state} and saves the same estimate`, async ({ page }) => {
+    await fixture(page, "admin");
+    let saved = false, revised = false;
+    const draft = { ...proposal.propuesta, notasInternas: "Nota interna", partidas: proposal.propuesta.partidas.map(line => ({ ...line, costeUnitario: 30 })) };
+    await page.route("**/api/opportunities", route => route.fulfill({ json: [{ id: 4, clienteId: 2, nombre: "Obra", direccion: "Madrid" }] }));
+    await page.route("**/api/estimates?*", route => {
+      expect(route.request().method()).toBe("GET");
+      return route.fulfill({ json: [{ ...proposal, estado: state }] });
+    });
+    await page.route("**/api/estimates/1/draft", route => route.fulfill({ json: { id: 1, oportunidadId: 4, estado: "borrador", borrador: draft } }));
+    await page.route("**/api/estimates/1/revise", route => {
+      revised = true;
+      return route.fulfill({ json: { id: 1, oportunidadId: 4, estado: "en_revision", borrador: draft } });
+    });
+    await page.route("**/api/estimates/1", route => {
+      expect(route.request().method()).toBe("PATCH");
+      expect(route.request().postDataJSON().borrador.titulo).toBe("Título corregido");
+      saved = true;
+      return route.fulfill({ json: { id: 1 } });
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Mostrar propuestas" }).click();
+    await page.getByRole("button", { name: state === "borrador" ? "Editar borrador" : "Crear revisión" }).click();
+    await expect(page.getByLabel("Título visible al cliente")).toHaveValue(draft.titulo);
+    await page.getByLabel("Título visible al cliente").fill("Título corregido");
+    await page.getByRole("button", { name: "Continuar", exact: true }).click();
+    await page.getByRole("button", { name: "Revisar propuesta" }).click();
+    await page.getByRole("button", { name: "Guardar como borrador" }).click();
+    await expect(page.getByRole("heading", { name: "Nueva oportunidad" })).toBeVisible();
+    expect(saved).toBe(true);
+    expect(revised).toBe(state === "rechazado");
+  });
+}
 for (const role of ["admin", "cliente"])
   for (const width of [320, 390, 768, 1440]) {
     test(role + " budget detail fits " + width + "px", async ({ page }) => {

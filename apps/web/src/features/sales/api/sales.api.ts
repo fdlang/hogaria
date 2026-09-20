@@ -7,17 +7,24 @@ export type PublicEstimateLineDTO = Pick<EstimateLineDTO, "id" | "categoria" | "
 export type PublicProposalDTO = { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; partidas: PublicEstimateLineDTO[]; totalSinIva: number; totalIva: number; totalConIva: number; enviadoAt: string | null; expiresAt: string | null; firmadoAt: string | null; hash: string | null };
 export type EstimateDTO = { id: number; numero: string; titulo: string; estado: string; versionActual: number; motivoRechazo: string | null; propuesta: PublicProposalDTO | null; createdAt: string; updatedAt: string };
 export type CatalogItemDTO = { id: number; reference: string; category: string; description: string; unit: string; salePrice: number; vatRate: number; active: boolean; updatedAt: string };
+export type AdminEstimateDTO = { id: number; oportunidadId: number; estado: string; borrador: EstimateDraftDTO };
+export type ChangeOrderDTO = { id: number; numero: string; estado: string; payload?: EstimateDraftDTO; propuesta?: Pick<PublicProposalDTO, "titulo" | "partidas" | "condicionesPago"> };
 
 export class SalesApi {
   constructor(private readonly http: ApiClient) {}
   opportunities() { return this.http.get<OpportunityDTO[]>("/opportunities"); }
+  updateOpportunity(id: number, input: Partial<OpportunityDTO>) { return this.http.patch<OpportunityDTO>(`/opportunities/${id}`, input); }
   catalog() { return this.http.get<CatalogItemDTO[]>("/catalog"); }
   adminCatalog() { return this.http.get<CatalogItemDTO[]>("/catalog?includeInactive=true"); }
   createCatalogItem(input: Omit<CatalogItemDTO, "id" | "active" | "updatedAt">) { return this.http.post<CatalogItemDTO>("/catalog", input); }
   updateCatalogItem(id: number, input: Partial<Omit<CatalogItemDTO, "id" | "updatedAt">>) { return this.http.patch<CatalogItemDTO>(`/catalog/${id}`, input); }
   archiveCatalogItem(id: number) { return this.http.delete<CatalogItemDTO>(`/catalog/${id}`); }
   createOpportunity(input: Omit<OpportunityDTO, "id" | "createdAt" | "updatedAt">) { return this.http.post<OpportunityDTO>("/opportunities", input); }
-  estimates() { return this.http.get<EstimateDTO[]>("/estimates"); }
+  estimates(page = 0, search = "", status = "") { return this.http.get<EstimateDTO[]>(`/estimates?page=${page}&search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`); }
+  history(id: number) { return this.http.get<EstimateDTO[]>(`/estimates/${id}/history`); }
+  draft(id: number) { return this.http.get<AdminEstimateDTO>(`/estimates/${id}/draft`); }
+  updateEstimate(id: number, borrador: EstimateDraftDTO) { return this.http.patch<AdminEstimateDTO>(`/estimates/${id}`, { borrador }); }
+  reviseEstimate(id: number) { return this.http.post<AdminEstimateDTO>(`/estimates/${id}/revise`); }
   downloadPdf(id:number,version:number) { return this.http.download(`/estimates/${id}/pdf?version=${version}`); }
   createEstimate(oportunidadId: number, borrador: EstimateDraftDTO) { return this.http.post<EstimateDTO>("/estimates", { oportunidadId, borrador }); }
   sendEstimate(id: number) { return this.http.post<EstimateDTO>(`/estimates/${id}/send`); }

@@ -2,7 +2,7 @@ import pg from "pg";
 import { AuditEntry, CatalogItem, ChangeOrder, Estimate, EstimateDraft, EstimateVersion, Opportunity, OpportunityStatus, Project, User, UserRole } from "@reformapro/domain/entities";
 import { Email, Money, Percentage } from "@reformapro/domain/value-objects";
 import { IAuditRepository, ICatalogRepository, IChangeOrderRepository, IEstimateRepository, IOpportunityRepository, IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
-import { NotFoundError } from "@reformapro/domain/errors";
+import { NotFoundError, ConflictError } from "@reformapro/domain/errors";
 import type { PasswordHasher } from "./inMemoryRepositories.js";
 import type { ProjectFile, IFileRepository } from "../../application/use-cases/file.use-cases.js";
 import type { ISolicitudRepository } from "../../application/use-cases/solicitud.use-cases.js";
@@ -20,19 +20,61 @@ export class PostgresUserRepository implements IUserRepository {
   async findAll() { return (await this.pool.query("SELECT * FROM users ORDER BY id")).rows.map(r => this.map(r)); }
   async findByRole(role: UserRole) { return (await this.pool.query("SELECT * FROM users WHERE rol=$1 ORDER BY id", [role])).rows.map(r => this.map(r)); }
   async save(user: User, passwordHash = "") { const r = await this.pool.query("INSERT INTO users(email,nombre,rol,profesion,telefono,activo,password_hash,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *", [user.email.value,user.nombre,user.rol,user.profesion ?? null,user.telefono ?? null,user.activo,passwordHash,user.createdAt]); return this.map(r.rows[0]); }
-  async update(id: number, changes: Partial<Omit<User,"id"|"createdAt">>) { const current = await this.findById(id); if (!current) throw new NotFoundError("Usuario"); const next = { ...current, ...changes }; const r = await this.pool.query("UPDATE users SET nombre=$2, rol=$3, profesion=$4, telefono=$5, activo=$6 WHERE id=$1 RETURNING *", [id,next.nombre,next.rol,next.profesion ?? null,next.telefono ?? null,next.activo]); return this.map(r.rows[0]); }
+  async update(id: number, changes: Partial<Omit<User,"id"|"createdAt">>, passwordHash?: string) {
+    const ownsConnection = !("release" in this.pool);
+    const client = ownsConnection ? await (this.pool as pg.Pool).connect() : this.pool as pg.PoolClient;
+    try {
+      if (ownsConnection) await client.query("BEGIN");
+      // Serialize administrator changes, including concurrent deactivations.
+      await client.query("SELECT pg_advisory_xact_lock(48127, 1)");
+      const found = await client.query("SELECT * FROM users WHERE id=$1 FOR UPDATE", [id]);
+      if (!found.rows[0]) throw new NotFoundError("Usuario");
+      const current = this.map(found.rows[0]);
+      const next = { ...current, ...changes };
+      if (current.rol === "admin" && current.activo && (!next.activo || next.rol !== "admin")) {
+        const other = await client.query("SELECT id FROM users WHERE rol='admin' AND activo=true AND id<>$1 LIMIT 1", [id]);
+        if (!other.rows.length) throw new ConflictError("Debe quedar un administrador activo");
+      }
+      const result = await client.query("UPDATE users SET nombre=$2,rol=$3,profesion=$4,telefono=$5,activo=$6,password_hash=COALESCE($7,password_hash) WHERE id=$1 RETURNING *", [id,next.nombre,next.rol,next.profesion ?? null,next.telefono ?? null,next.activo,passwordHash ?? null]);
+      if (changes.activo === false || passwordHash !== undefined || changes.rol !== undefined) await client.query("DELETE FROM account_activation_tokens WHERE user_id=$1", [id]);
+      if (ownsConnection) await client.query("COMMIT");
+      return this.map(result.rows[0]);
+    } catch (error) {
+      if (ownsConnection) await client.query("ROLLBACK");
+      throw error;
+    } finally { if (ownsConnection) client.release(); }
+  }
   async delete(id: number) { await this.pool.query("DELETE FROM users WHERE id=$1", [id]); }
   async verifyPassword(email: string, plaintext: string) { const r = await this.pool.query("SELECT * FROM users WHERE lower(email)=lower($1)", [email]); if (!r.rows[0] || !(await this.hasher.verify(plaintext, r.rows[0].password_hash))) return null; return this.map(r.rows[0]); }
-  async updatePassword(id: number, hash: string) { await this.pool.query("UPDATE users SET password_hash=$2 WHERE id=$1", [id, hash]); }
+  async updatePassword(id: number, hash: string) { await this.update(id, {}, hash); }
 }
 
 export class PostgresProjectRepository implements IProjectRepository {
   constructor(private readonly pool: pg.Pool | pg.PoolClient) {} private map(r: Row) { return restoreProject(Number(r.id), r.payload); }
   async findById(id:number){const r=await this.pool.query("SELECT * FROM projects WHERE id=$1",[id]);return r.rows[0]?this.map(r.rows[0]):null} async findByClient(id:number){return(await this.pool.query("SELECT * FROM projects WHERE cliente_id=$1",[id])).rows.map(r=>this.map(r))} async findByProfesional(id:number){return(await this.pool.query("SELECT * FROM projects WHERE payload->'profesionalesAsignados' @> $1::jsonb",[JSON.stringify([{userId:id}])])).rows.map(r=>this.map(r))} async findAll(){return(await this.pool.query("SELECT * FROM projects ORDER BY id")).rows.map(r=>this.map(r))}
-  async save(p:Project){const r=await this.pool.query("INSERT INTO projects(cliente_id,estimate_id,payload) VALUES($1,$2,$3) RETURNING *",[p.clienteId,p.estimateId,projectPayload(p)]);return this.map(r.rows[0])} async update(id:number,c:Partial<Omit<Project,"id"|"createdAt">>){const old=await this.findById(id);if(!old)throw new NotFoundError("Proyecto");const next={...old,...c};const r=await this.pool.query("UPDATE projects SET cliente_id=$2,payload=$3 WHERE id=$1 RETURNING *",[id,next.clienteId,projectPayload(next)]);return this.map(r.rows[0])} async delete(id:number){await this.pool.query("DELETE FROM projects WHERE id=$1",[id])}
+  async save(p:Project){const r=await this.pool.query("INSERT INTO projects(cliente_id,estimate_id,payload) VALUES($1,$2,$3) RETURNING *",[p.clienteId,p.estimateId,projectPayload(p)]);return this.map(r.rows[0])}
+  async update(id:number,c:Partial<Omit<Project,"id"|"createdAt">>,expectedRevision?:number){
+    const old=await this.findById(id);if(!old)throw new NotFoundError("Proyecto");
+    const revision=expectedRevision ?? old.revision ?? 0;
+    const next={...old,...c,revision:revision+1};
+    const r=await this.pool.query("UPDATE projects SET cliente_id=$2,payload=$3 WHERE id=$1 AND COALESCE((payload->>'revision')::int,0)=$4 RETURNING *",[id,next.clienteId,projectPayload(next),revision]);
+    if(!r.rows[0])throw new ConflictError("La obra ha cambiado. Actualiza los datos antes de guardar.");
+    return this.map(r.rows[0]);
+  }
+  async delete(id:number){await this.pool.query("DELETE FROM projects WHERE id=$1",[id])}
 }
 
 export class PostgresOpportunityRepository implements IOpportunityRepository {
+  async fromSolicitud(id: number, input: Omit<Opportunity, "id" | "createdAt" | "updatedAt">) {
+    const result = await this.pool.query(`WITH source AS (SELECT id FROM solicitudes WHERE id=$1 AND estado<>'rechazado' FOR UPDATE),
+      inserted AS (INSERT INTO opportunities(solicitud_id,cliente_id,nombre,email,telefono,direccion,tipo,descripcion,estado,notas_internas)
+      SELECT id,NULL,$2,$3,$4,$5,$6,$7,'nueva','' FROM source
+      ON CONFLICT(solicitud_id) WHERE solicitud_id IS NOT NULL DO UPDATE SET solicitud_id=EXCLUDED.solicitud_id RETURNING *),
+      contacted AS (UPDATE solicitudes SET estado='contactado' WHERE id IN (SELECT solicitud_id FROM inserted))
+      SELECT * FROM inserted`, [id,input.nombre,input.email,input.telefono,input.direccion,input.tipo,input.descripcion]);
+    if (!result.rows[0]) throw new ConflictError("La solicitud no está disponible para convertir");
+    return this.map(result.rows[0]);
+  }
   constructor(private readonly pool: pg.Pool | pg.PoolClient) {}
   private map(r: Row): Opportunity { return { id: Number(r.id), clienteId: r.cliente_id == null ? null : Number(r.cliente_id), nombre: r.nombre, email: r.email, telefono: r.telefono, direccion: r.direccion, tipo: r.tipo, descripcion: r.descripcion, estado: r.estado as OpportunityStatus, fechaVisita: r.fecha_visita ? date(r.fecha_visita) : null, notasInternas: r.notas_internas, createdAt: date(r.created_at), updatedAt: date(r.updated_at) }; }
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM opportunities WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
@@ -64,6 +106,18 @@ export class PostgresCatalogRepository implements ICatalogRepository {
 }
 
 export class PostgresEstimateRepository implements IEstimateRepository {
+  async findPage(query: import("@reformapro/domain/repositories").EstimatePageQuery) {
+    const words = query.search.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const rows = await this.pool.query(`WITH visible AS (
+      SELECT e.id,e.oportunidad_id,e.cliente_id,e.numero,e.estado,e.version_actual,e.borrador,e.motivo_rechazo,e.created_at,e.updated_at,CASE WHEN $1::bigint IS NOT NULL AND e.estado='en_revision' THEN v.snapshot->>'titulo' ELSE e.titulo END titulo,COALESCE(v.snapshot->>'referencia','') reference,
+      CASE WHEN e.estado='enviado' AND v.enviado_at+(v.snapshot->>'validezDias')::int*interval '1 day'<now() THEN 'caducado' ELSE e.estado END effective_state
+      FROM estimates e LEFT JOIN LATERAL (SELECT * FROM budget_versions b WHERE b.estimate_id=e.id AND b.enviado_at IS NOT NULL AND (b.version=e.version_actual OR e.estado='en_revision') ORDER BY b.version DESC LIMIT 1) v ON true
+      WHERE ($1::bigint IS NULL OR (e.cliente_id=$1 AND e.estado<>'borrador' AND (e.estado<>'en_revision' OR v.id IS NOT NULL)))
+    ) SELECT * FROM visible WHERE ($3='' OR effective_state=$3)
+      AND NOT EXISTS (SELECT 1 FROM unnest($2::text[]) word WHERE strpos(translate(lower(numero||' '||titulo||' '||reference||' '||CASE effective_state WHEN 'borrador' THEN 'Borrador' WHEN 'en_revision' THEN 'En revisión' WHEN 'enviado' THEN 'Enviado' WHEN 'firmado' THEN 'Firmado' WHEN 'aceptado' THEN 'Convertido en proyecto' WHEN 'rechazado' THEN 'Cambios solicitados' ELSE effective_state END),'áéíóúüñ','aeiouun'),word)=0)
+      ORDER BY updated_at DESC,id DESC LIMIT $4 OFFSET $5`, [query.clientId ?? null,words,query.status,query.limit,query.page*query.limit]);
+    return rows.rows.map(row => this.map(row));
+  }
   constructor(private readonly pool: pg.Pool | pg.PoolClient) {}
   private map(r: Row): Estimate { return { id: Number(r.id), oportunidadId: Number(r.oportunidad_id), clienteId: Number(r.cliente_id), numero: r.numero, titulo: r.titulo, estado: r.estado, versionActual: Number(r.version_actual), borrador: r.borrador as EstimateDraft, motivoRechazo: r.motivo_rechazo ?? null, createdAt: date(r.created_at), updatedAt: date(r.updated_at) }; }
   private mapVersion(r: Row): EstimateVersion { return { id: Number(r.id), estimateId: Number(r.estimate_id), version: Number(r.version), snapshot: r.snapshot as EstimateDraft, enviadoAt: r.enviado_at ? date(r.enviado_at) : null, firmadoAt: r.firmado_at ? date(r.firmado_at) : null, firma: r.firma ?? null, createdAt: date(r.created_at) }; }
@@ -78,11 +132,29 @@ export class PostgresEstimateRepository implements IEstimateRepository {
 }
 
 export class PostgresChangeOrderRepository implements IChangeOrderRepository {
+  async transition(id: number, projectId: number, expected: ChangeOrder["estado"], next: ChangeOrder["estado"], actorId: number) {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const project = await client.query("SELECT id FROM projects WHERE id=$1 FOR UPDATE", [projectId]);
+      if (!project.rows.length) throw new NotFoundError("Proyecto");
+      const result = await client.query("UPDATE change_orders SET estado=$4,aprobado_at=CASE WHEN $4='aprobado' THEN now() ELSE NULL END,decision=jsonb_build_object('actorId',$5::bigint,'at',now(),'state',$4::text) WHERE id=$1 AND project_id=$2 AND estado=$3 RETURNING *", [id,projectId,expected,next,actorId]);
+      if (!result.rows[0]) throw new ConflictError("La orden ha cambiado o ya fue resuelta. Actualiza los datos.");
+      if (next === "aprobado") {
+        const order = this.map(result.rows[0]);
+        const delta = order.payload.partidas.reduce((sum,line) => sum + line.cantidad * line.precioVentaUnitario * (1-line.descuento/100),0);
+        await client.query("UPDATE projects SET payload=jsonb_set(jsonb_set(payload,'{presupuesto}',to_jsonb((payload->>'presupuesto')::numeric+$2::numeric)),'{revision}',to_jsonb(COALESCE((payload->>'revision')::int,0)+1)) WHERE id=$1",[projectId,Math.round(delta*100)/100]);
+      }
+      await client.query("COMMIT");
+      return this.map(result.rows[0]);
+    } catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
+  }
   constructor(private readonly pool: pg.Pool) {}
   private map(r: Row): ChangeOrder { return { id: Number(r.id), projectId: Number(r.project_id), numero: r.numero, estado: r.estado, payload: r.payload as EstimateDraft, aprobadoAt: r.aprobado_at ? date(r.aprobado_at) : null, createdAt: date(r.created_at) }; }
   async findByProject(projectId: number) { return (await this.pool.query("SELECT * FROM change_orders WHERE project_id=$1 ORDER BY id DESC", [projectId])).rows.map(row => this.map(row)); }
   async save(c: Omit<ChangeOrder, "id" | "createdAt">) { const r = await this.pool.query("INSERT INTO change_orders(project_id,numero,estado,payload,aprobado_at) VALUES($1,$2,$3,$4,$5) RETURNING *", [c.projectId,c.numero,c.estado,c.payload,c.aprobadoAt]); return this.map(r.rows[0]); }
-  async update(id: number, changes: Partial<Pick<ChangeOrder, "estado" | "payload" | "aprobadoAt">>) { const r = await this.pool.query("UPDATE change_orders SET estado=COALESCE($2,estado),payload=COALESCE($3,payload),aprobado_at=COALESCE($4,aprobado_at) WHERE id=$1 RETURNING *", [id,changes.estado ?? null,changes.payload ?? null,changes.aprobadoAt ?? null]); if (!r.rows[0]) throw new NotFoundError("Orden de cambio"); return this.map(r.rows[0]); }
+  async update(id: number, changes: Partial<Pick<ChangeOrder, "estado" | "payload" | "aprobadoAt">>) { const r = await this.pool.query("UPDATE change_orders SET estado=COALESCE($2,estado),payload=COALESCE($3,payload),aprobado_at=COALESCE($4,aprobado_at) WHERE id=$1 AND ($3::jsonb IS NULL OR estado='borrador') RETURNING *", [id,changes.estado ?? null,changes.payload ?? null,changes.aprobadoAt ?? null]); if (!r.rows[0]) throw new ConflictError("La orden no existe o ya fue publicada"); return this.map(r.rows[0]); }
 }
 
 export class PostgresAuditRepository implements IAuditRepository {

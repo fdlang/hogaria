@@ -30,6 +30,36 @@ async function setup() {
 }
 
 describe("EstimateUseCases — client privacy and authorization", () => {
+  it("keeps published history readable during a revision without exposing draft data", async () => {
+    const {clientA,clientB,estimateA,estimates,estimateUseCases} = await setup();
+    await estimates.update(estimateA.id,{estado:"en_revision",versionActual:2,titulo:"Secret draft",borrador:{...draft,titulo:"Secret draft"}});
+    const visible = await estimateUseCases.publicGet(clientA.id,estimateA.id);
+    expect(visible.versionActual).toBe(1);
+    expect(JSON.stringify(visible)).not.toContain("Secret draft");
+    expect((await estimateUseCases.publicList(clientA.id)).some(item => item.id===estimateA.id)).toBe(true);
+    const history = await estimateUseCases.history(clientA.id,estimateA.id);
+    expect(history).toHaveLength(1);
+    expect(JSON.stringify(history)).not.toContain("costeUnitario");
+    await expect(estimateUseCases.history(clientB.id,estimateA.id)).rejects.toThrow();
+  });
+  it("requires the owning client's decision and applies changes only once", async () => {
+    const {users,clientA,clientB} = await setup();
+    const admin = await users.save({id:0,nombre:"Admin",email:Email.of("admin@test.es"),rol:"admin",activo:true,createdAt:new Date()},"hash");
+    const projects = new InMemoryProjectRepository();
+    const project = await projects.save({id:0,estimateId:1,clienteId:clientA.id,nombre:"Obra",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"planificacion",progreso:Percentage.zero(),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date()});
+    const repository = new InMemoryChangeOrderRepository(projects);
+    const service = new ChangeOrderUseCases(users,projects,repository);
+    const change = await service.create(admin.id,project.id,draft);
+    await service.transition(admin.id,project.id,change.id,"enviado");
+    await expect(service.edit(admin.id,project.id,change.id,draft)).rejects.toThrow();
+    await expect(service.transition(clientB.id,project.id,change.id,"aprobado","valid")).rejects.toThrow();
+    await expect(service.transition(admin.id,project.id,change.id,"aprobado","valid")).rejects.toThrow();
+    await expect(service.transition(clientA.id,project.id,change.id,"aprobado")).rejects.toThrow();
+    const result = await service.transition(clientA.id,project.id,change.id,"aprobado","valid");
+    expect(JSON.stringify(result)).not.toContain("costeUnitario");
+    expect((await projects.findById(project.id))?.presupuesto.amount).toBe(300);
+    await expect(service.transition(clientA.id,project.id,change.id,"aprobado","valid")).rejects.toThrow();
+  });
   it("only returns the authenticated client's proposals", async () => {
     const { clientA, estimateA, estimateB, estimateUseCases } = await setup();
     const results = await estimateUseCases.publicList(clientA.id);

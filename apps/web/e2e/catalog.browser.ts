@@ -57,7 +57,7 @@ for (const fail of [false, true]) test("estimate never falls back to static pric
   await page.goto("/admin/budgets");
   await page.getByLabel("Cliente existente").selectOption("2");
   await page.getByLabel("Nombre de la oportunidad").fill("Reforma prueba");
-  await page.getByLabel("Dirección", { exact: false }).fill("Dirección de prueba");
+  await page.getByRole("textbox", { name: "Dirección *", exact: true }).fill("Dirección de prueba");
   await page.getByRole("button", { name: "Continuar", exact: true }).click();
   await page.getByLabel("Título visible al cliente").fill("Propuesta de prueba");
   await page.getByRole("button", { name: "Continuar", exact: true }).click();

@@ -172,6 +172,14 @@ async function documents() {
   };
 }
 describe("Download-only budget PDF", () => {
+  it("downloads a previously published version while a new revision is internal", async () => {
+    const f = await documents();
+    await f.estimates.update(f.estimateA.id,{estado:"en_revision",versionActual:2,borrador:{...draft,titulo:"Internal revision"}});
+    const result = await f.service.download(f.clientA.id,f.estimateA.id,1);
+    expect(result.filename).toContain("v1.pdf");
+    expect(JSON.stringify(f.pdf.render.mock.calls)).not.toContain("Internal revision");
+    await expect(f.service.download(f.clientA.id,f.estimateA.id,2)).rejects.toThrow();
+  });
   it("blocks cross-client access", async () => {
     const f = await documents();
     await expect(

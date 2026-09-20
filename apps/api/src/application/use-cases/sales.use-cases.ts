@@ -9,6 +9,7 @@ import type {
   ChangeOrder,
   Estimate,
   EstimateDraft,
+  EstimateVersion,
   Opportunity,
   OpportunityStatus,
   Project,
@@ -24,6 +25,7 @@ import {
 } from "@reformapro/domain/errors";
 import { validateDraft } from "./estimate-validation.js";
 import type { ClientContext } from "./auth.use-cases.js";
+import type { ISolicitudRepository, ICooldownGate } from "./solicitud.use-cases.js";
 import type { ISignatureCrypto } from "../../infrastructure/crypto/crypto.service.js";
 
 type OpportunityInput = Pick<
@@ -159,7 +161,16 @@ export class OpportunityUseCases {
     private readonly users: IUserRepository,
     private readonly opportunities: IOpportunityRepository,
     private readonly events: IEventEmitter,
+    private readonly solicitudes?: ISolicitudRepository,
   ) {}
+  async fromSolicitud(actorId: number, id: number, direccion: string) {
+    assertAdmin(await this.users.findById(actorId));
+    if (typeof direccion !== "string" || !direccion.trim()) throw new ValidationError("Dirección obligatoria", "direccion");
+    const source = await this.solicitudes?.findById(id);
+    if (!source) throw new NotFoundError("Solicitud");
+    if (source.estado === "rechazado") throw new ConflictError("La solicitud está rechazada");
+    return this.opportunities.fromSolicitud(id, { clienteId: null, nombre: source.nombre, email: source.email, telefono: source.telefono, direccion: direccion.trim(), tipo: source.tipo, descripcion: source.descripcion, estado: "nueva", fechaVisita: null, notasInternas: "" });
+  }
   async list(actorId: number, estado?: OpportunityStatus) {
     assertAdmin(await this.users.findById(actorId));
     return this.opportunities.findAll(estado);
@@ -202,7 +213,25 @@ export class OpportunityUseCases {
   }
   async update(actorId: number, id: number, input: Partial<OpportunityInput>) {
     assertAdmin(await this.users.findById(actorId));
-    return this.opportunities.update(id, input);
+    const current = await this.opportunities.findById(id);
+    if (!current) throw new NotFoundError("Oportunidad");
+    const allowed = new Set(["nombre", "clienteId", "email", "telefono", "direccion", "tipo", "descripcion", "estado", "fechaVisita", "notasInternas"]);
+    if (Object.keys(input).some(key => !allowed.has(key))) throw new ValidationError("Campo de oportunidad no permitido");
+    const changes = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as Partial<OpportunityInput>;
+    for (const field of ["nombre", "direccion", "tipo"] as const) {
+      const value = changes[field];
+      if (value !== undefined && (typeof value !== "string" || !value.trim())) throw new ValidationError("Campo obligatorio", field);
+    }
+    if (changes.clienteId !== undefined && changes.clienteId !== current.clienteId) {
+      if (current.clienteId !== null) throw new ConflictError("No se puede cambiar el cliente de una oportunidad vinculada");
+      if (changes.clienteId !== null) {
+        const client = await this.users.findById(changes.clienteId);
+        if (!client || client.rol !== "cliente") throw new ValidationError("Cliente no válido", "clienteId");
+      }
+    }
+    if (changes.estado !== undefined && !["nueva", "contactada", "visita_agendada", "en_estudio", "ganada", "descartada"].includes(changes.estado)) throw new ValidationError("Estado no válido", "estado");
+    if (changes.fechaVisita !== undefined && changes.fechaVisita !== null && (!(changes.fechaVisita instanceof Date) || !Number.isFinite(changes.fechaVisita.getTime()))) throw new ValidationError("Fecha no válida", "fechaVisita");
+    return this.opportunities.update(id, changes);
   }
 }
 
@@ -263,10 +292,13 @@ export class EstimateUseCases {
           (e) => e.clienteId === actor.id,
         );
   }
-  async publicList(actorId: number) {
+  async publicList(actorId: number, query: { page?: number; search?: string; status?: string } = {}) {
     const actor = await this.users.findById(actorId);
     if (!actor) throw new ForbiddenError();
-    const all = await this.estimates.findAll();
+    if (!["admin", "cliente"].includes(actor.rol)) throw new ForbiddenError();
+    const page = query.page ?? 0;
+    if (!Number.isSafeInteger(page) || page < 0 || page > 100000) throw new ValidationError("Página no válida");
+    const all = await this.estimates.findPage({ ...(actor.rol === "cliente" ? { clientId: actor.id } : {}), page, limit: 20, search: (query.search ?? "").trim().slice(0,200), status: query.status ?? "" });
     // A proposal does not belong to the client portal until the business has
     // explicitly moved it beyond the internal draft state. This keeps titles,
     // numbers and workflow state of work-in-progress private as well.
@@ -275,9 +307,9 @@ export class EstimateUseCases {
         ? all
         : all.filter(
             (estimate) =>
-              estimate.clienteId === actor.id && !["borrador", "en_revision"].includes(estimate.estado),
+              estimate.clienteId === actor.id && estimate.estado !== "borrador",
           );
-    return Promise.all(items.map((item) => this.publicView(item)));
+    return Promise.all(items.map((item) => this.clientVisibleView(actor, item)));
   }
   async publicGet(actorId: number, id: number) {
     const actor = await this.users.findById(actorId);
@@ -285,8 +317,16 @@ export class EstimateUseCases {
     const estimate = await this.get(actorId, id);
     // Do not turn a known numeric identifier into a way of inspecting a
     // proposal that has not been shared with its owner yet.
-    if (actor.rol === "cliente" && ["borrador", "en_revision"].includes(estimate.estado))
+    if (actor.rol === "cliente" && estimate.estado === "borrador")
       throw new NotFoundError("Presupuesto");
+    return this.clientVisibleView(actor, estimate);
+  }
+  private async clientVisibleView(actor: User, estimate: Estimate) {
+    if (actor.rol === "cliente" && estimate.estado === "en_revision") {
+      const published = (await this.estimates.findVersions(estimate.id)).filter(item => item.enviadoAt).sort((a,b) => b.version-a.version)[0];
+      if (!published) throw new NotFoundError("Presupuesto");
+      return this.publicView({ ...estimate, titulo: published.snapshot.titulo, motivoRechazo: null }, published);
+    }
     return this.publicView(estimate);
   }
   async get(actorId: number, id: number) {
@@ -296,6 +336,10 @@ export class EstimateUseCases {
     if (actor.rol !== "admin" && estimate.clienteId !== actor.id)
       throw new ForbiddenError();
     return estimate;
+  }
+  async adminDraft(actorId: number, id: number) {
+    assertAdmin(await this.users.findById(actorId));
+    return this.require(id);
   }
   async create(
     actorId: number,
@@ -398,6 +442,20 @@ export class EstimateUseCases {
   async versions(actorId: number, id: number) {
     await this.get(actorId, id);
     return this.estimates.findVersions(id);
+  }
+  async history(actorId: number, id: number) {
+    const actor = await this.users.findById(actorId);
+    if (!actor?.activo || !["admin", "cliente"].includes(actor.rol)) throw new ForbiddenError();
+    const estimate = await this.get(actorId, id);
+    if (actor.rol === "cliente" && estimate.estado === "borrador") throw new NotFoundError("Presupuesto");
+    const versions = (await this.estimates.findVersions(id)).filter(version => version.enviadoAt !== null);
+    return Promise.all(versions.map(version => this.publicView({ ...estimate, titulo: version.snapshot.titulo, motivoRechazo: version.version === estimate.versionActual ? estimate.motivoRechazo : null, estado: version.version === estimate.versionActual ? estimate.estado : "sustituido" }, version)));
+  }
+  async publicVersion(actorId: number, id: number, number: number) {
+    const history = await this.history(actorId, id);
+    const version = history.find(item => item.versionActual === number);
+    if (!version) throw new NotFoundError("Versión publicada");
+    return version;
   }
   async reject(
     actorId: number,
@@ -622,8 +680,8 @@ export class EstimateUseCases {
     if (!estimate) throw new NotFoundError("Presupuesto");
     return estimate;
   }
-  private async publicView(estimate: Estimate) {
-    const version =
+  private async publicView(estimate: Estimate, selectedVersion?: EstimateVersion) {
+    const version = selectedVersion ??
       (await this.estimates.findVersions(estimate.id)).find(
         (v) => v.version === estimate.versionActual,
       ) ?? null;
@@ -663,7 +721,7 @@ export class EstimateUseCases {
       titulo: estimate.titulo,
       estado:
         expired && estimate.estado === "enviado" ? "caducado" : estimate.estado,
-      versionActual: estimate.versionActual,
+      versionActual: version?.version ?? estimate.versionActual,
       motivoRechazo: estimate.motivoRechazo,
       createdAt: estimate.createdAt,
       updatedAt: estimate.updatedAt,
@@ -696,7 +754,35 @@ export class ChangeOrderUseCases {
     private readonly users: IUserRepository,
     private readonly projects: IProjectRepository,
     private readonly changes: IChangeOrderRepository,
+    private readonly gate?: ICooldownGate,
   ) {}
+  async edit(actorId: number, projectId: number, id: number, payload: EstimateDraft) {
+    assertAdmin(await this.users.findById(actorId));
+    validateDraft(payload);
+    const order = (await this.changes.findByProject(projectId)).find(item => item.id === id);
+    if (!order) throw new NotFoundError("Orden de cambio");
+    if (order.estado !== "borrador") throw new ConflictError("Una orden publicada no se puede modificar");
+    return this.changes.update(id, { payload });
+  }
+  async transition(actorId: number, projectId: number, id: number, next: string, password?: string) {
+    const actor = await this.users.findById(actorId);
+    if (!actor?.activo) throw new ForbiddenError();
+    const project = await this.projects.findById(projectId);
+    if (!project) throw new NotFoundError("Proyecto");
+    const order = (await this.changes.findByProject(projectId)).find(item => item.id === id);
+    if (!order) throw new NotFoundError("Orden de cambio");
+    if (next === "enviado") {
+      assertAdmin(actor);
+      validateDraft(order.payload);
+      return this.changes.transition(id, projectId, "borrador", "enviado", actor.id);
+    }
+    if (!["aprobado", "rechazado"].includes(next)) throw new ValidationError("Acción no válida");
+    if (actor.rol !== "cliente" || project.clienteId !== actor.id) throw new ForbiddenError();
+    if (this.gate && !(await this.gate.check(`change-decision:${actorId}`, 5, 60000))) throw new ForbiddenError("Espera un minuto antes de volver a intentarlo");
+    if (typeof password !== "string" || password.length > 72 || !(await this.users.verifyPassword(actor.email.value, password))) throw new ForbiddenError("Confirma tu contraseña para registrar la decisión");
+    await this.changes.transition(id, projectId, "enviado", next as "aprobado" | "rechazado", actor.id);
+    return (await this.list(actorId, projectId)).find(item => item.id === id)!;
+  }
   async list(
     actorId: number,
     projectId: number,
@@ -731,10 +817,9 @@ export class ChangeOrderUseCases {
     if (!(await this.projects.findById(projectId)))
       throw new NotFoundError("Proyecto");
     validateDraft(payload);
-    const existing = await this.changes.findByProject(projectId);
     return this.changes.save({
       projectId,
-      numero: `OC-${String(existing.length + 1).padStart(3, "0")}`,
+      numero: `OC-${crypto.randomUUID()}`,
       estado: "borrador",
       payload,
       aprobadoAt: null,

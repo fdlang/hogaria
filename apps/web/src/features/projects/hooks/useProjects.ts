@@ -37,7 +37,7 @@ export function useProgressUpdater(api: ProjectsApi, resource: ReturnType<typeof
       current,
       { ...current, progreso },
       v => resource.setData(v),
-      () => api.update(current.id, { progreso }),
+      () => api.update(current.id, { progreso, revision: current.revision ?? 0 }),
     );
   }, [api, resource]);
 }
@@ -51,7 +51,7 @@ export function useMilestoneToggler(api: ProjectsApi, resource: ReturnType<typeo
       current,
       { ...current, hitos: nextHitos },
       v => resource.setData(v),
-      () => api.update(current.id, { hitos: nextHitos }),
+      () => api.update(current.id, { hitos: nextHitos, revision: current.revision ?? 0 }),
     );
   }, [api, resource]);
 }

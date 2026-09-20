@@ -51,7 +51,7 @@ export function useUserForm(api: UsersApi, initial: UserDTO | null = null) {
     if (!state.email.trim())  e.email  = "Obligatorio";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email)) e.email = "Email inválido";
     if (state.rol === "profesional" && !state.profesion) e.profesion = "Selecciona profesión";
-    if (state.newPassword && state.newPassword.length < 8) e.newPassword = "Mínimo 8 caracteres";
+    if (state.newPassword && (state.newPassword.length < 12 || new TextEncoder().encode(state.newPassword).length > 72 || !/[a-z]/i.test(state.newPassword) || !/\d/.test(state.newPassword))) e.newPassword = "Usa al menos 12 caracteres, incluyendo letras y números (máximo 72 bytes)";
     return e;
   }, [state]);
 

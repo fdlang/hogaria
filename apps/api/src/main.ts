@@ -12,6 +12,7 @@
  */
 
 import http from "node:http";
+import { requestAudit } from "./infrastructure/audit/request-audit.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { URL } from "node:url";
 import { buildApp } from "./bootstrap.js";
@@ -106,15 +107,20 @@ function getRuntime(): Promise<Runtime> {
   // Commercial pipeline: opportunity -> versioned estimate -> project.
   route("GET", "/estimates/:id/pdf", documents.pdf, { protected:true }),
   route("GET", "/internal/notifications/retry", notificationRetryController(app.useCases.notifications,
-    () => ({secret:process.env.CRON_SECRET,enabled:process.env.CLIENT_NOTIFICATIONS_ENABLED==="true"}))),
+    () => ({secret:process.env.CRON_SECRET,retrySecret:process.env.NOTIFICATION_RETRY_SECRET,enabled:process.env.CLIENT_NOTIFICATIONS_ENABLED==="true"}))),
   route("GET",   "/catalog",             req => catalog.list(req as never), { protected: true }),
   route("POST",  "/catalog",             req => catalog.create(req as never), { protected: true }),
   route("PATCH", "/catalog/:id",         req => catalog.update(req as never), { protected: true }),
   route("DELETE","/catalog/:id",         req => catalog.archive(req as never), { protected: true }),
   route("GET",   "/opportunities",       req => sales.listOpportunities(req as never), { protected: true }),
+  route("POST", "/projects/:projectId/change-orders/:id/transition", req => sales.transitionChange(req as never), { protected: true }),
+  route("PATCH", "/projects/:projectId/change-orders/:id", req => sales.editChange(req as never), { protected: true }),
+  route("POST", "/solicitudes/:id/opportunity", req => sales.convertSolicitud(req as never), { protected: true }),
   route("POST",  "/opportunities",       req => sales.createOpportunity(req as never), { protected: true }),
   route("PATCH", "/opportunities/:id",   req => sales.updateOpportunity(req as never), { protected: true }),
   route("GET",   "/estimates",           req => sales.listEstimates(req as never),     { protected: true }),
+  route("GET",   "/estimates/:id/draft", req => sales.draft(req as never), { protected: true }),
+  route("GET",   "/estimates/:id/history", req => sales.history(req as never), { protected: true }),
   route("POST",  "/estimates",           req => sales.createEstimate(req as never),    { protected: true }),
   route("GET",   "/estimates/:id",       req => sales.getEstimate(req as never),       { protected: true }),
   route("PATCH", "/estimates/:id",       req => sales.updateEstimate(req as never),    { protected: true }),
@@ -221,7 +227,7 @@ export async function apiHandler(req: IncomingMessage, res: ServerResponse): Pro
       httpReq.actorId = authResult.actorId;
     }
 
-    const result = await match.handler(httpReq);
+    const result = await requestAudit.run({ actorId: httpReq.actorId ?? 0, ip: httpReq.ip, userAgent: String(httpReq.headers["user-agent"] ?? "unknown") }, () => match.handler(httpReq));
     const headers = result.headers ?? {};
     if (result.body instanceof Uint8Array) {
       res.writeHead(result.status, headers).end(result.body as unknown as string);

@@ -3,11 +3,15 @@
 BEGIN;
 CREATE OR REPLACE FUNCTION enqueue_client_account_notice() RETURNS trigger
 LANGUAGE plpgsql AS $$
-DECLARE recipient bigint; kind text; notice_id uuid := gen_random_uuid();
+DECLARE recipient bigint; kind text; notice_id uuid := gen_random_uuid(); resource_id bigint := NEW.id;
 BEGIN
  IF TG_TABLE_NAME='estimates' THEN
   IF NEW.estado<>'enviado' OR OLD.estado=NEW.estado THEN RETURN NEW; END IF;
   recipient:=NEW.cliente_id; kind:='estimate';
+ ELSIF TG_TABLE_NAME='change_orders' THEN
+  IF NEW.estado<>'enviado' OR OLD.estado=NEW.estado THEN RETURN NEW; END IF;
+  SELECT cliente_id INTO recipient FROM projects WHERE id=NEW.project_id;
+  kind:='project-update'; resource_id:=NEW.project_id;
  ELSIF TG_TABLE_NAME='project_files' THEN
   SELECT cliente_id INTO recipient FROM projects WHERE id=NEW.project_id;
   IF recipient=(NEW.payload->>'uploadedBy')::bigint THEN RETURN NEW; END IF;
@@ -22,7 +26,7 @@ BEGIN
  END IF;
  IF EXISTS(SELECT 1 FROM users WHERE id=recipient AND activo AND rol='cliente') THEN
   INSERT INTO client_email_notifications(id,payload) VALUES(notice_id,
-   jsonb_build_object('id',notice_id,'clientId',recipient,'kind',kind,'resourceId',NEW.id));
+   jsonb_build_object('id',notice_id,'clientId',recipient,'kind',kind,'resourceId',resource_id));
  END IF;
  RETURN NEW;
 END $$;
@@ -32,4 +36,6 @@ DROP TRIGGER IF EXISTS project_client_notice ON projects;
 CREATE TRIGGER project_client_notice AFTER INSERT OR UPDATE ON projects FOR EACH ROW EXECUTE FUNCTION enqueue_client_account_notice();
 DROP TRIGGER IF EXISTS document_client_notice ON project_files;
 CREATE TRIGGER document_client_notice AFTER INSERT ON project_files FOR EACH ROW EXECUTE FUNCTION enqueue_client_account_notice();
+DROP TRIGGER IF EXISTS change_order_client_notice ON change_orders;
+CREATE TRIGGER change_order_client_notice AFTER UPDATE ON change_orders FOR EACH ROW EXECUTE FUNCTION enqueue_client_account_notice();
 COMMIT;

@@ -1,0 +1,26 @@
+name: Retry client notifications
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+permissions: {}
+concurrency:
+  group: client-notification-retries
+  cancel-in-progress: false
+jobs:
+  retry:
+    if: vars.NOTIFICATION_RETRIES_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Process persisted notifications
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          NOTIFICATION_RETRY_SECRET: ${{ secrets.NOTIFICATION_RETRY_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$APP_URL" == https://* && -n "$NOTIFICATION_RETRY_SECRET" ]] || { echo 'Missing HTTPS APP_URL or NOTIFICATION_RETRY_SECRET'; exit 1; }
+          curl --fail --silent --show-error --max-time 55 \
+            --header "Authorization: Bearer $NOTIFICATION_RETRY_SECRET" \
+            "${APP_URL%/}/api/internal/notifications/retry" | jq --exit-status '.configured == true'

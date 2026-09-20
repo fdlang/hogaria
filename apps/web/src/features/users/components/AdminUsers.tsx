@@ -208,7 +208,7 @@ function UserFormView({ api, initialUser, onSaved, onCancel }: {
       {initialUser && (
         <>
           <Input label="Nueva contraseña (dejar en blanco para no cambiar)"
-            type="password" placeholder="Mínimo 8 caracteres"
+            type="password" placeholder="Mínimo 12 caracteres, letras y números"
             value={form.state.newPassword ?? ""} error={form.errors.newPassword}
             onChange={e => form.setField("newPassword", e.target.value)} />
 

@@ -5,7 +5,8 @@
  * so events survive process restarts and can fan out to multiple consumers.
  *
  * Handlers run concurrently with isolated errors. This emitter is not durable;
- * critical client notifications are persisted by the SQL transactional outbox.
+ * critical client notifications and the business-write audit are persisted
+ * transactionally by SQL triggers. These subscribers enrich that durable trail.
  */
 
 import { IEventEmitter, DomainEvent } from "@reformapro/domain/events";

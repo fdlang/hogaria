@@ -9,6 +9,7 @@ import {
   PostgresOpportunityRepository,
   PostgresProjectRepository,
   PostgresUserRepository,
+  PostgresChangeOrderRepository,
 } from "./postgresRepositories.js";
 import { EstimateUseCases } from "../../application/use-cases/sales.use-cases.js";
 import { UpdateProjectUseCase } from "../../application/use-cases/project.use-cases.js";
@@ -16,6 +17,7 @@ import { toProjectDTO } from "../../interfaces/http/projectController.js";
 import { InMemoryEventEmitter } from "../events/inMemoryEventEmitter.js";
 import { Email, Money, Percentage } from "@reformapro/domain/value-objects";
 import { PostgresNoticeStore } from "./clientNoticeStore.js";
+import { auditedPool, requestAudit } from "../audit/request-audit.js";
 describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   const db = new PGlite();
   // PGlite has one connection. Serialize checked-out clients, like a size-one pool.
@@ -88,6 +90,8 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
       "schema.sql",
       "client-notifications.sql",
       "notification-outbox.sql",
+      "commercial-workflow.sql",
+      "durable-audit.sql",
     ])
       await db.exec(
         await readFile(
@@ -134,6 +138,95 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
       notasInternas: "",
     });
     estimateId = (await service.create(adminId, opportunity.id, draft, ctx)).id;
+  });
+  it("revokes activation links when deactivating an account", async () => {
+    const tokens = new PostgresActivationTokenRepository(pool);
+    await tokens.replace({ userId: clientId, tokenHash: "revoked", expiresAt: new Date(Date.now() + 60000), usedAt: null });
+    await users.update(clientId, { activo: false });
+    await expect(tokens.complete("revoked", "new-password")).rejects.toThrow();
+    expect((await users.findById(clientId))?.activo).toBe(false);
+  });
+  it("persists a redacted technical audit inside the business write", async () => {
+    await users.update(clientId, { nombre: "Private customer name" });
+    const rows = (await query("SELECT payload FROM audit_entries WHERE payload->>'action'='DB_USERS_UPDATE' AND payload->'details'->>'recordId'=$1 ORDER BY timestamp DESC LIMIT 1", [String(clientId)])).rows;
+    expect(rows).toHaveLength(1);
+    expect(JSON.stringify(rows)).not.toContain("Private customer name");
+    expect(JSON.stringify(rows)).not.toContain("password_hash");
+  });
+  it("records the authenticated actor without leaking context to the next transaction", async () => {
+    const scopedUsers = new PostgresUserRepository(auditedPool(pool),hasher);
+    await requestAudit.run({ actorId:adminId,ip:"127.0.0.1",userAgent:"test" }, () => scopedUsers.update(clientId,{ nombre:"Scoped" }));
+    const first = (await query("SELECT payload->>'userId' actor FROM audit_entries WHERE payload->>'action'='DB_USERS_UPDATE' AND payload->'details'->>'recordId'=$1 ORDER BY timestamp DESC LIMIT 1",[String(clientId)])).rows[0];
+    expect(first).toEqual({actor:String(adminId)});
+    await scopedUsers.update(clientId,{ nombre:"Unscoped" });
+    const second = (await query("SELECT payload->>'userId' actor FROM audit_entries WHERE payload->>'action'='DB_USERS_UPDATE' AND payload->'details'->>'recordId'=$1 ORDER BY timestamp DESC LIMIT 1",[String(clientId)])).rows[0];
+    expect(second).toEqual({actor:"0"});
+  });
+  it("rolls back a business write when its durable audit cannot be persisted", async () => {
+    await db.exec("CREATE FUNCTION fail_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'audit unavailable'; END $$; CREATE TRIGGER audit_failure BEFORE INSERT ON audit_entries FOR EACH ROW EXECUTE FUNCTION fail_audit();");
+    try {
+      await expect(users.update(clientId, { nombre: "Lost" })).rejects.toThrow("audit unavailable");
+      expect((await users.findById(clientId))?.nombre).toBe("Client");
+    } finally { await db.exec("DROP TRIGGER audit_failure ON audit_entries; DROP FUNCTION fail_audit();"); }
+  });
+  it("converts a request once and preserves its source", async () => {
+    const source = (await query("INSERT INTO solicitudes(nombre,email,telefono,tipo,descripcion,estado,ip,fecha) VALUES('Lead','lead@test.es','','Baño','Reforma','pendiente','127.0.0.1',now()) RETURNING id")).rows[0] as {id:number};
+    const input = { clienteId:null,nombre:"Lead",email:"lead@test.es",telefono:"",direccion:"Madrid",tipo:"Baño",descripcion:"Reforma",estado:"nueva" as const,fechaVisita:null,notasInternas:"" };
+    const first = await opportunities.fromSolicitud(source.id,input);
+    const second = await opportunities.fromSolicitud(source.id,input);
+    expect(second.id).toBe(first.id);
+    expect((await query("SELECT estado FROM solicitudes WHERE id=$1",[source.id])).rows[0]).toEqual({estado:"contactado"});
+  });
+  it("rejects stale project writes and applies an approved change only once", async () => {
+    const project = await projects.save({ id:0,estimateId,clienteId:clientId,nombre:"Obra",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"planificacion",progreso:Percentage.zero(),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date() });
+    await projects.update(project.id,{ nombre:"New" },0);
+    await expect(projects.update(project.id,{ descripcion:"Stale" },0)).rejects.toThrow("ha cambiado");
+    const changes = new PostgresChangeOrderRepository(pool);
+    const order = await changes.save({ projectId:project.id,numero:"OC-test",estado:"borrador",payload:draft,aprobadoAt:null });
+    await changes.transition(order.id,project.id,"borrador","enviado",adminId);
+    await db.exec("CREATE FUNCTION fail_apply_change() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'budget unavailable'; END $$; CREATE TRIGGER change_apply_failure BEFORE UPDATE ON projects FOR EACH ROW EXECUTE FUNCTION fail_apply_change();");
+    try {
+      await expect(changes.transition(order.id,project.id,"enviado","aprobado",clientId)).rejects.toThrow("budget unavailable");
+      expect((await changes.findByProject(project.id))[0]?.estado).toBe("enviado");
+      expect((await projects.findById(project.id))?.presupuesto.amount).toBe(100);
+    } finally { await db.exec("DROP TRIGGER change_apply_failure ON projects; DROP FUNCTION fail_apply_change();"); }
+    await changes.transition(order.id,project.id,"enviado","aprobado",clientId);
+    expect((await projects.findById(project.id))?.presupuesto.amount).toBe(200);
+    await expect(changes.transition(order.id,project.id,"enviado","aprobado",clientId)).rejects.toThrow();
+    expect((await projects.findById(project.id))?.presupuesto.amount).toBe(200);
+    await expect(projects.delete(project.id)).rejects.toThrow("histórico");
+    await expect(query("UPDATE change_orders SET payload=$2 WHERE id=$1",[order.id,{...draft,titulo:"Changed"}])).rejects.toThrow("inmutable");
+  });
+  it("returns bounded pages filtered by owner", async () => {
+    for (let i=0;i<24;i++) await service.create(adminId,(await estimates.findById(estimateId))!.oportunidadId,{...draft,titulo:`Item ${i}`},ctx);
+    const first = await service.publicList(adminId);
+    const second = await service.publicList(adminId,{page:1});
+    expect(first).toHaveLength(20); expect(second).toHaveLength(5);
+    expect(first.some(item => second.some(other => other.id===item.id))).toBe(false);
+    expect(await service.publicList(clientId)).toEqual([]);
+  });
+  it("protects the last active administrator in the database", async () => {
+    await expect(users.update(adminId, { activo: false })).rejects.toThrow("administrador activo");
+    expect((await users.findById(adminId))?.activo).toBe(true);
+  });
+  it("reuses a checked-out transaction for user updates", async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const transactionalUsers = new PostgresUserRepository(client, hasher);
+      await transactionalUsers.update(clientId, { nombre: "Transactional" });
+      await client.query("ROLLBACK");
+    } finally { client.release(); }
+    expect((await users.findById(clientId))?.nombre).toBe("Client");
+  });
+  it("rolls back profile and password when token revocation fails", async () => {
+    const tokens = new PostgresActivationTokenRepository(pool);
+    await tokens.replace({ userId: clientId, tokenHash: "pending", expiresAt: new Date(Date.now() + 60000), usedAt: null });
+    await db.exec("CREATE FUNCTION fail_revoke() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'revocation failed'; END $$; CREATE TRIGGER revoke_failure BEFORE DELETE ON account_activation_tokens FOR EACH ROW EXECUTE FUNCTION fail_revoke();");
+    try {
+      await expect(users.update(clientId, { nombre: "Changed" }, "new-password")).rejects.toThrow("revocation failed");
+      expect((await users.findById(clientId))?.nombre).toBe("Client");
+    } finally { await db.exec("DROP TRIGGER revoke_failure ON account_activation_tokens; DROP FUNCTION fail_revoke();"); }
   });
   it("rolls back the published snapshot when the state write fails", async () => {
     await db.exec(

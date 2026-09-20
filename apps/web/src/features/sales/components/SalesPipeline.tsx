@@ -6,6 +6,7 @@ import {
   EstimateSearch,
 } from "./EstimateContent";
 import { filterEstimates } from "../estimate-search";
+import { EstimateHistory } from "./EstimateHistory";
 import { formatDate, formatMoney } from "@/shared/lib/formatters";
 import { CatalogPicker } from "@/features/catalog/CatalogPicker";
 import {
@@ -97,6 +98,31 @@ export function SalesPipeline({
   });
   const [selected, setSelected] = useState<number | null>(null);
   const [draft, setDraft] = useState(blankDraft);
+  const [existingOpportunity, setExistingOpportunity] = useState(() => new URLSearchParams(window.location.hash.split("?")[1] ?? window.location.search).get("opportunity") ?? "");
+  useEffect(() => {
+    const item = opportunities.find(value => value.id === Number(existingOpportunity));
+    if (item) setOpportunity({ clienteId: item.clienteId == null ? "" : String(item.clienteId), nombre: item.nombre, direccion: item.direccion, tipo: item.tipo, descripcion: item.descripcion });
+  }, [existingOpportunity, opportunities]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  const editEstimate = async (estimate: EstimateDTO) => {
+    if (saving) return;
+    if ((editingId !== null || draft.partidas.length > 0) && !window.confirm("Se descartarán los cambios sin guardar. ¿Continuar?")) return;
+    setSaving(true);
+    setError("");
+    try {
+      const existing = ["borrador", "en_revision"].includes(estimate.estado)
+        ? await api.draft(estimate.id)
+        : await api.reviseEstimate(estimate.id);
+      setEditingId(existing.id);
+      setSelected(existing.oportunidadId);
+      setDraft(existing.borrador);
+      setStep(1);
+      await refresh();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (cause) { setError((cause as Error).message || "No se pudo recuperar el presupuesto"); }
+    finally { setSaving(false); }
+  };
 
   const refresh = () =>
     Promise.all([
@@ -176,7 +202,7 @@ export function SalesPipeline({
     setError("");
     try {
       setSaving(true);
-      const saved = await api.createOpportunity({
+      const input = {
         clienteId: Number(opportunity.clienteId),
         nombre: opportunity.nombre.trim(),
         email: null,
@@ -187,7 +213,8 @@ export function SalesPipeline({
         estado: "nueva",
         fechaVisita: null,
         notasInternas: "",
-      });
+      };
+      const saved = existingOpportunity ? await api.updateOpportunity(Number(existingOpportunity), { clienteId: input.clienteId, nombre: input.nombre, direccion: input.direccion, tipo: input.tipo, descripcion: input.descripcion }) : await api.createOpportunity(input);
       setSelected(saved.id);
       setStep(1);
       await refresh();
@@ -206,7 +233,9 @@ export function SalesPipeline({
     setError("");
     try {
       setSaving(true);
-      await api.createEstimate(selected, draft);
+      if (editingId !== null) await api.updateEstimate(editingId, draft);
+      else await api.createEstimate(selected, draft);
+      setEditingId(null);
       setStep(0);
       setSelected(null);
       setDraft(blankDraft());
@@ -222,6 +251,7 @@ export function SalesPipeline({
   };
 
   const send = async (estimate: EstimateDTO) => {
+    if (editingId === estimate.id) { setError("Guarda o cierra la edición antes de publicar el presupuesto."); return; }
     try {
       setSending(estimate.id);
       setError("");
@@ -324,7 +354,7 @@ export function SalesPipeline({
           <button
             key={label}
             type="button"
-            disabled={index > step}
+            disabled={saving || index > step || (index === 0 && selected !== null)}
             onClick={() => setStep(index)}
             className={
               index === step ? "sales-step sales-step--active" : "sales-step"
@@ -334,6 +364,10 @@ export function SalesPipeline({
           </button>
         ))}
       </div>
+      {selected !== null && <Button small variant="ghost" disabled={saving} onClick={() => {
+        if (!window.confirm("¿Cerrar el editor? Los cambios sin guardar se perderán.")) return;
+        setEditingId(null); setSelected(null); setDraft(blankDraft()); setStep(0); setError("");
+      }}>Cerrar editor</Button>}
       {error && (
         <p role="alert" className="sales-error">
           {error}
@@ -343,6 +377,12 @@ export function SalesPipeline({
       {step === 0 && (
         <div className="sales-card">
           <h2>Nueva oportunidad</h2>
+          <label>Continuar una oportunidad existente
+            <select value={existingOpportunity} onChange={event => setExistingOpportunity(event.target.value)}>
+              <option value="">Crear nueva</option>
+              {opportunities.map(item => <option key={item.id} value={item.id}>{item.nombre} · {item.direccion}</option>)}
+            </select>
+          </label>
           <p>Los campos con * son obligatorios.</p>
           <label>
             Cliente existente *
@@ -604,12 +644,15 @@ export function SalesPipeline({
       )}
 
       <RecentEstimates
+        api={api}
         estimates={estimates}
         sending={sending}
         converting={converting}
         onPreview={setPreview}
         onSend={send}
         onConvert={convert}
+        onEdit={editEstimate}
+        editing={saving}
       />
       <Modal
         open={preview !== null}
@@ -626,31 +669,50 @@ export function SalesPipeline({
           />
         )}
         <EstimateContent item={preview} />
+        {preview && <EstimateHistory key={preview.id} api={api} id={preview.id} />}
       </Modal>
     </section>
   );
 }
 
 function RecentEstimates({
+  api,
   estimates,
   sending,
   converting,
   onPreview,
   onSend,
   onConvert,
+  onEdit,
+  editing,
 }: {
+  api: SalesApi;
   estimates: EstimateDTO[];
   sending: number | null;
   converting: number | null;
   onPreview: (estimate: EstimateDTO) => void;
   onSend: (estimate: EstimateDTO) => void;
   onConvert: (estimate: EstimateDTO) => void;
+  onEdit: (estimate: EstimateDTO) => void;
+  editing: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rows, setRows] = useState(estimates);
+  const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    let current = true;
+    setLoading(true);
+    const timer = setTimeout(() => { void api.estimates(page, query, status).then(items => {
+      if (current) { setRows(items); setLoadError(""); }
+    }).catch(() => { if (current) setLoadError("No se pudieron cargar los presupuestos."); }).finally(() => { if (current) setLoading(false); }); }, 200);
+    return () => { current = false; clearTimeout(timer); };
+  }, [api, estimates, page, query, status]);
   const hasFilters = Boolean(query.trim() || status);
-  const filtered = filterEstimates(estimates, query, status);
+  const filtered = filterEstimates(rows, query, status);
   return (
     <section className="estimate-list" aria-labelledby="recent-estimates">
       <header>
@@ -659,8 +721,7 @@ function RecentEstimates({
           <h2 id="recent-estimates">{hasFilters ? "Resultados de búsqueda" : "Propuestas recientes"}</h2>
         </div>
         <p>
-          {estimates.length}{" "}
-          {estimates.length === 1 ? "propuesta" : "propuestas"}
+          Página {page + 1}
         </p>
         {!hasFilters && <Button small variant="ghost" aria-expanded={expanded} aria-controls="recent-estimates-content" onClick={() => setExpanded(value => !value)}>
           {expanded ? "Ocultar propuestas" : "Mostrar propuestas"}
@@ -669,12 +730,14 @@ function RecentEstimates({
       <EstimateSearch
         query={query}
         status={status}
-        onQuery={setQuery}
-        onStatus={setStatus}
+        onQuery={value => { setPage(0); setQuery(value); }}
+        onStatus={value => { setPage(0); setStatus(value); }}
       />
       <div id="recent-estimates-content" hidden={!expanded && !hasFilters}>
+      {loadError && <p role="alert">{loadError}</p>}
+      {loading && <p role="status">Cargando presupuestos…</p>}
       <p role="status">
-        {filtered.length} de {estimates.length} propuestas
+        {filtered.length} propuestas en esta página
       </p>
       {filtered.length ? (
         filtered.map((estimate) => (
@@ -691,6 +754,11 @@ function RecentEstimates({
               )}
             </div>
             <div className="estimate-list__actions">
+              {["borrador", "en_revision", "enviado", "rechazado", "caducado"].includes(estimate.estado) && (
+                <Button small variant="ghost" disabled={editing} onClick={() => void onEdit(estimate)}>
+                  {["borrador", "en_revision"].includes(estimate.estado) ? "Editar borrador" : "Crear revisión"}
+                </Button>
+              )}
               <Button small variant="ghost" onClick={() => onPreview(estimate)}>
                 Ver presupuesto
               </Button>
@@ -724,6 +792,7 @@ function RecentEstimates({
         </p>
       )}
       </div>
+      {(expanded || hasFilters) && <nav aria-label="Páginas de presupuestos"><Button small variant="ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button><Button small variant="ghost" disabled={rows.length < 20 || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>}
     </section>
   );
 }

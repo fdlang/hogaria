@@ -14,6 +14,7 @@ import { formatDateTime } from "@/shared/lib/formatters";
 export class AdminSolicitudesApi {
   constructor(private readonly http: ApiClient) {}
   list(): Promise<SolicitudDTO[]> { return this.http.get("/solicitudes"); }
+  convert(id: number, direccion: string): Promise<{ id: number }> { return this.http.post(`/solicitudes/${id}/opportunity`, { direccion }); }
   markContacted(id: number): Promise<void> { return this.http.post(`/solicitudes/${id}/contact`, {}); }
   reject(id: number, reason: string): Promise<void> { return this.http.post(`/solicitudes/${id}/reject`, { reason }); }
 }
@@ -29,6 +30,8 @@ export interface SolicitudDTO {
 interface Props { api: AdminSolicitudesApi }
 
 export function AdminSolicitudes({ api }: Props) {
+  const [address, setAddress] = useState("");
+  const [converting, setConverting] = useState(false);
   const [items, setItems]     = useState<SolicitudDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -102,9 +105,19 @@ export function AdminSolicitudes({ api }: Props) {
             ))}
           </div>}
 
-      <Modal open={!!detail} onClose={() => setDetail(null)} title="Detalle de solicitud" width={600}>
+      <Modal open={!!detail} onClose={() => { setDetail(null); setAddress(""); }} title="Detalle de solicitud" width={600}>
         {detail && (
           <div>
+            {detail.estado !== "rechazado" && <form onSubmit={async event => {
+              event.preventDefault(); if (converting || !address.trim()) return;
+              setConverting(true);
+              try { const saved = await api.convert(detail.id, address); window.location.hash = `#/admin/budgets?opportunity=${saved.id}`; }
+              catch (error) { push((error as Error).message || "No se pudo convertir la solicitud", "error"); }
+              finally { setConverting(false); }
+            }}>
+              <label>Dirección de la obra<input required value={address} onChange={event => setAddress(event.target.value)} /></label>
+              <Button type="submit" loading={converting}>Crear o abrir oportunidad</Button>
+            </form>}
             <dl style={{ display: "grid", gap: 10, fontSize: 13, marginBottom: 20 }}>
               <MetaRow k="Nombre"      v={detail.nombre} />
               <MetaRow k="Email"       v={detail.email} copyable />

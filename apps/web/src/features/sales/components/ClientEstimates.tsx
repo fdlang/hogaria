@@ -16,6 +16,7 @@ import {
   EstimateSearch,
 } from "./EstimateContent";
 import { filterEstimates } from "../estimate-search";
+import { EstimateHistory } from "./EstimateHistory";
 
 const consent =
   "Acepto la propuesta mostrada y autorizo el inicio de los trabajos descritos en sus condiciones.";
@@ -32,6 +33,7 @@ export function ClientEstimates({
   const [items, setItems] = useState<EstimateDTO[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
+  const [page, setPage] = useState(0);
   const filtered = filterEstimates(items, query, status);
   const [projects, setProjects] = useState<ProjectDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,14 +49,17 @@ export function ClientEstimates({
   const [password, setPassword] = useState("");
   const [accepted, setAccepted] = useState(false);
   const canvas = useRef<SignatureCanvasHandle>(null);
+  const requestId = useRef(0);
 
   const refresh = useCallback(async () => {
+    const request = ++requestId.current;
     setLoading(true);
     setError("");
     const [estimateResult, projectResult] = await Promise.allSettled([
-      api.estimates(),
+      api.estimates(page, query, status),
       projectsApi.list(),
     ]);
+    if (request !== requestId.current) return;
     if (estimateResult.status === "fulfilled") setItems(estimateResult.value);
     else
       setError(
@@ -68,9 +73,10 @@ export function ClientEstimates({
           message(projectResult.reason, "No se pudieron cargar tus proyectos."),
       );
     setLoading(false);
-  }, [api, projectsApi]);
+  }, [api, projectsApi, page, query, status]);
   useEffect(() => {
-    void refresh();
+    const timer = setTimeout(() => { void refresh(); }, 200);
+    return () => { clearTimeout(timer); requestId.current++; };
   }, [refresh]);
   const closeProposal = () => {
     setSelected(null);
@@ -168,8 +174,8 @@ export function ClientEstimates({
         <EstimateSearch
           query={query}
           status={status}
-          onQuery={setQuery}
-          onStatus={setStatus}
+        onQuery={value => { setPage(0); setQuery(value); }}
+        onStatus={value => { setPage(0); setStatus(value); }}
         />
         <p role="status">
           {filtered.length} de {items.length} propuestas
@@ -192,6 +198,7 @@ export function ClientEstimates({
           </p>
         )}
       </section>
+      <nav aria-label="Páginas de presupuestos"><Button small variant="ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button><span>Página {page + 1}</span><Button small variant="ghost" disabled={items.length < 20 || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>
       <section aria-labelledby="client-projects" style={{ marginTop: 36 }}>
         <h2 id="client-projects">Mis proyectos</h2>
         {loading ? (
@@ -236,6 +243,7 @@ export function ClientEstimates({
             item={selected}
           />
         )}
+        {selected && <EstimateHistory key={selected.id} api={api} id={selected.id} />}
         <ProposalDetail
           item={selected}
           canvas={canvas}

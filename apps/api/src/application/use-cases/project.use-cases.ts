@@ -32,7 +32,9 @@ export class UpdateProjectUseCase {
     if (!project) throw new NotFoundError("Proyecto");
 
     const built: Record<string, unknown> = {};
-    const changes = projectChanges(cmd.changes);
+    const raw = cmd.changes as Record<string, unknown> | null;
+    if (raw?.revision !== undefined && (!Number.isSafeInteger(raw.revision) || raw.revision !== (project.revision ?? 0))) throw new ConflictError("La obra ha cambiado. Actualiza los datos antes de guardar.");
+    const changes = projectChanges(raw && typeof raw === "object" && !Array.isArray(raw) ? Object.fromEntries(Object.entries(raw).filter(([key]) => key !== "revision")) : cmd.changes);
 
     if (actor.rol === "admin") {
       // Admin allowlist — clienteId and profesionalesAsignados are NEVER allowed via this endpoint
@@ -66,7 +68,7 @@ export class UpdateProjectUseCase {
     const visibleKeys = ["estado","progreso","hitos","fechaInicio","fechaFinPrevista","nombre","descripcion","direccion","tipo","presupuesto"] as const;
     const changedFields = visibleKeys.filter(key => key in built && JSON.stringify(project[key]) !== JSON.stringify(built[key]));
 
-    const updated = await this.projects.update(cmd.projectId, allowedChanges);
+    const updated = await this.projects.update(cmd.projectId, allowedChanges, project.revision ?? 0);
 
     // Emit ProjectCompleted if we just transitioned to finalizado
     if (changes.estado === "finalizado" && previousState !== "finalizado") {
@@ -92,6 +94,7 @@ export class DeleteProjectUseCase {
     private readonly users: IUserRepository,
     private readonly projects: IProjectRepository,
     private readonly hasWorkHistory?: (projectId: number) => Promise<boolean>,
+    private readonly hasCommercialHistory?: (projectId: number) => Promise<boolean>,
   ) {}
   async execute(cmd: { actorId: number; projectId: number }): Promise<void> {
     const actor = await this.users.findById(cmd.actorId);
@@ -99,6 +102,7 @@ export class DeleteProjectUseCase {
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
     if (await this.hasWorkHistory?.(project.id)) throw new ConflictError("La obra tiene registros o previsiones de trabajo. Conserva el histórico y marca la obra como finalizada");
+    if (await this.hasCommercialHistory?.(project.id)) throw new ConflictError("La obra tiene órdenes de cambio publicadas. Conserva su histórico y marca la obra como finalizada");
     await this.projects.delete(cmd.projectId);
   }
 }
@@ -133,7 +137,7 @@ export class AssignProjectProfessionalUseCase {
     // Do not accept a client-controlled override that could grant mismatched access.
     if (!professional.profesion) throw new ValidationError("El profesional no tiene profesión configurada", "userId");
     const assignment: ProjectProfessional = { userId: professional.id, profesion: professional.profesion };
-    return this.projects.update(project.id, { profesionalesAsignados: [...project.profesionalesAsignados, assignment] });
+    return this.projects.update(project.id, { profesionalesAsignados: [...project.profesionalesAsignados, assignment] }, project.revision ?? 0);
   }
 }
 
@@ -146,7 +150,7 @@ export class UnassignProjectProfessionalUseCase {
     if (!project) throw new NotFoundError("Proyecto");
     const remaining = project.profesionalesAsignados.filter(p => p.userId !== cmd.userId);
     if (remaining.length === project.profesionalesAsignados.length) throw new NotFoundError("Asignación");
-    return this.projects.update(project.id, { profesionalesAsignados: remaining });
+    return this.projects.update(project.id, { profesionalesAsignados: remaining }, project.revision ?? 0);
   }
 }
 
