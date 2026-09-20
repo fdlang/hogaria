@@ -1,116 +1,131 @@
-/**
- * AdminActivity — paginated audit log viewer.
- * Uses useAuditLog hook that owns pagination/filter state.
- */
-
-import { AuditApi, useAuditLog } from "../api/audit.api";
+import { useMemo, useState } from "react";
+import { AuditApi, useAuditLog, type AuditEntryDTO } from "../api/audit.api";
 import { Button, Spinner, EmptyState } from "@/shared/ui";
 import { formatDateTime } from "@/shared/lib/formatters";
+import {
+  BUSINESS_ACTIONS,
+  auditActionLabel,
+  auditDescription,
+  auditTone,
+  isTechnicalAudit,
+} from "../audit-presentation";
+import "../audit.css";
 
 interface Props { api: AuditApi }
 
-const ACTION_COLORS: Record<string, string> = {
-  LOGIN_SUCCESS:               "#34d399",
-  DOCUMENTO_FIRMADO:           "#c17248",
-  PRESUPUESTO_CREADO:          "#60a5fa",
-  PRESUPUESTO_ENVIADO:         "#60a5fa",
-  FIRMA_CHALLENGE_SOLICITADO:  "#fbbf24",
-  FIRMA_INTENTO_INVALIDO:      "#b5483f",
-  FIRMA_PASSWORD_INCORRECTO:   "#b5483f",
-  USUARIO_CREADO:              "#c17248",
-  USUARIO_DESACTIVADO:         "#b5483f",
-  CONTRASENA_RESETEADA:        "#fbbf24",
-  PROYECTO_CREADO:             "#34d399",
-  PROYECTO_FINALIZADO:         "#c17248",
-  ARCHIVO_SUBIDO:              "#60a5fa",
-  PROFESIONAL_ASIGNADO:        "#60a5fa",
-  PROFESIONAL_DESASIGNADO:     "#b5483f",
-};
-
-const ACTION_OPTIONS = Object.keys(ACTION_COLORS);
-
 export function AdminActivity({ api }: Props) {
   const log = useAuditLog(api);
+  const [showTechnical, setShowTechnical] = useState(false);
+  const visibleEntries = useMemo(
+    () => (log.page?.items ?? []).filter(entry => showTechnical || !isTechnicalAudit(entry.action)),
+    [log.page?.items, showTechnical],
+  );
+  const hiddenTechnical = (log.page?.items.length ?? 0) - visibleEntries.length;
 
   return (
-    <section>
-      <header style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
+    <section className="audit-page">
+      <header className="audit-page__header">
         <div>
-          <h1 style={{ fontSize: 38, fontWeight: 700, color: "#302d29" }}>Actividad</h1>
-          <p style={{ fontSize: 13, color: "#71685e", marginTop: 6 }}>
-            Audit log · {log.page?.total ?? 0} eventos{log.query.action ? ` · filtrando "${log.query.action}"` : ""}
+          <p className="eyebrow">Administración</p>
+          <h1>Historial de actividad</h1>
+          <p>
+            {log.page?.total ?? 0} movimientos registrados
+            {log.query.action ? ` · Filtro: ${auditActionLabel(log.query.action)}` : ""}
           </p>
         </div>
       </header>
 
-      {/* Filters */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-        <select value={log.query.action ?? ""} onChange={e => log.setFilter({ action: e.target.value || null })}
-          style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "7px 12px", color: log.query.action ? "#c17248" : "#71685e", fontSize: 12, cursor: "pointer" }}>
-          <option value="">Todos los eventos</option>
-          {ACTION_OPTIONS.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
-
-        <input type="date" value={log.query.from ?? ""}
-          onChange={e => log.setFilter({ from: e.target.value || null })}
-          style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "7px 12px", color: "#302d29", fontSize: 12 }} />
-        <input type="date" value={log.query.to ?? ""}
-          onChange={e => log.setFilter({ to: e.target.value || null })}
-          style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "7px 12px", color: "#302d29", fontSize: 12 }} />
-
+      <div className="audit-filters" aria-label="Filtros de actividad">
+        <label>
+          Tipo de actividad
+          <select value={log.query.action ?? ""} onChange={event => log.setFilter({ action: event.target.value || null })}>
+            <option value="">Todas las actividades</option>
+            {BUSINESS_ACTIONS.map(action => <option key={action} value={action}>{auditActionLabel(action)}</option>)}
+          </select>
+        </label>
+        <label>
+          Desde
+          <input type="date" value={log.query.from ?? ""} onChange={event => log.setFilter({ from: event.target.value || null })} />
+        </label>
+        <label>
+          Hasta
+          <input type="date" value={log.query.to ?? ""} onChange={event => log.setFilter({ to: event.target.value || null })} />
+        </label>
+        <label className="audit-filters__technical">
+          <input type="checkbox" checked={showTechnical} onChange={event => setShowTechnical(event.target.checked)} />
+          Mostrar registros técnicos
+        </label>
         {(log.query.action || log.query.from || log.query.to) && (
-          <Button small variant="ghost" onClick={() => log.setFilter({ action: null, from: null, to: null })}>✕ Limpiar</Button>
+          <Button small variant="ghost" onClick={() => log.setFilter({ action: null, from: null, to: null })}>
+            Limpiar filtros
+          </Button>
         )}
       </div>
 
-      {/* Body */}
+      {hiddenTechnical > 0 && (
+        <p className="audit-page__technical-note" role="status">
+          {hiddenTechnical} {hiddenTechnical === 1 ? "registro técnico oculto" : "registros técnicos ocultos"} en esta página.
+        </p>
+      )}
+
       {log.loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>
+        <div className="audit-page__loading"><Spinner size={32} /></div>
       ) : log.error ? (
-        <div role="alert" style={{ color: "#b5483f", padding: 20 }}>{log.error}</div>
-      ) : !log.page || log.page.items.length === 0 ? (
-        <EmptyState icon="◎" title="Sin eventos" hint="Prueba a cambiar los filtros" />
+        <div role="alert" className="audit-page__error">{log.error}</div>
+      ) : !log.page || visibleEntries.length === 0 ? (
+        <EmptyState
+          icon="◎"
+          title={hiddenTechnical ? "No hay actividad operativa en esta página" : "Sin actividad"}
+          hint={hiddenTechnical ? "Activa los registros técnicos para consultar la trazabilidad interna." : "Prueba a cambiar los filtros."}
+        />
       ) : (
         <>
-          {/* Timeline */}
-          <ul style={{ listStyle: "none", padding: 0, maxWidth: 800 }}>
-            {log.page.items.map((entry, i) => (
-              <li key={entry.id} style={{ display: "flex", gap: 16 }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 4 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: ACTION_COLORS[entry.action] ?? "#71685e", flexShrink: 0 }} />
-                  {i < log.page!.items.length - 1 && <div style={{ width: 1, flex: 1, background: "#decdb8", minHeight: 24 }} />}
-                </div>
-                <div style={{ flex: 1, paddingBottom: 18 }}>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "monospace", color: ACTION_COLORS[entry.action] ?? "#71685e", background: `${ACTION_COLORS[entry.action] ?? "#71685e"}18`, padding: "2px 7px", borderRadius: 4 }}>
-                      {entry.action}
-                    </span>
-                    <span style={{ fontSize: 12, color: "#85786b" }}>{formatDateTime(entry.timestamp)}</span>
-                    <span style={{ fontSize: 12, color: "#545048" }}>IP: {entry.ip}</span>
-                  </div>
-                  <p className="audit-entry-details" style={{ fontSize: 12, color: "#71685e" }}>
-                    Usuario: <strong style={{ color: "#302d29" }}>{entry.userName}</strong>
-                    {" "}<span style={{ fontFamily: "monospace", fontSize: 12, color: "#85786b", overflowWrap: "anywhere" }}>
-                      · {JSON.stringify(entry.details)}
-                    </span>
-                  </p>
-                </div>
-              </li>
+          <ul className="audit-timeline">
+            {visibleEntries.map((entry, index) => (
+              <ActivityEntry key={entry.id} entry={entry} continued={index < visibleEntries.length - 1} />
             ))}
           </ul>
-
-          {/* Pagination */}
           {log.page.pages > 1 && (
-            <nav style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 16, justifyContent: "center" }}>
-              <Button small variant="ghost" onClick={log.prevPage} disabled={log.page.page === 0}>← Anterior</Button>
-              <span style={{ fontSize: 12, color: "#71685e" }}>
-                Página {log.page.page + 1} / {log.page.pages}
-              </span>
-              <Button small variant="ghost" onClick={log.nextPage} disabled={log.page.page >= log.page.pages - 1}>Siguiente →</Button>
+            <nav className="audit-pagination" aria-label="Páginas del historial">
+              <Button small variant="ghost" onClick={log.prevPage} disabled={log.page.page === 0}>Anterior</Button>
+              <span>Página {log.page.page + 1} de {log.page.pages}</span>
+              <Button small variant="ghost" onClick={log.nextPage} disabled={log.page.page >= log.page.pages - 1}>Siguiente</Button>
             </nav>
           )}
         </>
       )}
     </section>
+  );
+}
+
+function ActivityEntry({ entry, continued }: { entry: AuditEntryDTO; continued: boolean }) {
+  const technical = isTechnicalAudit(entry.action);
+  return (
+    <li className="audit-entry">
+      <div className="audit-entry__rail" aria-hidden="true">
+        <span data-tone={auditTone(entry.action)} />
+        {continued && <i />}
+      </div>
+      <article className="audit-entry__content">
+        <div className="audit-entry__heading">
+          <h2>{auditActionLabel(entry.action)}</h2>
+          {technical && <span className="audit-entry__technical-badge">Técnico</span>}
+        </div>
+        <p className="audit-entry__description">{auditDescription(entry)}</p>
+        <p className="audit-entry__meta">
+          <strong>{entry.userName}</strong><span aria-hidden="true">·</span>
+          <time dateTime={entry.timestamp}>{formatDateTime(entry.timestamp)}</time>
+        </p>
+        <details className="audit-entry__details">
+          <summary>Ver detalles técnicos</summary>
+          <dl>
+            <div><dt>Código</dt><dd>{entry.action}</dd></div>
+            <div><dt>Dirección IP</dt><dd>{entry.ip}</dd></div>
+            <div><dt>Navegador</dt><dd>{entry.userAgent}</dd></div>
+          </dl>
+          <pre>{JSON.stringify(entry.details, null, 2)}</pre>
+        </details>
+      </article>
+    </li>
   );
 }
