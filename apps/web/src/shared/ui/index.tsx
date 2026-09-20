@@ -101,7 +101,7 @@ export function Button({ variant = "primary", loading, small, children, disabled
   };
   const c = colors[variant];
   return (
-    <button {...rest} className={`ui-button ui-button--${variant}${className ? ` ${className}` : ""}`} data-variant={variant} disabled={disabled || loading}
+    <button {...rest} className={`ui-button ui-button--${variant}${small ? " ui-button--small" : ""}${className ? ` ${className}` : ""}`} data-variant={variant} disabled={disabled || loading}
       style={{
         background: c.bg, color: c.fg, border: `1px solid ${c.border}`,
         padding: small ? "6px 12px" : "9px 18px",

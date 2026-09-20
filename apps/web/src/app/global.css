@@ -368,18 +368,25 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
     font-size: 12px;
     letter-spacing: .055em;
   }
-  .portfolio nav button {
-    min-height: 44px;
-    flex: 0 0 100%;
-    margin-top: 1px;
-    text-align: left;
+  .portfolio nav button.private-access {
+    position: relative;
+    min-height: 36px;
+    margin-top: 0;
+    padding: 5px 9px;
+    font-size: 11px;
+    text-align: center;
+  }
+  .portfolio nav button.private-access::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
   }
   .portfolio section { scroll-margin-top: 166px; }
 
   .hero { min-height: auto; padding: 72px 24px 76px; }
   .hero > .hero-marble { display: none; }
   .hero::after { background: rgba(255,253,250,.96); }
-  .portfolio nav button { padding: 9px 11px; border: 1px solid rgba(193,113,72,.42); border-radius: 5px; background: rgba(193,113,72,.08); }
+  .portfolio nav button.private-access { border: 1px solid rgba(193,113,72,.42); border-radius: 5px; background: rgba(193,113,72,.08); }
   .services-cta { gap: 18px; padding: 24px; }.services-cta .ui-button { width: 100%; }
   .project-showcase { margin: 42px 16px; }.project-showcase__intro, .project-showcase__story, .project-showcase__materials { padding: 28px 24px; }.project-showcase__image { min-height: 340px; }.project-showcase__video { padding: 16px; }.project-showcase__cta { align-items: flex-start; flex-direction: column; padding: 22px 24px; }.project-showcase__cta .ui-button { width: 100%; }
 
@@ -409,6 +416,12 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .private-mobile-menu-panel nav a:hover, .private-mobile-menu-panel nav a:focus-visible { color: var(--copper-dark); background: rgba(193,113,72,.1); }
   .private-mobile-menu-panel > .ui-button { width: 100%; margin-top: auto; min-height: 44px; }
   .private-nav > a, .private-nav > button, .ui-button { min-height: 44px; }
+  .ui-button--small,
+  .professional-dashboard-header .professional-work-cta {
+    min-height: 38px;
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+  }
   .admin-home-grid { grid-template-columns: 1fr; }
   .admin-home-grid > a { min-height: 0; }
   .admin-home-group > header { align-items: flex-start; flex-direction: column; gap: 4px; }

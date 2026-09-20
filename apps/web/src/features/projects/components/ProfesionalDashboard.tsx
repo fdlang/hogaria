@@ -50,7 +50,7 @@ export function ProfesionalDashboard({ apis, onOpenProject, onOpenWork }: Props)
             subtitle={profInfo?.desc}
           />
         </div>
-        <Button className="professional-work-cta" onClick={onOpenWork}>
+        <Button className="professional-work-cta" small onClick={onOpenWork}>
           Registrar trabajo
         </Button>
       </header>
