@@ -159,7 +159,13 @@
   letter-spacing: -.045em;
   line-height: 1;
 }
-.client-estimates__intro h1 em { color: var(--copper-dark); }
+.client-estimates__brand-logo {
+  display: block;
+  width: clamp(220px, 28vw, 320px);
+  max-width: 100%;
+  height: auto;
+  margin-top: 10px;
+}
 .client-estimates__intro > p:last-child {
   max-width: 610px;
   margin: 22px 0 0;

@@ -145,7 +145,17 @@ export function ClientEstimates({
       <header className="client-estimates__hero">
         <div className="client-estimates__intro">
           <p className="eyebrow">Área cliente</p>
-          <h1>Tu proyecto con <em>Hogaria</em></h1>
+          <h1>
+            Tu proyecto con
+            <img
+              className="client-estimates__brand-logo"
+              src="/brand/hogaria-wordmark.png"
+              alt="Hogaria"
+              width="2362"
+              height="511"
+              decoding="async"
+            />
+          </h1>
           <p>
             Consulta tus propuestas, revisa cada decisión y sigue el avance de
             tu obra desde un único lugar.
