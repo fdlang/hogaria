@@ -23,6 +23,7 @@ import {
 
 import { useCatalog } from "@/features/catalog/useCatalog";
 import { CatalogLoadState } from "@/features/catalog/CatalogLoadState";
+import { blankOpportunity, opportunityForSelection } from "../sales-pipeline.utils";
 
 const steps = ["Oportunidad", "Alcance", "Partidas", "Revisión"];
 
@@ -89,19 +90,12 @@ export function SalesPipeline({
   const [showCatalog, setShowCatalog] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<EstimateDTO | null>(null);
-  const [opportunity, setOpportunity] = useState({
-    clienteId: "",
-    nombre: "",
-    direccion: "",
-    tipo: "Reforma integral",
-    descripcion: "",
-  });
+  const [opportunity, setOpportunity] = useState(blankOpportunity);
   const [selected, setSelected] = useState<number | null>(null);
   const [draft, setDraft] = useState(blankDraft);
   const [existingOpportunity, setExistingOpportunity] = useState(() => new URLSearchParams(window.location.hash.split("?")[1] ?? window.location.search).get("opportunity") ?? "");
   useEffect(() => {
-    const item = opportunities.find(value => value.id === Number(existingOpportunity));
-    if (item) setOpportunity({ clienteId: item.clienteId == null ? "" : String(item.clienteId), nombre: item.nombre, direccion: item.direccion, tipo: item.tipo, descripcion: item.descripcion });
+    setOpportunity(opportunityForSelection(existingOpportunity, opportunities));
   }, [existingOpportunity, opportunities]);
   const [editingId, setEditingId] = useState<number | null>(null);
 
