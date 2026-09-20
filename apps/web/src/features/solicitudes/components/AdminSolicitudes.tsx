@@ -32,6 +32,7 @@ interface Props { api: AdminSolicitudesApi }
 export function AdminSolicitudes({ api }: Props) {
   const [address, setAddress] = useState("");
   const [converting, setConverting] = useState(false);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [items, setItems]     = useState<SolicitudDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -48,15 +49,19 @@ export function AdminSolicitudes({ api }: Props) {
   useEffect(() => { load(); }, [load]);
 
   const handleContact = async (s: SolicitudDTO) => {
-    try { await api.markContacted(s.id); push("Marcada como contactada", "success"); load(); }
+    if (updatingId !== null) return;
+    try { setUpdatingId(s.id); await api.markContacted(s.id); push("Marcada como contactada", "success"); await load(); }
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
+    finally { setUpdatingId(null); }
   };
 
   const handleReject = async (s: SolicitudDTO) => {
     const reason = prompt("Motivo de rechazo (quedará en el audit log):");
     if (!reason) return;
-    try { await api.reject(s.id, reason); push("Solicitud rechazada", "success"); load(); }
+    if (updatingId !== null) return;
+    try { setUpdatingId(s.id); await api.reject(s.id, reason); push("Solicitud rechazada", "success"); await load(); }
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
+    finally { setUpdatingId(null); }
   };
 
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>;
@@ -96,8 +101,8 @@ export function AdminSolicitudes({ api }: Props) {
                   <Button small variant="ghost" onClick={() => setDetail(s)}>Ver</Button>
                   {s.estado === "pendiente" && (
                     <>
-                      <Button small onClick={() => handleContact(s)}>✓ Contactar</Button>
-                      <Button small variant="danger" onClick={() => handleReject(s)}>✕</Button>
+                      <Button small disabled={updatingId !== null} loading={updatingId === s.id} onClick={() => handleContact(s)}>✓ Contactar</Button>
+                      <Button small disabled={updatingId !== null} variant="danger" onClick={() => handleReject(s)}>✕</Button>
                     </>
                   )}
                 </div>
