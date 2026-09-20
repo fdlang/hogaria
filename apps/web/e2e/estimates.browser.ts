@@ -93,6 +93,11 @@ for (const width of [320, 390, 768, 1440]) {
     await expect(page.getByRole("heading", { name: "Tu proyecto con Hogaria" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Propuestas" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Mis proyectos" })).toBeVisible();
+    const hero = await page.locator(".client-estimates__hero").boundingBox();
+    const firstSection = await page.locator(".client-estimates__section").first().boundingBox();
+    expect(hero).not.toBeNull();
+    expect(firstSection).not.toBeNull();
+    expect(firstSection!.y - (hero!.y + hero!.height)).toBeGreaterThanOrEqual(28);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth + 1,
