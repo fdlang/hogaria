@@ -11,6 +11,7 @@ import { ValidationError } from "@reformapro/domain/errors";
 import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
 import { ProfessionalDocumentUseCases, type ProfessionalDocument } from "../../application/use-cases/professional-document.use-cases.js";
+import { pageIndex, positiveId, validDate } from "./requestValidation.js";
 
 // ─────────────────────────────────────────────────────────────
 // Audit
@@ -32,12 +33,12 @@ export function auditController(deps: { query: QueryAuditLogUseCase }) {
       try {
         const result = await deps.query.execute({
           actorId: req.actorId,
-          page:   req.query.page   ? parseInt(req.query.page,   10) : undefined,
-          limit:  req.query.limit  ? parseInt(req.query.limit,  10) : undefined,
+          page:   pageIndex(req.query.page),
+          limit:  req.query.limit ? positiveId(req.query.limit, "limit") : undefined,
           action: req.query.action ?? null,
-          userId: req.query.userId ? parseInt(req.query.userId, 10) : null,
-          from:   req.query.from   ? new Date(req.query.from)   : null,
-          to:     req.query.to     ? new Date(req.query.to)     : null,
+          userId: req.query.userId ? positiveId(req.query.userId, "userId") : null,
+          from:   validDate(req.query.from, "from"),
+          to:     validDate(req.query.to, "to"),
         });
         return {
           status: 200,
@@ -82,7 +83,7 @@ export function solicitudController(deps: { submit: SubmitSolicitudUseCase; list
     // POST /solicitudes/:id/contact — admin only
     async contact(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {
-        const solicitud = await deps.updateStatus.execute({ actorId: req.actorId, solicitudId: parseInt(req.params.id, 10), estado: "contactado" });
+        const solicitud = await deps.updateStatus.execute({ actorId: req.actorId, solicitudId: positiveId(req.params.id), estado: "contactado" });
         return { status: 200, body: toSolicitudDTO(solicitud) };
       } catch (e) { return toHttpError(e); }
     },
@@ -91,7 +92,7 @@ export function solicitudController(deps: { submit: SubmitSolicitudUseCase; list
     async reject(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {
         const body = req.body as { reason?: string };
-        const cmd = { actorId: req.actorId, solicitudId: parseInt(req.params.id, 10), estado: "rechazado" as const, ...(body.reason ? { motivo: body.reason } : {}) };
+        const cmd = { actorId: req.actorId, solicitudId: positiveId(req.params.id), estado: "rechazado" as const, ...(body.reason ? { motivo: body.reason } : {}) };
         const solicitud = await deps.updateStatus.execute(cmd);
         return { status: 200, body: toSolicitudDTO(solicitud) };
       } catch (e) { return toHttpError(e); }
@@ -127,7 +128,7 @@ export function fileController(deps: {
         const body = (req.body ?? {}) as { nombre: string; tipo: string; tamaño: number; sensitive: boolean; contenidoBase64: string; classification?: string };
         const file = await deps.upload.execute({
           actorId: req.actorId,
-          projectId: parseInt(req.params.projectId, 10),
+          projectId: positiveId(req.params.projectId, "projectId"),
           ctx: ctxOf(req),
           nombre: body.nombre, tipo: body.tipo, tamaño: body.tamaño,
           sensitive: body.sensitive, contenidoBase64: body.contenidoBase64,
@@ -140,7 +141,7 @@ export function fileController(deps: {
     // DELETE /files/:id
     async delete(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {
-        await deps.delete.execute({ actorId: req.actorId, fileId: parseInt(req.params.id, 10) });
+        await deps.delete.execute({ actorId: req.actorId, fileId: positiveId(req.params.id) });
         return { status: 204, body: null };
       } catch (e) { return toHttpError(e); }
     },
@@ -150,7 +151,7 @@ export function fileController(deps: {
       try {
         const files = await deps.list.execute({
           actorId: req.actorId,
-          projectId: parseInt(req.params.projectId, 10),
+          projectId: positiveId(req.params.projectId, "projectId"),
         });
         return { status: 200, body: files.map(toFileDTO) };
       } catch (e) { return toHttpError(e); }
@@ -159,7 +160,7 @@ export function fileController(deps: {
     // GET /files/:id/download — authorized binary response from private storage.
     async download(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {
-        const { file, bytes } = await deps.download.execute({ actorId: req.actorId, fileId: parseInt(req.params.id, 10) });
+        const { file, bytes } = await deps.download.execute({ actorId: req.actorId, fileId: positiveId(req.params.id) });
         const filename = file.nombre.replace(/[\\"\r\n]/g, "_");
         return {
           status: 200, body: bytes,

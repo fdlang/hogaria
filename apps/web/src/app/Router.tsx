@@ -75,8 +75,9 @@ export function Router({ routes, fallback, layout = (content) => content }: { ro
 
   const match = useMemo(() => matchRoute(routes, path), [routes, path]);
 
-  // Still authenticating? Show nothing (prevents flashing the fallback)
-  if (status === "authenticating" || status === "restoring") return null;
+  if (status === "authenticating" || status === "restoring") {
+    return <div role="status" aria-live="polite" style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#71685e" }}>Preparando tu área privada…</div>;
+  }
 
   // Route requires a role the user doesn't have
   const allowed = !match?.roles || (user && match.roles.includes(user.rol));

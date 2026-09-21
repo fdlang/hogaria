@@ -11,7 +11,7 @@ import { ValidationError, ForbiddenError, NotFoundError, ConflictError } from "@
 import { ClientContext } from "./auth.use-cases.js";
 import { PasswordHasher } from "../../infrastructure/database/inMemoryRepositories.js";
 import { AccountActivationUseCases } from "./account-activation.use-cases.js";
-import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword, PROFESIONES } from "@reformapro/domain";
+import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword, isValidSpanishPhone, PROFESIONES } from "@reformapro/domain";
 
 const isProfesion = (value: unknown): value is Profesion =>
   typeof value === "string" && Object.prototype.hasOwnProperty.call(PROFESIONES, value);
@@ -46,6 +46,7 @@ export class CreateUserUseCase {
     if (cmd.rol !== "profesional" && cmd.profesion !== undefined) {
       throw new ValidationError("La profesión solo corresponde a profesionales", "profesion");
     }
+    if (!isValidSpanishPhone(cmd.telefono ?? "")) throw new ValidationError("Teléfono no válido", "telefono");
 
     const email = Email.of(cmd.email); // throws ValidationError if malformed
     const existing = await this.users.findByEmail(email.value);
@@ -65,7 +66,7 @@ export class CreateUserUseCase {
       // Every account sets its own password through a one-time link.
       activo: false, accountStatus: "pending_activation", createdAt: new Date(),
       ...(cmd.profesion !== undefined ? { profesion: cmd.profesion } : {}),
-      ...(cmd.telefono  !== undefined ? { telefono:  cmd.telefono  } : {}),
+      ...(cmd.telefono?.trim() ? { telefono: cmd.telefono.trim() } : {}),
     };
     const saved = await this.users.save(user, passwordHash);
     try {
@@ -111,6 +112,10 @@ export class UpdateUserUseCase {
     if (fields.activo !== undefined && typeof fields.activo !== "boolean") throw new ValidationError("Estado no válido", "activo");
     if (fields.activo === true && !target.activo) throw new ConflictError("Reactiva la cuenta mediante un enlace de acceso seguro");
     if (fields.nombre !== undefined && (typeof fields.nombre !== "string" || !fields.nombre.trim())) throw new ValidationError("Nombre obligatorio", "nombre");
+    if (fields.telefono !== undefined) {
+      if (typeof fields.telefono !== "string" || !isValidSpanishPhone(fields.telefono)) throw new ValidationError("Teléfono no válido", "telefono");
+      fields.telefono = fields.telefono.trim();
+    }
     if (fields.profesion !== undefined && (target.rol !== "profesional" || !isProfesion(fields.profesion))) throw new ValidationError("Profesión no válida", "profesion");
     if (cmd.actorId === cmd.userId && fields.activo === false) throw new ValidationError("No puedes desactivar tu propia cuenta");
     if (newPassword !== undefined && !isValidAccountPassword(newPassword)) throw new ValidationError(ACCOUNT_PASSWORD_REQUIREMENTS, "newPassword");

@@ -30,6 +30,7 @@ const ACTION_CODES: Record<DomainEvent["type"], string> = {
   EstimateSigned:              "DOCUMENTO_FIRMADO",
   EstimateAccepted:            "PRESUPUESTO_ACEPTADO",
   EstimateRejected:            "PRESUPUESTO_RECHAZADO",
+  ChangeOrderSent:             "ORDEN_CAMBIO_PUBLICADA",
 };
 
 export class AuditSubscriber {

@@ -5,3 +5,4 @@ export class UnauthorizedError extends DomainError { constructor(message = "No a
 export class ForbiddenError extends DomainError { constructor(message = "No tienes permiso para realizar esta acción") { super(message, "FORBIDDEN"); } }
 export class ConflictError extends DomainError { constructor(message = "Conflicto") { super(message, "CONFLICT"); } }
 export class RateLimitError extends DomainError { constructor(message = "Demasiadas solicitudes") { super(message, "RATE_LIMIT"); } }
+export class ServiceUnavailableError extends DomainError { constructor(message = "Servicio temporalmente no disponible") { super(message, "SERVICE_UNAVAILABLE"); } }

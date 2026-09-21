@@ -22,16 +22,17 @@ const message = (error: unknown, fallback: string) =>
 export function ClientEstimates({
   api,
   projectsApi,
+  view = "projects",
 }: {
   api: SalesApi;
   projectsApi: ProjectsApi;
+  view?: "projects" | "budgets";
 }) {
   const [items, setItems] = useState<EstimateDTO[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(0);
   const filtered = filterEstimates(items, query, status);
-  const hasSignedProposal = items.some((item) => item.estado === "firmado");
   const [projects, setProjects] = useState<ProjectDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -52,25 +53,23 @@ export function ClientEstimates({
     const request = ++requestId.current;
     setLoading(true);
     setError("");
-    const [estimateResult, projectResult] = await Promise.allSettled([
-      api.estimates(page, query, status),
-      projectsApi.list(),
-    ]);
+    try {
+      if (view === "budgets") {
+        const estimates = await api.estimates(page, query, status);
+        if (request !== requestId.current) return;
+        setItems(estimates);
+      } else {
+        const assignedProjects = await projectsApi.list();
+        if (request !== requestId.current) return;
+        setProjects(assignedProjects);
+      }
+    } catch (cause) {
+      if (request !== requestId.current) return;
+      setError(message(cause, view === "budgets" ? "No se pudieron cargar tus propuestas." : "No se pudieron cargar tus proyectos."));
+    }
     if (request !== requestId.current) return;
-    if (estimateResult.status === "fulfilled") setItems(estimateResult.value);
-    else
-      setError(
-        message(estimateResult.reason, "No se pudieron cargar tus propuestas."),
-      );
-    if (projectResult.status === "fulfilled") setProjects(projectResult.value);
-    else
-      setError(
-        (previous) =>
-          previous ||
-          message(projectResult.reason, "No se pudieron cargar tus proyectos."),
-      );
     setLoading(false);
-  }, [api, projectsApi, page, query, status]);
+  }, [api, projectsApi, page, query, status, view]);
   useEffect(() => {
     const timer = setTimeout(() => { void refresh(); }, 200);
     return () => { clearTimeout(timer); requestId.current++; };
@@ -142,7 +141,7 @@ export function ClientEstimates({
 
   return (
     <section className="client-estimates">
-      <header className="client-estimates__hero">
+      {view === "projects" && <header className="client-estimates__hero">
         <div className="client-estimates__intro">
           <p className="eyebrow">Área cliente</p>
           <h1>
@@ -163,19 +162,20 @@ export function ClientEstimates({
         </div>
         <dl className="client-estimates__summary" aria-label="Resumen de tu cuenta">
           <div>
-            <dt>Propuestas</dt>
-            <dd>{items.length}</dd>
-          </div>
-          <div>
             <dt>Obras activas</dt>
-            <dd>{projects.length}</dd>
+            <dd>{projects.filter(project => project.estado !== "finalizado").length}</dd>
           </div>
           <div>
             <dt>Próximo paso</dt>
-            <dd>{items.some(item => item.estado === "enviado") ? "Revisar propuesta" : projects.length ? "Seguir la obra" : "Sin acciones"}</dd>
+            <dd><a href={projects.length ? "#client-projects" : "#/cliente/budgets"}>{projects.length ? "Seguir la obra" : "Consultar presupuestos"}</a></dd>
           </div>
         </dl>
-      </header>
+      </header>}
+      {view === "budgets" && <header className="private-page-header">
+        <p className="eyebrow">Documentación comercial</p>
+        <h1>Presupuestos</h1>
+        <p>Consulta, descarga y revisa cada propuesta que Hogaria haya publicado para ti.</p>
+      </header>}
       {error && (
         <div
           className="client-estimates__alert"
@@ -187,6 +187,7 @@ export function ClientEstimates({
           </Button>
         </div>
       )}
+      {view === "budgets" && <>
       <section className="client-estimates__section" aria-labelledby="client-proposals">
         <div className="client-estimates__section-heading">
           <div>
@@ -211,7 +212,7 @@ export function ClientEstimates({
         onStatus={value => { setPage(0); setStatus(value); }}
         />
         <p className="client-estimates__results" role="status">
-          {filtered.length} de {items.length} propuestas
+          {filtered.length} propuestas en esta página
         </p>
         {loading ? (
           <p>Cargando propuestas…</p>
@@ -233,7 +234,8 @@ export function ClientEstimates({
         )}
       </section>
       <nav className="client-estimates__pagination" aria-label="Páginas de presupuestos"><Button small variant="ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button><span>Página {page + 1}</span><Button small variant="ghost" disabled={items.length < 20 || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>
-      <section className="client-estimates__section client-estimates__section--projects" aria-labelledby="client-projects">
+      </>}
+      {view === "projects" && <section className="client-estimates__section client-estimates__section--projects" aria-labelledby="client-projects">
         <div className="client-estimates__section-heading">
           <div>
             <p className="eyebrow">Ejecución y seguimiento</p>
@@ -253,7 +255,7 @@ export function ClientEstimates({
               className="private-action-card client-row client-project-card"
             >
               <div>
-                <span className="client-project-card__status">Obra en curso</span>
+                <span className="client-project-card__status">{projectStatus(project.estado)}</span>
                 <strong>{project.nombre}</strong>
                 <p>{project.direccion}</p>
                 <div className="client-project-card__progress" aria-label={`${project.progreso}% completado`}>
@@ -271,13 +273,9 @@ export function ClientEstimates({
             </article>
           ))
         ) : (
-          <p>
-            {hasSignedProposal
-              ? "Tu propuesta está firmada. La obra aparecerá aquí cuando Hogaria complete su alta como proyecto."
-              : "Cuando una propuesta firmada se convierta en obra, aparecerá aquí."}
-          </p>
+          <p>Cuando una propuesta firmada se convierta en obra, aparecerá aquí.</p>
         )}
-      </section>
+      </section>}
       <Modal
         open={selected !== null && !changeOpen}
         onClose={closeProposal}
@@ -387,6 +385,13 @@ export function ClientEstimates({
     </section>
   );
 }
+
+const projectStatus = (status: ProjectDTO["estado"]) => ({
+  planificacion: "En planificación",
+  en_curso: "Obra en curso",
+  pausado: "Obra pausada",
+  finalizado: "Obra finalizada",
+})[status];
 
 function ProposalCard({
   item,

@@ -43,6 +43,13 @@ export function userController(deps: {
       try { const body = req.body as { token?: string; password?: string }; await deps.activation.activate(body.token ?? "", body.password ?? ""); return { status: 204, body: null }; } catch (e) { return toHttpError(e); }
     },
 
+    async reactivate(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        const result = await deps.activation.invite(req.actorId, idOf(req.params.id), ctxOf(req));
+        return { status: result.sent ? 202 : 200, body: result };
+      } catch (e) { return toHttpError(e); }
+    },
+
     // PATCH /users/:id
     async update(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {

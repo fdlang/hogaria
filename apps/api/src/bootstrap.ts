@@ -237,7 +237,7 @@ export async function buildApp(): Promise<AppDependencies> {
     opportunities:              new OpportunityUseCases(users, opportunities, events, solicitudes),
     estimates:                  estimateCases,
     estimateDocuments: new EstimateDocumentUseCases(users,estimateCases,new PdfEstimateRenderer(),cooldown),
-    changes:                    new ChangeOrderUseCases(users, projects, changes, cooldown),
+    changes:                    new ChangeOrderUseCases(users, projects, changes, cooldown, events),
     catalog:                    new CatalogUseCases(users, catalog),
     activation,
     work: new WorkTrackingUseCases(users, projects, workStore),

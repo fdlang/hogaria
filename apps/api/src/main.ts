@@ -103,6 +103,7 @@ function getRuntime(): Promise<Runtime> {
   // Auth (public)
   route("POST", "/auth/login",  async req => auth.login(req)),
   route("GET",  "/auth/me",     async req => auth.me(req)),
+  route("POST", "/auth/logout", async req => auth.logout(req as never), { protected: true }),
   route("POST", "/auth/activate", async req => users.activate(req)),
 
   // Commercial pipeline: opportunity -> versioned estimate -> project.
@@ -137,6 +138,7 @@ function getRuntime(): Promise<Runtime> {
   route("GET",    "/users",        req => users.list(req   as never), { protected: true }),
   route("POST",   "/users",        req => users.create(req as never), { protected: true }),
   route("PATCH",  "/users/:id",    req => users.update(req as never), { protected: true }),
+  route("POST",   "/users/:id/reactivate", req => users.reactivate(req as never), { protected: true }),
   route("DELETE", "/users/:id",    req => users.delete(req as never), { protected: true }),
   route("GET", "/professionals/:id/documents", req => professionalDocuments.list(req as never), { protected: true }),
   route("POST", "/professionals/:id/documents", req => professionalDocuments.upload(req as never), { protected: true }),

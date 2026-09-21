@@ -37,7 +37,17 @@ export function AdminSolicitudes({ api }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [detail, setDetail]   = useState<SolicitudDTO | null>(null);
+  const [rejecting, setRejecting] = useState<SolicitudDTO | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
   const { push } = useNotifications();
+  const copyEmail = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      push("Email copiado", "success");
+    } catch {
+      push("No se pudo copiar el email. Selecciónalo manualmente.", "error");
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -55,17 +65,18 @@ export function AdminSolicitudes({ api }: Props) {
     finally { setUpdatingId(null); }
   };
 
-  const handleReject = async (s: SolicitudDTO) => {
-    const reason = prompt("Motivo de rechazo (quedará en el audit log):");
-    if (!reason) return;
+  const handleReject = async () => {
+    const s = rejecting;
+    const reason = rejectionReason.trim();
+    if (!s || reason.length < 3) return;
     if (updatingId !== null) return;
-    try { setUpdatingId(s.id); await api.reject(s.id, reason); push("Solicitud rechazada", "success"); await load(); }
+    try { setUpdatingId(s.id); await api.reject(s.id, reason); push("Solicitud rechazada", "success"); setRejecting(null); setRejectionReason(""); await load(); }
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
     finally { setUpdatingId(null); }
   };
 
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>;
-  if (error)   return <div role="alert" style={{ color: "#b5483f", padding: 20 }}>{error}</div>;
+  if (error)   return <div role="alert" style={{ color: "#b5483f", padding: 20 }}><p>{error}</p><Button small variant="ghost" onClick={() => void load()}>Reintentar</Button></div>;
 
   const pending = items.filter(i => i.estado === "pendiente");
 
@@ -101,8 +112,8 @@ export function AdminSolicitudes({ api }: Props) {
                   <Button small variant="ghost" onClick={() => setDetail(s)}>Ver</Button>
                   {s.estado === "pendiente" && (
                     <>
-                      <Button small disabled={updatingId !== null} loading={updatingId === s.id} onClick={() => handleContact(s)}>✓ Contactar</Button>
-                      <Button small disabled={updatingId !== null} variant="danger" onClick={() => handleReject(s)}>✕</Button>
+                      <Button small disabled={updatingId !== null} loading={updatingId === s.id} onClick={() => handleContact(s)}>✓ Marcar contactada</Button>
+                      <Button small disabled={updatingId !== null} variant="danger" aria-label={`Rechazar solicitud de ${s.nombre}`} onClick={() => { setRejecting(s); setRejectionReason(""); }}>✕</Button>
                     </>
                   )}
                 </div>
@@ -125,7 +136,7 @@ export function AdminSolicitudes({ api }: Props) {
             </form>}
             <dl style={{ display: "grid", gap: 10, fontSize: 13, marginBottom: 20 }}>
               <MetaRow k="Nombre"      v={detail.nombre} />
-              <MetaRow k="Email"       v={detail.email} copyable />
+              <MetaRow k="Email"       v={detail.email} onCopy={copyEmail} />
               <MetaRow k="Teléfono"   v={detail.telefono || "—"} />
               <MetaRow k="Tipo"        v={detail.tipo} />
               <MetaRow k="Recibida"    v={formatDateTime(detail.fecha)} />
@@ -140,17 +151,22 @@ export function AdminSolicitudes({ api }: Props) {
           </div>
         )}
       </Modal>
+      <Modal open={rejecting !== null} onClose={() => { if (updatingId === null) { setRejecting(null); setRejectionReason(""); } }} title="Rechazar solicitud" width={520}>
+        <p>Indica el motivo. Quedará registrado en el historial de actividad.</p>
+        <label style={{ display: "grid", gap: 6, marginTop: 14 }}>Motivo<textarea rows={4} value={rejectionReason} maxLength={500} onChange={event => setRejectionReason(event.target.value)} /></label>
+        <footer style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}><Button variant="ghost" disabled={updatingId !== null} onClick={() => { setRejecting(null); setRejectionReason(""); }}>Cancelar</Button><Button variant="danger" loading={updatingId !== null} disabled={rejectionReason.trim().length < 3} onClick={() => void handleReject()}>Rechazar</Button></footer>
+      </Modal>
     </section>
   );
 }
 
-function MetaRow({ k, v, copyable }: { k: string; v: string; copyable?: boolean }) {
+function MetaRow({ k, v, onCopy }: { k: string; v: string; onCopy?: (value: string) => Promise<void> }) {
   return (
     <div className="solicitud-meta-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 6, borderBottom: "1px solid #decdb8" }}>
       <dt style={{ color: "#71685e" }}>{k}</dt>
       <dd style={{ color: "#302d29", fontWeight: 600, display: "flex", alignItems: "center", gap: 6, minWidth: 0, overflowWrap: "anywhere" }}>
         {v}
-        {copyable && <button onClick={() => navigator.clipboard.writeText(v)} style={{ background: "none", border: "none", color: "#c17248", cursor: "pointer", fontSize: 12 }}>📋</button>}
+        {onCopy && <button type="button" aria-label={`Copiar ${k.toLowerCase()}`} onClick={() => void onCopy(v)} style={{ background: "none", border: "none", color: "#c17248", cursor: "pointer", fontSize: 12 }}>📋</button>}
       </dd>
     </div>
   );

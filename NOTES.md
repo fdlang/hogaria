@@ -1,13 +1,14 @@
-- Estado: ciclo de usuarios y zona de profesionales corregidos y validados.
-- Alta: invitación automática única; eliminado el reenvío manual.
-- Identidad: email único sin distinguir mayúsculas/minúsculas.
-- Estados: activación pendiente, activo y archivado diferenciados.
-- Migración: conserva el usuario canónico y archiva duplicados heredados.
-- Profesionales: archivados ocultos en la vista operativa.
-- Documentos: carga, listado, descarga y borrado privados para administración.
-- Separación: documentos laborales fuera de los archivos técnicos de obra.
-- Seguridad: clientes y profesionales no acceden a documentos laborales.
-- Validación: dominio 7, API 166 y web 47 pruebas correctas.
-- Navegador: 80 escenarios correctos en Chromium y WebKit.
-- Typecheck y builds de API/web correctos; dominio no define script build.
-- Pendiente despliegue: ejecutar migración mediante el flujo autorizado de producción.
+- Estado: corrección de la auditoría UX privada validada.
+- Acceso: logout revoca sesiones del servidor y la caducidad redirige con explicación.
+- Cuentas: reactivación segura y reenvío solo cuando no existe enlace vigente.
+- Invitaciones: errores de correo accionables; token retirado de la URL tras leerlo.
+- Cliente: Mis obras y Presupuestos son vistas distintas; estados y contadores corregidos.
+- Economía: el importe de obra se presenta como Base imponible; total con IVA pendiente de validar por gestor.
+- Accesibilidad: firma operable con teclado y controles críticos etiquetados.
+- Recuperación: reintentos en proyectos, profesionales, documentos y actividad.
+- Operativa: rechazo de solicitudes mediante modal y acciones con textos precisos.
+- API: identificadores, páginas y fechas se validan antes de persistencia.
+- Notificaciones: publicar una orden de cambio activa el procesado inmediato.
+- Validación: 243 pruebas unitarias, 108 de navegador, typecheck y build correctos.
+- Pendiente: cola operativa para reintentar borrados de Blob marcados como deleting.
+- Pendiente: paginación server-side de listados administrativos al crecer el volumen.

@@ -5,7 +5,8 @@ import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword } from "@reformap
 
 export interface ActivationToken { userId: number; tokenHash: string; expiresAt: Date; usedAt: Date | null; }
 export interface IActivationTokenRepository {
-  hasIssued(userId: number): Promise<boolean>;
+  /** Atomically reserve one current invitation per user. */
+  reserve(token: ActivationToken, now: Date): Promise<boolean>;
   stage(token: ActivationToken): Promise<void>;
   promote(userId: number, tokenHash: string): Promise<void>;
   discard(tokenHash: string): Promise<void>;
@@ -38,11 +39,17 @@ export class AccountActivationUseCases {
     const user = await this.users.findById(userId);
     if (!user) throw new ValidationError("La cuenta no existe", "userId");
     if (user.activo) throw new ConflictError("La cuenta ya está activada");
-    if (await this.tokens.hasIssued(user.id)) throw new ConflictError("La invitación de acceso ya fue enviada al crear la cuenta");
+    const reactivating = user.accountStatus === "archived";
     const token = newToken(); const expiresAt = new Date(Date.now() + this.ttlMs); const hash = await tokenHash(token);
-    await this.tokens.stage({ userId: user.id, tokenHash: hash, expiresAt, usedAt: null });
     const activationUrl = `${this.appUrl.replace(/\/$/, "")}/#/activar-cuenta?token=${encodeURIComponent(token)}`;
     try {
+      const reserved = await this.tokens.reserve({ userId: user.id, tokenHash: hash, expiresAt, usedAt: null }, new Date());
+      if (!reserved) {
+        return { sent: false as const, status: "existing_or_in_progress" as const, email: user.email.value, requestedBy: context.ip };
+      }
+      // Only the reservation winner changes the archived account. Doing this
+      // before delivery prevents a fast activation from being overwritten.
+      if (reactivating) await this.users.update(user.id, { accountStatus: "pending_activation" });
       await this.email.sendActivation({ to: user.email.value, name: user.nombre, activationUrl, expiresAt });
     } catch (error) {
       await this.tokens.discard(hash).catch(() => undefined);
@@ -51,7 +58,7 @@ export class AccountActivationUseCases {
     // Once the email has been delivered, never fail the request or discard its
     // token. A staged token is already valid; promotion only retires older links.
     await this.tokens.promote(user.id, hash).catch(() => undefined);
-    return { expiresAt, email: user.email.value, requestedBy: context.ip };
+    return { sent: true as const, status: "sent" as const, expiresAt, email: user.email.value, requestedBy: context.ip };
   }
   async activate(token: string, password: string) {
     if (typeof token !== "string" || token.length < 40 || token.length > 200) throw new ValidationError("Enlace de activación no válido", "token");

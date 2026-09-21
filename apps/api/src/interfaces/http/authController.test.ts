@@ -17,6 +17,18 @@ describe("authController", () => {
     expect((login.body as { user: { email: string } }).user.email).toBe(user.email.value);
     expect((session.body as { email: string }).email).toBe(user.email.value);
   });
+
+  it("revokes the current account sessions on logout", async () => {
+    let revoked = 0;
+    const controller = authController({
+      loginUseCase: {} as never,
+      users: { revokeSessions: async (id: number) => { revoked = id; } } as never,
+      tokens: {} as never,
+    });
+    const response = await controller.logout({ actorId: user.id, body: null, headers: {}, ip: "127.0.0.1" });
+    expect(response.status).toBe(204);
+    expect(revoked).toBe(user.id);
+  });
 });
 
 describe("requireAuth", () => {

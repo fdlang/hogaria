@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState } from "react";
 import { Button } from "@/shared/ui";
 
 interface Props { onChange?: (dataUrl: string) => void; width?: number; height?: number; disabled?: boolean; }
@@ -10,6 +10,8 @@ export const SignatureCanvas = forwardRef<SignatureCanvasHandle, Props>(function
   const [drawing, setDrawing] = useState(false);
   const [hasContent, setHasContent] = useState(false);
   const [width, setWidth] = useState(requestedWidth);
+  const instructionsId = useId();
+  const keyboardPoint = useRef({ x: requestedWidth / 2, y: height / 2 });
 
   useEffect(() => {
     const element = wrapperRef.current; if (!element) return;
@@ -22,17 +24,32 @@ export const SignatureCanvas = forwardRef<SignatureCanvasHandle, Props>(function
     canvas.width = width * ratio; canvas.height = height * ratio;
     const context = canvas.getContext("2d"); if (!context) return;
     context.scale(ratio, ratio); context.lineWidth = 2; context.lineCap = "round"; context.lineJoin = "round"; context.strokeStyle = "#302d29";
-  }, [width, height]);
-  const clear = () => { const canvas = canvasRef.current; const context = canvas?.getContext("2d"); if (canvas && context) context.clearRect(0, 0, canvas.width, canvas.height); setHasContent(false); onChange?.(""); };
+    keyboardPoint.current = { x: width / 2, y: height / 2 };
+    setHasContent(false); onChange?.("");
+  }, [width, height, onChange]);
+  const clear = () => { const canvas = canvasRef.current; const context = canvas?.getContext("2d"); if (canvas && context) context.clearRect(0, 0, canvas.width, canvas.height); keyboardPoint.current = { x: width / 2, y: height / 2 }; setHasContent(false); onChange?.(""); };
   useImperativeHandle(ref, () => ({ clear, getData: () => canvasRef.current?.toDataURL("image/png") ?? "", isEmpty: () => !hasContent }), [hasContent]);
   const position = (event: React.PointerEvent<HTMLCanvasElement>) => { const rect = event.currentTarget.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; };
   const start = (event: React.PointerEvent<HTMLCanvasElement>) => { if (disabled) return; event.currentTarget.setPointerCapture(event.pointerId); const context = canvasRef.current?.getContext("2d"); if (!context) return; const point = position(event); context.beginPath(); context.moveTo(point.x, point.y); setDrawing(true); };
   const move = (event: React.PointerEvent<HTMLCanvasElement>) => { if (!drawing || disabled) return; const context = canvasRef.current?.getContext("2d"); if (!context) return; const point = position(event); context.lineTo(point.x, point.y); context.stroke(); };
   const finish = () => { if (!drawing) return; setDrawing(false); setHasContent(true); onChange?.(canvasRef.current?.toDataURL("image/png") ?? ""); };
+  const drawWithKeyboard = (event: React.KeyboardEvent<HTMLCanvasElement>) => {
+    if (disabled || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+    event.preventDefault();
+    const canvas = canvasRef.current; const context = canvas?.getContext("2d"); if (!canvas || !context) return;
+    const from = keyboardPoint.current;
+    const step = event.shiftKey ? 12 : 4;
+    const next = {
+      x: Math.max(0, Math.min(width, from.x + (event.key === "ArrowRight" ? step : event.key === "ArrowLeft" ? -step : 0))),
+      y: Math.max(0, Math.min(height, from.y + (event.key === "ArrowDown" ? step : event.key === "ArrowUp" ? -step : 0))),
+    };
+    context.beginPath(); context.moveTo(from.x, from.y); context.lineTo(next.x, next.y); context.stroke();
+    keyboardPoint.current = next; setHasContent(true); onChange?.(canvas.toDataURL("image/png"));
+  };
 
   return <div ref={wrapperRef} style={{ width: "100%" }}>
-    <canvas ref={canvasRef} aria-label="Firma manuscrita" onPointerDown={start} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish} style={{ display:"block", width:"100%", height, background:"#fffaf4", border:"1px dashed #d8c4ad", borderRadius:8, cursor:disabled ? "not-allowed" : "crosshair", touchAction:"none", opacity:disabled ? .5 : 1 }} />
-    <p style={{ margin:"6px 0", color:"#71685e", fontSize:12 }}>Dibuja tu firma con el dedo, lápiz o ratón.</p>
+    <canvas ref={canvasRef} tabIndex={disabled ? -1 : 0} aria-label="Firma manuscrita" aria-describedby={instructionsId} onKeyDown={drawWithKeyboard} onPointerDown={start} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish} style={{ display:"block", width:"100%", height, background:"#fffaf4", border:"1px dashed #d8c4ad", borderRadius:8, cursor:disabled ? "not-allowed" : "crosshair", touchAction:"none", opacity:disabled ? .5 : 1 }} />
+    <p id={instructionsId} style={{ margin:"6px 0", color:"#71685e", fontSize:12 }}>Dibuja con el dedo, lápiz o ratón. Con teclado, usa las flechas; mantén Mayús para trazos largos.</p>
     <div style={{ display:"flex", justifyContent:"flex-end" }}><Button small variant="ghost" onClick={clear} disabled={disabled || !hasContent}>Borrar firma</Button></div>
   </div>;
 });

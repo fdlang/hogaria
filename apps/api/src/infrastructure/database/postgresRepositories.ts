@@ -52,6 +52,10 @@ export class PostgresUserRepository implements IUserRepository {
   async delete(id: number) { await this.pool.query("DELETE FROM users WHERE id=$1", [id]); }
   async verifyPassword(email: string, plaintext: string) { const r = await this.pool.query("SELECT * FROM users WHERE lower(email)=lower($1)", [email]); if (!r.rows[0] || !(await this.hasher.verify(plaintext, r.rows[0].password_hash))) return null; return this.map(r.rows[0]); }
   async updatePassword(id: number, hash: string) { await this.update(id, {}, hash); }
+  async revokeSessions(id: number) {
+    const result = await this.pool.query("UPDATE users SET session_version=session_version+1 WHERE id=$1 RETURNING id", [id]);
+    if (!result.rows[0]) throw new NotFoundError("Usuario");
+  }
 }
 
 export class PostgresProjectRepository implements IProjectRepository {

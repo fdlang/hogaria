@@ -125,7 +125,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
 
   if (project.loading) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>;
   if (project.error || !project.data) {
-    return <div role="alert" style={{ color: "#b5483f", padding: 20 }}>{project.error ?? "Proyecto no encontrado"}</div>;
+    return <div role="alert" style={{ color: "#b5483f", padding: 20 }}><p>{project.error ?? "Proyecto no encontrado"}</p><div style={{ display: "flex", gap: 8, marginTop: 12 }}><Button small onClick={() => void project.refresh()}>Reintentar</Button><Button small variant="ghost" onClick={onBack}>Volver</Button></div></div>;
   }
 
   const p = project.data;
@@ -179,7 +179,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                 </>
               ) : (
                 <div className="project-progress-editor" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <input type="range" min="0" max="100" value={editingProgress}
+                  <input type="range" aria-label="Porcentaje de progreso de la obra" min="0" max="100" value={editingProgress}
                     onChange={e => setEditingProgress(parseInt(e.target.value, 10))}
                     style={{ flex: 1 }} />
                   <strong style={{ minWidth: 50, textAlign: "right", color: "#c17248" }}>{editingProgress}%</strong>
@@ -199,7 +199,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                   {p.hitos.map(h => (
                     <li className="project-milestone-item" key={h.id}
                       style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, background: h.completado ? "#34d39908" : "#fffaf4", border: `1px solid ${h.completado ? "#34d399" : "#d8c4ad"}`, borderRadius: 8 }}>
-                      <input type="checkbox" checked={h.completado} disabled={!canEditMilestones || projectSaving}
+                      <input type="checkbox" aria-label={`${h.completado ? "Marcar pendiente" : "Marcar completado"}: ${h.nombre}`} checked={h.completado} disabled={!canEditMilestones || projectSaving}
                         onChange={() => handleMilestoneToggle(h.id)}
                         style={{ cursor: canEditMilestones ? "pointer" : "not-allowed" }} />
                       <div style={{ flex: 1 }}>
@@ -249,7 +249,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           <div className="project-detail__aside-card" style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, marginBottom: 14 }}>
             <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Detalles</h3>
             <dl style={{ display: "grid", gap: 10, fontSize: 12 }}>
-              {(isAdmin || isCliente) && p.presupuesto !== undefined && <Meta k="Presupuesto" v={formatMoney(p.presupuesto)} />}
+              {(isAdmin || isCliente) && p.presupuesto !== undefined && <Meta k="Base imponible" v={formatMoney(p.presupuesto)} />}
               <Meta k="Fecha inicio"      v={formatDate(p.fechaInicio)} />
               <Meta k="Entrega prevista"  v={formatDate(p.fechaFinPrevista)} />
               <Meta k="Tipo"               v={p.tipo} />
@@ -297,10 +297,11 @@ function Meta({ k, v }: { k: string; v: string }) {
 }
 
 function FileUploadButton({ onUpload, canMarkSensitive }: {
-  onUpload: (file: File, sensitive: boolean, classification: "publico" | "tecnico" | "contrato" | "factura" | "reservado") => void;
+  onUpload: (file: File, sensitive: boolean, classification: "publico" | "tecnico" | "contrato" | "factura" | "reservado") => Promise<void>;
   canMarkSensitive: boolean;
 }) {
   const [classification, setClassification] = useState<"publico" | "tecnico" | "contrato" | "factura" | "reservado">("publico");
+  const [uploading, setUploading] = useState(false);
   return (
     <div className="file-upload-controls" style={{ display: "flex", alignItems: "center", gap: 10 }}>
       {canMarkSensitive && (
@@ -311,12 +312,16 @@ function FileUploadButton({ onUpload, canMarkSensitive }: {
           </select>
         </label>
       )}
-      <label style={{ cursor: "pointer", padding: "6px 12px", fontSize: 12, fontWeight: 600, background: "#c17248", color: "#302d29", borderRadius: 6 }}>
-        + Subir archivo
-        <input type="file" style={{ display: "none" }}
-          onChange={e => {
+      <label style={{ position: "relative", overflow: "hidden", cursor: uploading ? "wait" : "pointer", padding: "6px 12px", fontSize: 12, fontWeight: 600, background: "#c17248", color: "#302d29", borderRadius: 6 }}>
+        {uploading ? "Subiendo…" : "+ Subir archivo"}
+        <input type="file" aria-label="Seleccionar archivo para subir" disabled={uploading} style={{ position: "absolute", inset: 0, opacity: 0, cursor: uploading ? "wait" : "pointer" }}
+          onChange={async e => {
             const file = e.target.files?.[0];
-            if (file) onUpload(file, ["contrato", "factura", "reservado"].includes(classification), classification);
+            if (file) {
+              setUploading(true);
+              try { await onUpload(file, ["contrato", "factura", "reservado"].includes(classification), classification); }
+              finally { setUploading(false); }
+            }
             e.target.value = "";
           }} />
       </label>

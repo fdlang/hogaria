@@ -1,6 +1,7 @@
 import type { CatalogUseCases } from "../../application/use-cases/catalog.use-cases.js";
 import { toHttpError } from "./errorMiddleware.js";
 import type { HttpRequest, HttpResponse } from "./authController.js";
+import { positiveId } from "./requestValidation.js";
 
 export function catalogController(deps: { catalog: CatalogUseCases }) {
   return {
@@ -13,8 +14,8 @@ export function catalogController(deps: { catalog: CatalogUseCases }) {
       }
     },
     async create(req: HttpRequest & { actorId: number }): Promise<HttpResponse> { try { return { status: 201, body: dto(await deps.catalog.create(req.actorId, req.body as never)) }; } catch (error) { return toHttpError(error); } },
-    async update(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> { try { return { status: 200, body: dto(await deps.catalog.update(req.actorId, Number(req.params.id), req.body as never)) }; } catch (error) { return toHttpError(error); } },
-    async archive(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> { try { return { status: 200, body: dto(await deps.catalog.archive(req.actorId, Number(req.params.id))) }; } catch (error) { return toHttpError(error); } },
+    async update(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> { try { return { status: 200, body: dto(await deps.catalog.update(req.actorId, positiveId(req.params.id), req.body as never)) }; } catch (error) { return toHttpError(error); } },
+    async archive(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> { try { return { status: 200, body: dto(await deps.catalog.archive(req.actorId, positiveId(req.params.id))) }; } catch (error) { return toHttpError(error); } },
   };
 }
 

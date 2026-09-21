@@ -15,6 +15,7 @@ export const BUSINESS_ACTIONS = [
   "PROYECTO_ACTUALIZADO",
   "PROYECTO_FINALIZADO",
   "ARCHIVO_SUBIDO",
+  "ORDEN_CAMBIO_PUBLICADA",
 ] as const;
 
 const TITLES: Record<string, string> = {
@@ -32,6 +33,7 @@ const TITLES: Record<string, string> = {
   PROYECTO_ACTUALIZADO: "Proyecto actualizado",
   PROYECTO_FINALIZADO: "Proyecto finalizado",
   ARCHIVO_SUBIDO: "Documento añadido",
+  ORDEN_CAMBIO_PUBLICADA: "Orden de cambio publicada",
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -103,6 +105,7 @@ export function auditDescription(entry: AuditEntryDTO) {
     }
     case "PROYECTO_FINALIZADO": return `Se marcó como finalizado ${reference(details, "projectId", "el proyecto")}.`;
     case "ARCHIVO_SUBIDO": return `Se añadió un documento a ${reference(details, "projectId", "el proyecto")}.`;
+    case "ORDEN_CAMBIO_PUBLICADA": return `Se publicó ${reference(details, "changeOrderId", "una orden de cambio")} para ${reference(details, "projectId", "el proyecto")}.`;
     default: return technicalDescription(entry);
   }
 }

@@ -51,6 +51,13 @@ export function authController(deps: {
         return { status: 200, body: toUserDTO(user) };
       } catch (e) { const { status, body } = toHttpError(e); return { status, body }; }
     },
+
+    async logout(req: HttpRequest & { actorId: number }): Promise<HttpResponse> {
+      try {
+        await deps.users.revokeSessions(req.actorId);
+        return { status: 204, body: null };
+      } catch (e) { const { status, body } = toHttpError(e); return { status, body }; }
+    },
   };
 }
 

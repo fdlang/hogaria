@@ -28,7 +28,10 @@ import { ErrorBoundary } from "@/shared/ui/error-boundary";
 let authStore: AuthStore;
 const api = new ApiClient({
   baseUrl: import.meta.env.VITE_API_URL ?? "/api",
-  onUnauthorized: () => authStore?.signOut(),
+  onUnauthorized: () => {
+    authStore?.expireSession();
+    window.location.hash = "#/login";
+  },
 });
 
 // 2) Auth store — owns session state

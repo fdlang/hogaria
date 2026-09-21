@@ -61,5 +61,6 @@ export function useAuditLog(api: AuditApi, initialQuery: AuditQuery = {}) {
   const nextPage = useCallback(() => setQuery(q => ({ ...q, page: (q.page ?? 0) + 1 })), []);
   const prevPage = useCallback(() => setQuery(q => ({ ...q, page: Math.max(0, (q.page ?? 0) - 1) })), []);
 
-  return { page, loading, error, query, setFilter, nextPage, prevPage };
+  const refresh = useCallback(() => fetchPage(query), [fetchPage, query]);
+  return { page, loading, error, query, setFilter, nextPage, prevPage, refresh };
 }

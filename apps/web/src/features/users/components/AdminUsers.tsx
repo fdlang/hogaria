@@ -40,6 +40,7 @@ export function AdminUsers({ api }: Props) {
   const [filterRol, setFilterRol] = useState<UserDTO["rol"] | "all">("all");
   const [filterStatus, setFilterStatus] = useState<AccountStatus | "current" | "all">("current");
   const [search, setSearch] = useState("");
+  const [reactivatingId, setReactivatingId] = useState<number | null>(null);
 
   const filtered = useMemo(() => {
     return (users.data ?? []).filter(u => {
@@ -68,6 +69,24 @@ export function AdminUsers({ api }: Props) {
       push("Usuario archivado. Puedes recuperarlo desde el filtro Archivados.", "success");
       users.refresh();
     } catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
+  };
+
+  const handleReactivate = async (user: UserDTO) => {
+    if (reactivatingId !== null) return;
+    const isPending = accountStatusOf(user) === "pending_activation";
+    const ok = await confirm({
+      title: isPending ? "Reenviar acceso" : "Reactivar acceso",
+      message: <>Se enviará un nuevo enlace de un solo uso a <strong>{user.email}</strong> únicamente si el anterior ya ha caducado.</>,
+      confirmLabel: "Enviar acceso",
+    });
+    if (!ok) return;
+    try {
+      setReactivatingId(user.id);
+      const result = await api.reactivate(user.id);
+      push(result.sent ? (isPending ? "Nuevo enlace de acceso enviado" : "Enlace de reactivación enviado") : "Ya existe un envío en curso o un enlace de acceso vigente", result.sent ? "success" : "info");
+      users.refresh();
+    } catch (e) { push((e as { message?: string }).message ?? "No se pudo enviar el acceso", "error"); }
+    finally { setReactivatingId(null); }
   };
 
   const columns: ColumnDef<UserDTO>[] = [
@@ -100,7 +119,7 @@ export function AdminUsers({ api }: Props) {
         subtitle={`${users.data?.length ?? 0} usuarios · ${(users.data ?? []).filter(u => u.activo).length} activos`}
         actions={
           <>
-            <Button small variant="ghost" onClick={users.refresh}>↻</Button>
+            <Button small variant="ghost" aria-label="Actualizar usuarios" onClick={users.refresh}>↻</Button>
             {can("user.manage") && <Button small onClick={() => setModal({ kind: "create" })}>+ Nuevo usuario</Button>}
           </>
         }
@@ -137,7 +156,9 @@ export function AdminUsers({ api }: Props) {
         actions={u => (
           <div style={{ display: "flex", gap: 6 }}>
             {can("user.manage") && <Button small variant="ghost" onClick={() => setModal({ kind: "edit", user: u })}>Editar</Button>}
-            {can("user.manage") && u.activo && <Button small variant="danger" onClick={() => handleDelete(u)}>✕</Button>}
+            {can("user.manage") && accountStatusOf(u) === "pending_activation" && <Button small loading={reactivatingId === u.id} disabled={reactivatingId !== null} onClick={() => void handleReactivate(u)}>Reenviar acceso</Button>}
+            {can("user.manage") && accountStatusOf(u) === "archived" && <Button small loading={reactivatingId === u.id} disabled={reactivatingId !== null} onClick={() => void handleReactivate(u)}>Reactivar</Button>}
+            {can("user.manage") && u.activo && <Button small variant="danger" aria-label={`Archivar a ${u.nombre}`} onClick={() => handleDelete(u)}>✕</Button>}
           </div>
         )}
       />
@@ -211,7 +232,7 @@ function UserFormView({ api, initialUser, onSaved, onCancel }: {
       )}
 
       <Input label="Teléfono (opcional)"
-        value={form.state.telefono ?? ""}
+        value={form.state.telefono ?? ""} error={form.errors.telefono}
         onChange={e => form.setField("telefono", e.target.value)} />
 
       {initialUser && (

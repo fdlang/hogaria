@@ -26,7 +26,7 @@ export function AdminProfesionales({ apis }: Props) {
   }, [projects.data]);
 
   if (users.loading || projects.loading) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>;
-  if (users.error || projects.error) return <div role="alert" style={{ color: "#b5483f", padding: 20 }}>{users.error ?? projects.error}</div>;
+  if (users.error || projects.error) return <div role="alert" style={{ color: "#b5483f", padding: 20 }}><p>{users.error ?? projects.error}</p><Button small variant="ghost" onClick={() => { void users.refresh(); void projects.refresh(); }}>Reintentar</Button></div>;
   const userList = (users.data ?? []).filter(user => accountStatusOf(user) !== "archived");
   const totalAssignments = (projects.data ?? []).reduce((total, project) => total + (project.profesionalesAsignados ?? []).length, 0);
 
@@ -66,18 +66,21 @@ function ProfessionalDocumentsModal({ api, professional, onClose }: { api: Users
   const inputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<ProfessionalDocumentDTO[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!professional) { setDocuments([]); return; }
     let active = true;
     setLoading(true);
+    setLoadError("");
     api.listProfessionalDocuments(professional.id)
       .then(items => { if (active) setDocuments(items); })
-      .catch(error => { if (active) push((error as { message?: string }).message ?? "No se pudo cargar la documentación", "error"); })
+      .catch(error => { if (active) { const message = (error as { message?: string }).message ?? "No se pudo cargar la documentación"; setLoadError(message); push(message, "error"); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [api, professional, push]);
+  }, [api, professional, push, reloadKey]);
 
   const upload = async (file: File | undefined) => {
     if (!professional || !file) return;
@@ -100,7 +103,7 @@ function ProfessionalDocumentsModal({ api, professional, onClose }: { api: Users
     <p style={{ color: "#71685e", fontSize: 13, marginBottom: 16 }}>Documentación interna del profesional. Solo es accesible para administración.</p>
     <input ref={inputRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif" hidden onChange={event => void upload(event.target.files?.[0])} />
     <Button small loading={uploading} disabled={uploading} onClick={() => inputRef.current?.click()}>+ Subir documentación</Button>
-    {loading ? <div style={{ padding: 24, textAlign: "center" }}><Spinner size={24} /></div> : documents.length === 0 ? <p style={{ padding: "24px 0", color: "#71685e" }}>No hay documentos guardados.</p> : <ul style={{ listStyle: "none", padding: 0, marginTop: 18, display: "grid", gap: 8 }}>
+    {loading ? <div style={{ padding: 24, textAlign: "center" }}><Spinner size={24} /></div> : loadError ? <div role="alert" style={{ padding: "24px 0", color: "#b5483f" }}><p>{loadError}</p><Button small variant="ghost" onClick={() => setReloadKey(value => value + 1)}>Reintentar</Button></div> : documents.length === 0 ? <p style={{ padding: "24px 0", color: "#71685e" }}>No hay documentos guardados.</p> : <ul style={{ listStyle: "none", padding: 0, marginTop: 18, display: "grid", gap: 8 }}>
       {documents.map(document => <li key={document.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: 10, border: "1px solid #d8c4ad", borderRadius: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}><strong style={{ display: "block", overflowWrap: "anywhere" }}>{document.nombre}</strong><span style={{ color: "#71685e", fontSize: 12 }}>{formatDate(document.uploadedAt)} · {(document.tamano / 1024).toFixed(0)} KB</span></div>
         <Button small variant="ghost" onClick={() => void download(document)}>Descargar</Button><Button small variant="danger" onClick={() => void remove(document)}>Eliminar</Button>

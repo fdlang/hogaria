@@ -36,7 +36,7 @@ export function ProfesionalDashboard({ apis, onOpenProject, onOpenWork }: Props)
   }, [projects.data]);
 
   if (projects.loading) return <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner size={32} /></div>;
-  if (projects.error)   return <div role="alert" style={{ color: "#b5483f", padding: 20 }}>{projects.error}</div>;
+  if (projects.error)   return <div role="alert" style={{ color: "#b5483f", padding: 20 }}><p>{projects.error}</p><Button small variant="ghost" onClick={() => void projects.refresh()}>Reintentar</Button></div>;
 
   const proj = projects.data ?? [];
 
@@ -76,8 +76,8 @@ export function ProfesionalDashboard({ apis, onOpenProject, onOpenWork }: Props)
             {proj.map(p => {
               const pendingMilestones = p.hitos.filter(h => !h.completado).length;
               return (
-                <button className="private-project-card" key={p.id} role="listitem" onClick={() => onOpenProject(p.id)}
-                  style={{ textAlign: "left", padding: 16, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 10, cursor: "pointer" }}>
+                <div key={p.id} role="listitem"><button className="private-project-card" onClick={() => onOpenProject(p.id)}
+                  style={{ width: "100%", textAlign: "left", padding: 16, background: "#fffaf4", border: "1px solid #d8c4ad", borderRadius: 10, cursor: "pointer" }}>
                   <div className="private-project-card__header" style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 600, color: "#302d29" }}>{p.nombre}</h3>
                     <div style={{ display: "flex", gap: 6 }}>
@@ -89,7 +89,7 @@ export function ProfesionalDashboard({ apis, onOpenProject, onOpenWork }: Props)
                     {p.direccion} · {p.progreso}% · entrega {formatDate(p.fechaFinPrevista)}
                     {pendingMilestones > 0 && ` · ${pendingMilestones} hitos pendientes`}
                   </p>
-                </button>
+                </button></div>
               );
             })}
           </div>

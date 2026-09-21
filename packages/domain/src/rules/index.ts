@@ -40,8 +40,8 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/file.use-cases.ts"], tests: ["apps/api/src/application/use-cases/audit-regressions.test.ts", "apps/api/src/application/use-cases/security-regressions.test.ts"],
   },
   {
-    id: "HOG-SEC-003", description: "El alta envía una única invitación automática, de un solo uso y sin transportar contraseñas.", origin: "security", owner: "seguridad",
-    assumption: "El correo es el canal de incorporación verificado para clientes y profesionales.", validScale: "Altas ocasionales; requiere cola duradera al crecer el volumen de invitaciones.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
+    id: "HOG-SEC-003", description: "El alta envía una única invitación automática, de un solo uso; solo se reenvía tras caducar o al reactivar.", origin: "security", owner: "seguridad",
+    assumption: "El correo es el canal de incorporación verificado y cada cuenta mantiene como máximo una invitación vigente.", validScale: "Altas ocasionales; requiere cola duradera al crecer el volumen de invitaciones.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("activation_expiry_rate", "Invitaciones caducadas sin activación", "database"), metric("duplicate_identity_attempt_rate", "Altas duplicadas bloqueadas")],
     implementation: ["apps/api/src/application/use-cases/account-activation.use-cases.ts", "apps/api/src/infrastructure/database/activationTokenRepositories.ts"], tests: ["apps/api/src/application/use-cases/account-activation.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
   },
@@ -152,7 +152,7 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/notifications/client-notifications.ts", "apps/api/database/notification-outbox.sql"], tests: ["apps/api/src/application/notifications/client-notifications.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
   },
   {
-    id: "HOG-SEC-004", description: "Los cambios de contraseña, rol o activación revocan todas las sesiones emitidas anteriormente.", origin: "security", owner: "seguridad",
+    id: "HOG-SEC-004", description: "Cerrar sesión o cambiar contraseña, rol o activación revoca todas las sesiones emitidas anteriormente.", origin: "security", owner: "seguridad",
     assumption: "Un contador de sesión por usuario permite revocación inmediata sin almacenar cada token.", validScale: "Una empresa y miles de sesiones; MFA administrativo queda como control adicional antes de ampliar privilegios.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("session_revocation_count", "Sesiones invalidadas por cambios sensibles", "audit_log"), metric("revoked_token_attempt_rate", "Intentos con versiones de sesión antiguas")],
     implementation: ["apps/api/src/application/use-cases/auth.use-cases.ts", "apps/api/src/interfaces/http/authController.ts", "apps/api/src/infrastructure/database/activationTokenRepositories.ts", "apps/api/database/schema.sql"], tests: ["apps/api/src/interfaces/http/authController.test.ts", "apps/api/src/application/use-cases/account-activation.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],

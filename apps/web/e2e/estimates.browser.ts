@@ -90,9 +90,10 @@ for (const width of [320, 390, 768, 1440]) {
   test(`client dashboard keeps its editorial layout at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await fixture(page, "cliente");
+    await page.goto("/cliente");
     await expect(page.getByRole("heading", { name: "Tu proyecto con Hogaria" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Propuestas" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Mis proyectos" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Propuestas" })).toBeHidden();
     const hero = await page.locator(".client-estimates__hero").boundingBox();
     const firstSection = await page.locator(".client-estimates__section").first().boundingBox();
     const logoLocator = page.locator(".client-estimates__brand-logo");
@@ -112,12 +113,19 @@ for (const width of [320, 390, 768, 1440]) {
     ).toBe(true);
   });
 }
+test("client navigation separates projects from budgets", async ({ page }) => {
+  await fixture(page, "cliente");
+  await page.goto("/cliente/budgets");
+  await expect(page.getByRole("heading", { name: "Presupuestos", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Propuestas" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Mis proyectos" })).toBeHidden();
+});
 test("client opens an assigned project with an explicit button", async ({ page }) => {
   await fixture(page, "cliente");
   await page.route("**/api/projects", route => route.fulfill({
     json: [{ id: 7, nombre: "Reforma cocina", direccion: "Madrid", progreso: 35 }],
   }));
-  await page.reload();
+  await page.goto("/cliente");
   const openProject = page.getByRole("button", { name: "Ver obra" });
   await expect(openProject).toBeVisible();
   await openProject.click();

@@ -71,7 +71,7 @@ export function AdminActivity({ api }: Props) {
       {log.loading ? (
         <div className="audit-page__loading"><Spinner size={32} /></div>
       ) : log.error ? (
-        <div role="alert" className="audit-page__error">{log.error}</div>
+        <div role="alert" className="audit-page__error"><p>{log.error}</p><Button small variant="ghost" onClick={() => void log.refresh()}>Reintentar</Button></div>
       ) : !log.page || visibleEntries.length === 0 ? (
         <EmptyState
           icon="◎"
@@ -85,14 +85,14 @@ export function AdminActivity({ api }: Props) {
               <ActivityEntry key={entry.id} entry={entry} continued={index < visibleEntries.length - 1} />
             ))}
           </ul>
-          {log.page.pages > 1 && (
-            <nav className="audit-pagination" aria-label="Páginas del historial">
-              <Button small variant="ghost" onClick={log.prevPage} disabled={log.page.page === 0}>Anterior</Button>
-              <span>Página {log.page.page + 1} de {log.page.pages}</span>
-              <Button small variant="ghost" onClick={log.nextPage} disabled={log.page.page >= log.page.pages - 1}>Siguiente</Button>
-            </nav>
-          )}
         </>
+      )}
+      {!log.loading && !log.error && log.page && log.page.pages > 1 && (
+        <nav className="audit-pagination" aria-label="Páginas del historial">
+          <Button small variant="ghost" onClick={log.prevPage} disabled={log.page.page === 0}>Anterior</Button>
+          <span>Página {log.page.page + 1} de {log.page.pages}</span>
+          <Button small variant="ghost" onClick={log.nextPage} disabled={log.page.page >= log.page.pages - 1}>Siguiente</Button>
+        </nav>
       )}
     </section>
   );

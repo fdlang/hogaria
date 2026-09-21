@@ -80,14 +80,26 @@ describe("AuthStore", () => {
     expect(store.getState()).toMatchObject({ status: "unauthenticated", user: null, token: null });
   });
 
-  it("clears the token and persisted data on sign out", () => {
+  it("revokes the server session and clears persisted data on sign out", async () => {
     const api = createApi();
     const storage = createStorage("token");
     const store = new AuthStore(api, storage);
 
-    store.signOut();
+    vi.mocked(api.get).mockResolvedValue(user);
+    await store.restore();
+    vi.mocked(api.post).mockResolvedValue(undefined);
+    await store.signOut();
+    expect(api.post).toHaveBeenCalledWith("/auth/logout", {});
     expect(api.setToken).toHaveBeenCalledWith(null);
     expect(storage.removeItem).toHaveBeenCalledWith("rp_token");
     expect(store.getState()).toMatchObject({ status: "unauthenticated", user: null, token: null });
+  });
+
+  it("explains an expired session instead of failing silently", () => {
+    const api = createApi();
+    const storage = createStorage("expired");
+    const store = new AuthStore(api, storage);
+    store.expireSession();
+    expect(store.getState()).toMatchObject({ status: "unauthenticated", user: null, error: expect.stringContaining("caducado") });
   });
 });

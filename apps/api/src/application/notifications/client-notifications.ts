@@ -32,6 +32,7 @@ const types: DomainEvent["type"][] = [
   "EstimateAccepted",
   "FileUploaded",
   "ProjectUpdated",
+  "ChangeOrderSent",
 ];
 export class ClientNotifications {
   constructor(

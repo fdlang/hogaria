@@ -86,7 +86,7 @@ export class InMemoryUserRepository implements IUserRepository {
 
   activateAccount(id: number, passwordHash: string): void {
     const user = this.users.find(user => user.id === id);
-    if (!user || !["cliente", "profesional"].includes(user.rol)) throw new NotFoundError("Invitación");
+    if (!user || !["admin", "cliente", "profesional"].includes(user.rol)) throw new NotFoundError("Invitación");
     user.passwordHash = passwordHash;
     user.activo = true;
     user.accountStatus = "active";
@@ -95,6 +95,12 @@ export class InMemoryUserRepository implements IUserRepository {
 
   async updatePassword(id: number, newPasswordHash: string): Promise<void> {
     await this.update(id, {}, newPasswordHash);
+  }
+
+  async revokeSessions(id: number): Promise<void> {
+    const user = this.users.find(user => user.id === id);
+    if (!user) throw new NotFoundError("Usuario");
+    user.sessionVersion = (user.sessionVersion ?? 0) + 1;
   }
 
   // Never return passwordHash externally

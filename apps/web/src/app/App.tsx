@@ -77,7 +77,7 @@ export function App({ apis }: { apis: AllApis }) {
     // Cliente
     { path: "#/cliente",               roles: ["cliente"],      element: <ClientDashboardRoute apis={apis} /> },
     { path: "#/cliente/projects/",     roles: ["cliente"],      element: <ClientProjectDetailRoute apis={apis} /> },
-    { path: "#/cliente/budgets",       roles: ["cliente"],      element: <ClientEstimates api={apis.sales} projectsApi={apis.projects} /> },
+    { path: "#/cliente/budgets",       roles: ["cliente"],      element: <ClientEstimates api={apis.sales} projectsApi={apis.projects} view="budgets" /> },
 
     // Profesional
     { path: "#/profesional/work", roles: ["profesional"], element: <WorkPage api={apis.work} projects={apis.projects} users={apis.users}/> },
@@ -105,12 +105,18 @@ export function App({ apis }: { apis: AllApis }) {
 // TopBar — role-aware navigation
 // ─────────────────────────────────────────────────────────────
 
-function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "cliente" | "profesional" } | null; onSignOut: () => void }) {
+function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "cliente" | "profesional" } | null; onSignOut: () => void | Promise<void> }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLElement>(null);
-  const { currentPath } = useNavigation();
+  const { currentPath, navigate } = useNavigation();
   const groups = navigationFor(user?.rol);
+
+  const handleSignOut = async () => {
+    setMenuOpen(false);
+    await onSignOut();
+    navigate("#/");
+  };
 
   useEffect(() => { setMenuOpen(false); }, [currentPath]);
 
@@ -163,13 +169,13 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
         <DesktopNavigation groups={groups} currentPath={currentPath} grouped={user.rol === "admin"} />
         <div className="private-account" aria-label="Cuenta">
           <span title={user.nombre}>{user.nombre}</span>
-          <Button small variant="ghost" onClick={onSignOut}>Salir</Button>
+          <Button small variant="ghost" onClick={() => void handleSignOut()}>Salir</Button>
         </div>
         {menuOpen && <div className="private-mobile-menu-backdrop" onClick={(event) => { if (event.target === event.currentTarget) setMenuOpen(false); }}>
           <aside ref={menuPanelRef} id="private-mobile-navigation" className="private-mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Menú privado">
             <header><div><p className="eyebrow">Área privada</p><strong>{user.nombre}</strong></div><button type="button" className="private-mobile-menu-close" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú"><span className="private-mobile-menu-icon private-mobile-menu-icon--close" aria-hidden="true"><span /><span /><span /></span></button></header>
             <nav aria-label="Secciones privadas">{groups.map((group) => group.links.length > 0 && <section key={group.label}><p><NavigationIcon name={group.icon} />{group.label}</p>{group.links.map((link) => <a key={link.to} href={link.to} aria-current={isNavigationActive(currentPath, link.to) ? "page" : undefined} onClick={() => setMenuOpen(false)}>{link.label}</a>)}</section>)}</nav>
-            <Button variant="ghost" onClick={() => { setMenuOpen(false); onSignOut(); }}>Salir del área privada</Button>
+            <Button variant="ghost" onClick={() => void handleSignOut()}>Salir del área privada</Button>
           </aside>
         </div>}
         </>
@@ -236,7 +242,7 @@ function AdminProjectDetailRoute({ apis }: { apis: AllApis }) {
 }
 
 function ClientDashboardRoute({ apis }: { apis: AllApis }) {
-  return <ClientEstimates api={apis.sales} projectsApi={apis.projects} />;
+  return <ClientEstimates api={apis.sales} projectsApi={apis.projects} view="projects" />;
 }
 
 function ClientProjectDetailRoute({ apis }: { apis: AllApis }) {

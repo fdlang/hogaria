@@ -58,7 +58,7 @@ describe("AccountActivationUseCases", () => {
     await expect(useCases.activate(token,"OtraClaveSegura2026")).rejects.toThrow();
   });
 
-  it("blocks a second invitation and keeps the original activation link valid", async () => {
+  it("reuses the current invitation without sending another email", async () => {
     const users = new InMemoryUserRepository(hasher);
     const admin = await users.save({ id: 0, email: Email.of("admin3@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
     const client = await users.save({ id: 0, email: Email.of("resend@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: false, createdAt: new Date() }, "");
@@ -76,7 +76,7 @@ describe("AccountActivationUseCases", () => {
     configureActivationPasswordHasher(hasher.hash);
     const useCases = new AccountActivationUseCases(users, tokens, email, "https://hogaria.test");
     await useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" });
-    await expect(useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("ya fue enviada");
+    await expect(useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" })).resolves.toMatchObject({ sent: false, status: "existing_or_in_progress" });
     expect(attempts).toBe(1);
 
     const firstToken = new URLSearchParams(firstUrl.split("?")[1]).get("token")!;
@@ -90,7 +90,7 @@ describe("AccountActivationUseCases", () => {
     const innerTokens = new InMemoryActivationTokenRepository(users);
     let deliveredUrl = "";
     const tokens = {
-      hasIssued: innerTokens.hasIssued.bind(innerTokens),
+      reserve: innerTokens.reserve.bind(innerTokens),
       stage: innerTokens.stage.bind(innerTokens),
       promote: async () => { throw new Error("promotion unavailable"); },
       discard: innerTokens.discard.bind(innerTokens),
@@ -107,6 +107,86 @@ describe("AccountActivationUseCases", () => {
     await expect(useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" })).resolves.toMatchObject({ email: client.email.value });
     const deliveredToken = new URLSearchParams(deliveredUrl.split("?")[1]).get("token")!;
     await expect(useCases.activate(deliveredToken, "ClaveSegura2026")).resolves.toBeUndefined();
+  });
+
+  it("allows a new one-time link after the previous invitation expires", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("admin-expiry@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
+    const client = await users.save({ id: 0, email: Email.of("expired@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: false, createdAt: new Date() }, "");
+    const tokens = new InMemoryActivationTokenRepository(users);
+    let deliveries = 0;
+    const email = { isConfigured: () => true, sendActivation: async () => { deliveries += 1; } };
+    const useCases = new AccountActivationUseCases(users, tokens, email, "https://hogaria.test", 1);
+
+    await useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" });
+    await new Promise(resolve => setTimeout(resolve, 5));
+    await expect(useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" })).resolves.toBeDefined();
+    expect(deliveries).toBe(2);
+  });
+
+  it("serializes concurrent invitations and sends exactly one email", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("admin-race@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
+    const client = await users.save({ id: 0, email: Email.of("race@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: false, createdAt: new Date() }, "");
+    let deliveries = 0;
+    const useCases = new AccountActivationUseCases(users, new InMemoryActivationTokenRepository(users), { isConfigured: () => true, sendActivation: async () => { deliveries += 1; } }, "https://hogaria.test");
+
+    const results = await Promise.all([
+      useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" }),
+      useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" }),
+    ]);
+
+    expect(deliveries).toBe(1);
+    expect(results.map(result => result.sent).sort()).toEqual([false, true]);
+  });
+
+  it("moves an archived account to pending activation when reactivation is delivered", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("admin-reactivate@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
+    const client = await users.save({ id: 0, email: Email.of("archived@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: false, accountStatus: "archived", createdAt: new Date() }, "");
+    const useCases = new AccountActivationUseCases(users, new InMemoryActivationTokenRepository(users), { isConfigured: () => true, sendActivation: async () => undefined }, "https://hogaria.test");
+
+    await useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" });
+    await expect(users.findById(client.id)).resolves.toMatchObject({ activo: false, accountStatus: "pending_activation" });
+  });
+
+  it("keeps the winning link and pending state during concurrent reactivation", async () => {
+    configureActivationPasswordHasher(hasher.hash);
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("admin-archived-race@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
+    const client = await users.save({ id: 0, email: Email.of("archived-race@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: false, accountStatus: "archived", createdAt: new Date() }, "");
+    let deliveredUrl = "";
+    let deliveries = 0;
+    const useCases = new AccountActivationUseCases(users, new InMemoryActivationTokenRepository(users), { isConfigured: () => true, sendActivation: async ({ activationUrl }) => { deliveries += 1; deliveredUrl = activationUrl; } }, "https://hogaria.test");
+
+    const results = await Promise.all([
+      useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" }),
+      useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" }),
+    ]);
+
+    expect(deliveries).toBe(1);
+    expect(results.map(result => result.sent).sort()).toEqual([false, true]);
+    await expect(users.findById(client.id)).resolves.toMatchObject({ activo: false, accountStatus: "pending_activation" });
+    const token = new URLSearchParams(deliveredUrl.split("?")[1]).get("token")!;
+    await expect(useCases.activate(token, "ClaveSegura2026")).resolves.toBeUndefined();
+  });
+
+  it("never overwrites an activation completed immediately after email delivery", async () => {
+    configureActivationPasswordHasher(hasher.hash);
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("admin-fast@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
+    const client = await users.save({ id: 0, email: Email.of("fast@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: false, accountStatus: "archived", createdAt: new Date() }, "");
+    let useCases!: AccountActivationUseCases;
+    useCases = new AccountActivationUseCases(users, new InMemoryActivationTokenRepository(users), {
+      isConfigured: () => true,
+      sendActivation: async ({ activationUrl }) => {
+        const token = new URLSearchParams(activationUrl.split("?")[1]).get("token")!;
+        await useCases.activate(token, "ClaveSegura2026");
+      },
+    }, "https://hogaria.test");
+
+    await useCases.invite(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" });
+    await expect(users.findById(client.id)).resolves.toMatchObject({ activo: true, accountStatus: "active" });
   });
 
   it("keeps the winner of two interleaved promotions and consumes every sibling link", async () => {

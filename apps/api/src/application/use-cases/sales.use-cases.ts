@@ -838,6 +838,7 @@ export class ChangeOrderUseCases {
     private readonly projects: IProjectRepository,
     private readonly changes: IChangeOrderRepository,
     private readonly gate?: ICooldownGate,
+    private readonly events?: IEventEmitter,
   ) {}
   async edit(actorId: number, projectId: number, id: number, payload: EstimateDraft) {
     assertAdmin(await this.users.findById(actorId));
@@ -857,7 +858,9 @@ export class ChangeOrderUseCases {
     if (next === "enviado") {
       assertAdmin(actor);
       validateDraft(order.payload);
-      return this.changes.transition(id, projectId, "borrador", "enviado", actor.id);
+      const saved = await this.changes.transition(id, projectId, "borrador", "enviado", actor.id);
+      await this.events?.emit({ type: "ChangeOrderSent", eventId: crypto.randomUUID(), occurredAt: new Date(), actorId: actor.id, actorName: actor.nombre, projectId, changeOrderId: id });
+      return saved;
     }
     if (!["aprobado", "rechazado"].includes(next)) throw new ValidationError("Acción no válida");
     if (actor.rol !== "cliente" || project.clienteId !== actor.id) throw new ForbiddenError();

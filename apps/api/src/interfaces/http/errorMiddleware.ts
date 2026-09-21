@@ -7,7 +7,7 @@
 
 import {
   DomainError, NotFoundError, UnauthorizedError, ForbiddenError,
-  ValidationError, ConflictError, RateLimitError,
+  ValidationError, ConflictError, RateLimitError, ServiceUnavailableError,
 } from "@reformapro/domain/errors";
 
 interface HttpErrorResponse {
@@ -21,6 +21,7 @@ export function toHttpError(err: unknown): HttpErrorResponse {
   if (err instanceof NotFoundError)           return { status: 404, body: { code: err.code, message: err.message } };
   if (err instanceof ConflictError)           return { status: 409, body: { code: err.code, message: err.message } };
   if (err instanceof RateLimitError)          return { status: 429, body: { code: err.code, message: err.message } };
+  if (err instanceof ServiceUnavailableError) return { status: 503, body: { code: err.code, message: err.message } };
   if (err instanceof ValidationError) {
     const body: HttpErrorResponse["body"] = { code: err.code, message: err.message };
     if (err.field !== undefined) body.field = err.field;

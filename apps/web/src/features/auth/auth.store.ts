@@ -73,15 +73,27 @@ export class AuthStore {
       const user = await this.api.get<AuthUser>("/auth/me");
       this.setState({ status: "authenticated", user, token, error: null });
     } catch {
+      if (this.state.status === "unauthenticated" && this.state.error) return;
       this.storage.removeItem("rp_token");
       this.api.setToken(null);
       this.setState({ status: "unauthenticated", user: null, token: null });
     }
   }
 
-  signOut(): void {
+  async signOut(): Promise<void> {
+    try {
+      if (this.state.token) await this.api.post("/auth/logout", {});
+    } catch {
+      // Local cleanup is still required when the network is unavailable.
+    }
     this.storage.removeItem("rp_token");
     this.api.setToken(null);
     this.setState({ status: "unauthenticated", user: null, token: null, error: null });
+  }
+
+  expireSession(): void {
+    this.storage.removeItem("rp_token");
+    this.api.setToken(null);
+    this.setState({ status: "unauthenticated", user: null, token: null, error: "Tu sesión ha caducado. Inicia sesión de nuevo para continuar." });
   }
 }

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { UsersApi, UserDTO, CreateUserPayload } from "../api/users.api";
-import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword, Profesion } from "@reformapro/domain";
+import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword, isValidSpanishPhone, Profesion } from "@reformapro/domain";
 
 export interface UserFormState {
   email: string;
@@ -49,6 +49,7 @@ export function useUserForm(api: UsersApi, initial: UserDTO | null = null) {
     if (!state.email.trim())  e.email  = "Obligatorio";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email)) e.email = "Email inválido";
     if (state.rol === "profesional" && !state.profesion) e.profesion = "Selecciona profesión";
+    if (!isValidSpanishPhone(state.telefono)) e.telefono = "Teléfono no válido";
     if (state.newPassword && !isValidAccountPassword(state.newPassword)) e.newPassword = ACCOUNT_PASSWORD_REQUIREMENTS;
     return e;
   }, [state]);

@@ -15,7 +15,11 @@ export class InMemoryActivationTokenRepository
   constructor(
     private readonly users: Pick<InMemoryUserRepository, "activateAccount" | "activationRevision">,
   ) {}
-  async hasIssued(userId: number) { return this.items.some(token => token.userId === userId); }
+  async reserve(token: ActivationToken, now: Date) {
+    if (this.items.some(item => item.userId === token.userId && !item.usedAt && item.expiresAt > now)) return false;
+    await this.stage(token);
+    return true;
+  }
   async stage(token: ActivationToken) {
     this.items.push(token);
     this.revisions.set(token.tokenHash, this.users.activationRevision(token.userId));
@@ -52,7 +56,18 @@ export class PostgresActivationTokenRepository
   implements IActivationTokenRepository
 {
   constructor(private readonly pool: pg.Pool) {}
-  async hasIssued(userId: number) { return (await this.pool.query("SELECT 1 FROM account_activation_tokens WHERE user_id=$1 LIMIT 1", [userId])).rowCount === 1; }
+  async reserve(token: ActivationToken, now: Date) {
+    return this.transaction(async (client) => {
+      await client.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [token.userId]);
+      const current = await client.query("SELECT 1 FROM account_activation_tokens WHERE user_id=$1 AND used_at IS NULL AND expires_at>$2 LIMIT 1", [token.userId, now]);
+      if (current.rowCount === 1) return false;
+      await client.query(
+        "INSERT INTO account_activation_tokens(user_id,token_hash,expires_at,used_at) VALUES($1,$2,$3,$4)",
+        [token.userId, token.tokenHash, token.expiresAt, token.usedAt],
+      );
+      return true;
+    });
+  }
   private async transaction<T>(fn: (client: pg.PoolClient) => Promise<T>) {
     const client = await this.pool.connect();
     try {
