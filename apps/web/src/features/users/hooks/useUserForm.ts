@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { UsersApi, UserDTO, CreateUserPayload } from "../api/users.api";
-import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword, isValidSpanishPhone, Profesion } from "@reformapro/domain";
+import { isValidSpanishPhone, Profesion } from "@reformapro/domain";
 
 export interface UserFormState {
   email: string;
@@ -13,12 +13,11 @@ export interface UserFormState {
   rol: UserDTO["rol"];
   profesion: Profesion | null;
   telefono: string;
-  newPassword?: string;
 }
 
 const EMPTY: UserFormState = {
   email: "", nombre: "", rol: "cliente",
-  profesion: null, telefono: "", newPassword: "",
+  profesion: null, telefono: "",
 };
 
 export type UserFormErrors = Partial<Record<keyof UserFormState, string>>;
@@ -34,7 +33,6 @@ export function useUserForm(api: UsersApi, initial: UserDTO | null = null) {
       email: initial.email, nombre: initial.nombre, rol: initial.rol,
       profesion: (initial.profesion ?? null) as Profesion | null,
       telefono:  initial.telefono ?? "",
-      newPassword: "",
     });
   }, [initial]);
 
@@ -50,7 +48,6 @@ export function useUserForm(api: UsersApi, initial: UserDTO | null = null) {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email)) e.email = "Email inválido";
     if (state.rol === "profesional" && !state.profesion) e.profesion = "Selecciona profesión";
     if (!isValidSpanishPhone(state.telefono)) e.telefono = "Teléfono no válido";
-    if (state.newPassword && !isValidAccountPassword(state.newPassword)) e.newPassword = ACCOUNT_PASSWORD_REQUIREMENTS;
     return e;
   }, [state]);
 
@@ -64,7 +61,6 @@ export function useUserForm(api: UsersApi, initial: UserDTO | null = null) {
           nombre: state.nombre,
           telefono: state.telefono,
           profesion: state.profesion ?? undefined,
-          newPassword: state.newPassword || undefined,
         });
       }
       const payload: CreateUserPayload = {

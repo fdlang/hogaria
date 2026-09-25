@@ -6,10 +6,12 @@
 
 import { AssignProjectProfessionalUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "../../application/use-cases/project.use-cases.js";
 import { Project } from "@reformapro/domain/entities";
+import { aggregateFiscalSnapshots } from "@reformapro/domain";
 import type { IUserRepository } from "@reformapro/domain/repositories";
 import { ForbiddenError, ValidationError } from "@reformapro/domain/errors";
 import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
+import { parsePagination, wantsPagination } from "./pagination.js";
 
 export function toProjectDTO(p: Project, audience: "full" | "professional" | "client" = "full") {
   const shared = {
@@ -31,6 +33,7 @@ export function toProjectDTO(p: Project, audience: "full" | "professional" | "cl
     estimateId: p.estimateId,
     clienteId: p.clienteId,
     presupuesto: p.presupuesto.amount,
+    financialSummary: p.fiscalSnapshots?.length ? aggregateFiscalSnapshots(p.fiscalSnapshots) : null,
   };
   return commercial;
 }
@@ -95,8 +98,14 @@ export function projectController(deps: {
     },
 
     // GET /projects
-    async list(req: HttpRequest & { actorId: number }): Promise<HttpResponse> {
+    async list(req: HttpRequest & { actorId: number; query: { page?: string; limit?: string; search?: string; status?: string } }): Promise<HttpResponse> {
       try {
+        if (wantsPagination(req.query)) {
+          const status = req.query.status ?? "all";
+          if (!["all","planificacion","en_curso","pausado","finalizado"].includes(status)) throw new ValidationError("Estado no válido", "status");
+          const page = await deps.list.executePage({ actorId: req.actorId, ...parsePagination(req.query), search: (req.query.search ?? "").trim().slice(0, 100), status: status as Project["estado"] | "all" });
+          return { status: 200, body: { ...page, items: await Promise.all(page.items.map(project => dtoFor(req.actorId, project))) } };
+        }
         const projects = await deps.list.execute({ actorId: req.actorId });
         return { status: 200, body: await Promise.all(projects.map(project => dtoFor(req.actorId, project))) };
       } catch (e) { return toHttpError(e); }

@@ -11,6 +11,7 @@ import { ValidationError, ForbiddenError, NotFoundError, ConflictError } from "@
 import { PermissionPolicy } from "@reformapro/domain/services";
 import { ClientContext } from "./auth.use-cases.js";
 import { projectChanges } from "./project-validation.js";
+import { canStartProject, projectStateViolation } from "@reformapro/domain";
 
 // Direct creation is intentionally absent: projects originate from signed estimates.
 
@@ -75,7 +76,18 @@ export class UpdateProjectUseCase {
       };
       if (!transitions[project.estado].includes(allowedChanges.estado)) throw new ConflictError("Transición de estado no permitida");
     }
-    if (allowedChanges.estado === "finalizado" && (allowedChanges.progreso ?? project.progreso).value !== 100) throw new ValidationError("Para finalizar la obra, el progreso debe ser del 100 %");
+    const effectiveState = allowedChanges.estado ?? project.estado;
+    const effectiveProgress = (allowedChanges.progreso ?? project.progreso).value;
+    if (projectStateViolation(effectiveState, effectiveProgress)) throw new ValidationError("Una obra finalizada debe conservar el progreso al 100 %");
+    if (project.estado === "planificacion" && effectiveState === "en_curso") {
+      const readiness = canStartProject({
+        fechaInicio: allowedChanges.fechaInicio ?? project.fechaInicio,
+        fechaFinPrevista: allowedChanges.fechaFinPrevista ?? project.fechaFinPrevista,
+        profesionalesAsignados: project.profesionalesAsignados,
+        hitos: allowedChanges.hitos ?? project.hitos,
+      });
+      if (!readiness.ready) throw new ValidationError("Completa la planificación: fecha de entrega posterior, al menos un profesional y un hito");
+    }
     if((allowedChanges.fechaFinPrevista??project.fechaFinPrevista)<(allowedChanges.fechaInicio??project.fechaInicio))throw new ValidationError("La fecha final no puede ser anterior al inicio");
     // Capture old values before repositories that mutate in place run.
     const previousState = project.estado;
@@ -163,5 +175,10 @@ export class ListProjectsUseCase {
     if (actor.rol === "cliente")      return this.projects.findByClient(actor.id);
     if (actor.rol === "profesional")  return this.projects.findByProfesional(actor.id);
     return [];
+  }
+  async executePage(cmd: { actorId: number; page: number; limit: number; search: string; status?: Project["estado"] | "all" }) {
+    const actor = await this.users.findById(cmd.actorId);
+    if (!actor?.activo || actor.rol !== "admin") throw new ForbiddenError();
+    return this.projects.findPage(cmd);
   }
 }

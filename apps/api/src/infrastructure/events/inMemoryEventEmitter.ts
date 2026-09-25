@@ -19,7 +19,7 @@ export class InMemoryEventEmitter implements IEventEmitter {
   async emit(event: DomainEvent): Promise<void> {
     const subs = this.handlers.get(event.type);
     if (!subs) return;
-    await Promise.allSettled([...subs].map(h => Promise.resolve().then(() => h(event))));
+    await Promise.all([...subs].map(h => Promise.resolve().then(() => h(event))));
   }
 
   subscribe(type: DomainEvent["type"], handler: Handler): () => void {

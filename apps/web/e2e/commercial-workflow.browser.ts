@@ -12,7 +12,7 @@ const estimate = {id:1,numero:"HOG-001",titulo:"Propuesta",estado:"enviado",vers
 
 test("request conversion opens an existing opportunity without creating a duplicate", async ({page}) => {
   await authenticated(page,"admin");
-  await page.route("**/api/solicitudes", route => route.fulfill({json:[{id:3,nombre:"Solicitud prueba",email:"cliente@test.es",telefono:"614786341",tipo:"Baño",descripcion:"Reforma del baño completo",estado:"pendiente",fecha:"2026-09-01",ip:"127.0.0.1"}]}));
+  await page.route("**/api/solicitudes?*", route => route.fulfill({json:{items:[{id:3,nombre:"Solicitud prueba",email:"cliente@test.es",telefono:"614786341",tipo:"Baño",descripcion:"Reforma del baño completo",estado:"pendiente",fecha:"2026-09-01",ip:"127.0.0.1"}],total:1,page:1,limit:20,pages:1}}));
   let converted = false;
   await page.route("**/api/solicitudes/3/opportunity", route => { converted = true; expect(route.request().postDataJSON()).toEqual({direccion:"Calle Madrid 1"}); return route.fulfill({json:{id:9}}); });
   await page.route("**/api/opportunities", route => route.fulfill({json:[{id:9,clienteId:null,nombre:"Solicitud prueba",direccion:"Calle Madrid 1",tipo:"Baño",descripcion:"Reforma del baño completo"}]}));
@@ -59,16 +59,24 @@ test("client explicitly approves a change and sees the updated project amount", 
   await authenticated(page,"cliente");
   let approved = false;
   const project = {id:1,estimateId:1,nombre:"Obra",descripcion:"",clienteId:2,direccion:"Madrid",tipo:"Reforma",estado:"en_curso",progreso:10,presupuesto:100,fechaInicio:"2026-09-01",fechaFinPrevista:"2026-10-01",profesionalesAsignados:[{userId:9,profesion:"carpintero"}],hitos:[]};
-  await page.route("**/api/projects/1",route => route.fulfill({json:{...project,presupuesto:approved?200:100}}));
+  await page.route("**/api/projects/1",route => route.fulfill({json:{
+    ...project,
+    presupuesto:approved?200:100,
+    financialSummary: approved
+      ? {baseAmount:200,vatAmount:42,totalAmount:242,vatBreakdown:[{rate:21,baseAmount:200,vatAmount:42,totalAmount:242}]}
+      : {baseAmount:100,vatAmount:21,totalAmount:121,vatBreakdown:[{rate:21,baseAmount:100,vatAmount:21,totalAmount:121}]},
+  }}));
   await page.route("**/api/projects/1/change-orders",route => route.fulfill({json:[{id:7,numero:"OC-7",estado:approved?"aprobado":"enviado",propuesta:proposal}]}));
   await page.route("**/api/projects/1/change-orders/7/transition",route => {expect(route.request().postDataJSON()).toEqual({estado:"aprobado",password:"Password12345"});approved=true;return route.fulfill({json:{id:7,estado:"aprobado"}});});
   await page.goto("/cliente/projects/1");
   await expect(page.getByRole("heading", { name: /Equipo/ })).toHaveCount(0);
+  await expect(page.getByText("121,00 €",{exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Revisar decisión"}).click();
   await expect(page.getByRole("button",{name:"Aceptar ampliación"})).toBeDisabled();
   await page.getByLabel("Confirma tu contraseña").fill("Password12345");
   await page.getByRole("button",{name:"Aceptar ampliación"}).click();
   await expect(page.getByText("OC-7 · aprobado",{exact:true})).toBeVisible();
+  await expect(page.getByText("242,00 €",{exact:true})).toBeVisible();
   expect(approved).toBe(true);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });

@@ -24,6 +24,10 @@ export function useProjects(api: ProjectsApi) {
   return resource;
 }
 
+export function useProjectPage(api: ProjectsApi, page: number, search: string, status: ProjectDTO["estado"] | "all") {
+  return useResource(() => api.page({ page, search, status }), [api, page, search, status]);
+}
+
 export function useProject(api: ProjectsApi, id: number | null) {
   return useResource<ProjectDTO | null>(
     () => id == null ? Promise.resolve(null) : api.get(id),

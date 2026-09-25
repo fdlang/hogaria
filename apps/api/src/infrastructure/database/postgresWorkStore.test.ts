@@ -25,6 +25,7 @@ describe("PostgreSQL work schema and repository", () => {
     unitLabel: "hora",
     effectiveAt: "2026-09-01T00:00:00.000Z",
     createdAt: "2026-09-01T00:00:00.000Z",
+    createdBy: 1,
   };
   const entry: WorkEntry = {
     id: crypto.randomUUID(),

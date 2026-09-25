@@ -7,12 +7,12 @@ import type { PasswordHasher } from "./inMemoryRepositories.js";
 import type { ProjectFile, IFileRepository } from "../../application/use-cases/file.use-cases.js";
 import type { IProfessionalDocumentRepository, ProfessionalDocument } from "../../application/use-cases/professional-document.use-cases.js";
 import type { ISolicitudRepository } from "../../application/use-cases/solicitud.use-cases.js";
-import { calculateEstimateTotals } from "@reformapro/domain";
+import { createFiscalSnapshot } from "@reformapro/domain";
 
 type Row = Record<string, any>;
 const date = (value: string | Date) => new Date(value);
-const projectPayload = (p: Project) => ({ ...p, progreso: p.progreso.value, presupuesto: p.presupuesto.amount, fechaInicio: p.fechaInicio.toISOString(), fechaFinPrevista: p.fechaFinPrevista.toISOString(), createdAt: p.createdAt.toISOString(), hitos: p.hitos.map(h => ({ ...h, fecha: h.fecha.toISOString() })) });
-const restoreProject = (id: number, p: any): Project => ({ ...p, id, progreso: Percentage.of(p.progreso), presupuesto: Money.of(p.presupuesto), fechaInicio: date(p.fechaInicio), fechaFinPrevista: date(p.fechaFinPrevista), createdAt: date(p.createdAt), hitos: p.hitos.map((h: any) => ({ ...h, fecha: date(h.fecha) })) });
+const projectPayload = (p: Project) => ({ ...p, progreso: p.progreso.value, presupuesto: p.presupuesto.amount, fiscalSnapshots: p.fiscalSnapshots?.map(snapshot => ({ ...snapshot, capturedAt: snapshot.capturedAt.toISOString() })), fechaInicio: p.fechaInicio.toISOString(), fechaFinPrevista: p.fechaFinPrevista.toISOString(), createdAt: p.createdAt.toISOString(), hitos: p.hitos.map(h => ({ ...h, fecha: h.fecha.toISOString() })) });
+const restoreProject = (id: number, p: any): Project => ({ ...p, id, progreso: Percentage.of(p.progreso), presupuesto: Money.of(p.presupuesto), fiscalSnapshots: Array.isArray(p.fiscalSnapshots) ? p.fiscalSnapshots.map((snapshot: any) => ({ ...snapshot, capturedAt: date(snapshot.capturedAt) })) : undefined, fechaInicio: date(p.fechaInicio), fechaFinPrevista: date(p.fechaFinPrevista), createdAt: date(p.createdAt), hitos: p.hitos.map((h: any) => ({ ...h, fecha: date(h.fecha) })) });
 
 export class PostgresUserRepository implements IUserRepository {
   constructor(private readonly pool: pg.Pool | pg.PoolClient, private readonly hasher: PasswordHasher) {}
@@ -21,6 +21,22 @@ export class PostgresUserRepository implements IUserRepository {
   async findByEmail(email: string) { const r = await this.pool.query("SELECT * FROM users WHERE lower(email)=lower($1)", [email]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async findAll() { return (await this.pool.query("SELECT * FROM users ORDER BY id")).rows.map(r => this.map(r)); }
   async findByRole(role: UserRole) { return (await this.pool.query("SELECT * FROM users WHERE rol=$1 ORDER BY id", [role])).rows.map(r => this.map(r)); }
+  async findPage(query: import("@reformapro/domain/repositories").UserPageQuery) {
+    const values: unknown[] = [];
+    const where: string[] = [];
+    const add = (value: unknown) => { values.push(value); return `$${values.length}`; };
+    if (query.role) where.push(`rol=${add(query.role)}`);
+    if (query.status === "current") where.push("COALESCE(account_status,CASE WHEN activo THEN 'active' ELSE 'pending_activation' END)<>'archived'");
+    else if (query.status && query.status !== "all") where.push(`COALESCE(account_status,CASE WHEN activo THEN 'active' ELSE 'pending_activation' END)=${add(query.status)}`);
+    if (query.search) { const term = add(`%${query.search}%`); where.push(`(nombre ILIKE ${term} OR email ILIKE ${term})`); }
+    const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const count = await this.pool.query(`SELECT COUNT(*)::int AS total FROM users ${clause}`, values);
+    const offset = add((query.page - 1) * query.limit);
+    const limit = add(query.limit);
+    const rows = await this.pool.query(`SELECT * FROM users ${clause} ORDER BY id DESC OFFSET ${offset} LIMIT ${limit}`, values);
+    const total = Number(count.rows[0]?.total ?? 0);
+    return { items: rows.rows.map(row => this.map(row)), total, page: query.page, limit: query.limit, pages: Math.max(1, Math.ceil(total / query.limit)) };
+  }
   async save(user: User, passwordHash = "") { try { const r = await this.pool.query("INSERT INTO users(email,nombre,rol,profesion,telefono,activo,account_status,password_hash,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *", [user.email.value,user.nombre,user.rol,user.profesion ?? null,user.telefono ?? null,user.activo,user.accountStatus ?? (user.activo ? "active" : "pending_activation"),passwordHash,user.createdAt]); return this.map(r.rows[0]); } catch (error) { if ((error as { code?: string }).code === "23505") throw new ConflictError("Ya existe un usuario con ese email"); throw error; } }
   async update(id: number, changes: Partial<Omit<User,"id"|"createdAt">>, passwordHash?: string) {
     const ownsConnection = !("release" in this.pool);
@@ -61,6 +77,7 @@ export class PostgresUserRepository implements IUserRepository {
 export class PostgresProjectRepository implements IProjectRepository {
   constructor(private readonly pool: pg.Pool | pg.PoolClient) {} private map(r: Row) { return restoreProject(Number(r.id), r.payload); }
   async findById(id:number){const r=await this.pool.query("SELECT * FROM projects WHERE id=$1",[id]);return r.rows[0]?this.map(r.rows[0]):null} async findByClient(id:number){return(await this.pool.query("SELECT * FROM projects WHERE cliente_id=$1",[id])).rows.map(r=>this.map(r))} async findByProfesional(id:number){return(await this.pool.query("SELECT * FROM projects WHERE payload->'profesionalesAsignados' @> $1::jsonb",[JSON.stringify([{userId:id}])])).rows.map(r=>this.map(r))} async findAll(){return(await this.pool.query("SELECT * FROM projects ORDER BY id")).rows.map(r=>this.map(r))}
+  async findPage(query: import("@reformapro/domain/repositories").ProjectPageQuery) { const values:unknown[]=[];const where:string[]=[];const add=(value:unknown)=>{values.push(value);return `$${values.length}`;};if(query.status&&query.status!=="all")where.push(`payload->>'estado'=${add(query.status)}`);if(query.search){const term=add(`%${query.search}%`);where.push(`(payload->>'nombre' ILIKE ${term} OR payload->>'direccion' ILIKE ${term})`);}const clause=where.length?`WHERE ${where.join(" AND ")}`:"";const count=await this.pool.query(`SELECT COUNT(*)::int AS total FROM projects ${clause}`,values);const offset=add((query.page-1)*query.limit);const limit=add(query.limit);const rows=await this.pool.query(`SELECT * FROM projects ${clause} ORDER BY id DESC OFFSET ${offset} LIMIT ${limit}`,values);const total=Number(count.rows[0]?.total??0);return {items:rows.rows.map(row=>this.map(row)),total,page:query.page,limit:query.limit,pages:Math.max(1,Math.ceil(total/query.limit))};}
   async save(p:Project){const r=await this.pool.query("INSERT INTO projects(cliente_id,estimate_id,payload) VALUES($1,$2,$3) RETURNING *",[p.clienteId,p.estimateId,projectPayload(p)]);return this.map(r.rows[0])}
   async update(id:number,c:Partial<Omit<Project,"id"|"createdAt">>,expectedRevision?:number){
     const old=await this.findById(id);if(!old)throw new NotFoundError("Proyecto");
@@ -161,14 +178,21 @@ export class PostgresChangeOrderRepository implements IChangeOrderRepository {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const project = await client.query("SELECT id FROM projects WHERE id=$1 FOR UPDATE", [projectId]);
+      const project = await client.query("SELECT id,payload FROM projects WHERE id=$1 FOR UPDATE", [projectId]);
       if (!project.rows.length) throw new NotFoundError("Proyecto");
       const result = await client.query("UPDATE change_orders SET estado=$4,aprobado_at=CASE WHEN $4='aprobado' THEN now() ELSE NULL END,decision=jsonb_build_object('actorId',$5::bigint,'at',now(),'state',$4::text) WHERE id=$1 AND project_id=$2 AND estado=$3 RETURNING *", [id,projectId,expected,next,actorId]);
       if (!result.rows[0]) throw new ConflictError("La orden ha cambiado o ya fue resuelta. Actualiza los datos.");
       if (next === "aprobado") {
         const order = this.map(result.rows[0]);
-        const delta = calculateEstimateTotals(order.payload.partidas).totalSinIva;
-        await client.query("UPDATE projects SET payload=jsonb_set(jsonb_set(payload,'{presupuesto}',to_jsonb((payload->>'presupuesto')::numeric+$2::numeric)),'{revision}',to_jsonb(COALESCE((payload->>'revision')::int,0)+1)) WHERE id=$1",[projectId,delta]);
+        const current = restoreProject(Number(project.rows[0].id), project.rows[0].payload);
+        const fiscalSnapshot = createFiscalSnapshot(order.payload.partidas, { type: "change_order", id: order.id }, order.aprobadoAt!);
+        const updated: Project = {
+          ...current,
+          presupuesto: current.presupuesto.plus(Money.of(fiscalSnapshot.baseAmount)),
+          revision: (current.revision ?? 0) + 1,
+          ...(current.fiscalSnapshots ? { fiscalSnapshots: [...current.fiscalSnapshots, fiscalSnapshot] } : {}),
+        };
+        await client.query("UPDATE projects SET payload=$2 WHERE id=$1", [projectId, projectPayload(updated)]);
       }
       await client.query("COMMIT");
       return this.map(result.rows[0]);
@@ -211,10 +235,11 @@ export class PostgresSolicitudRepository implements ISolicitudRepository {
   private map(r: Row) { return { id: Number(r.id), nombre: r.nombre, email: r.email, telefono: r.telefono, tipo: r.tipo, descripcion: r.descripcion, estado: r.estado, ip: r.ip ?? "", fecha: date(r.fecha), motivo: r.motivo ?? null }; }
   async save(s: { nombre:string; email:string; telefono:string; tipo:string; descripcion:string; fecha:Date; estado:"pendiente"; ip:string }) { const r = await this.pool.query("INSERT INTO solicitudes(nombre,email,telefono,tipo,descripcion,estado,ip,fecha) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id", [s.nombre,s.email,s.telefono,s.tipo,s.descripcion,s.estado,s.ip,s.fecha]); return { id: Number(r.rows[0].id) }; }
   async findAll() { return (await this.pool.query("SELECT * FROM solicitudes ORDER BY fecha DESC")).rows.map(r => this.map(r)); }
+  async findPage(query: { page: number; limit: number }) { const count = await this.pool.query("SELECT COUNT(*)::int AS total FROM solicitudes"); const rows = await this.pool.query("SELECT * FROM solicitudes ORDER BY fecha DESC,id DESC OFFSET $1 LIMIT $2", [(query.page - 1) * query.limit, query.limit]); const total = Number(count.rows[0]?.total ?? 0); return { items: rows.rows.map(row => this.map(row)), total, page: query.page, limit: query.limit, pages: Math.max(1, Math.ceil(total / query.limit)) }; }
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM solicitudes WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async update(id: number, changes: { estado: "contactado" | "rechazado"; motivo: string | null }) { const r = await this.pool.query("UPDATE solicitudes SET estado=$2,motivo=$3 WHERE id=$1 AND estado='pendiente' RETURNING *", [id, changes.estado, changes.motivo]); if (!r.rows[0]) throw new ConflictError("La solicitud ya no está pendiente"); return this.map(r.rows[0]); }
 }
-export class PostgresFileRepository implements IFileRepository { constructor(private readonly pool: pg.Pool) {} async save(file: Omit<ProjectFile,"id">) { const r=await this.pool.query("INSERT INTO project_files(project_id,payload,uploaded_at) VALUES($1,$2,$3) RETURNING id",[file.projectId,{...file,uploadedAt:file.uploadedAt.toISOString()},file.uploadedAt]); return { ...file, id:Number(r.rows[0].id) }; } async findById(id:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE id=$1",[id]); return r.rows[0] ? { ...r.rows[0].payload, id:Number(r.rows[0].id), uploadedAt:date(r.rows[0].payload.uploadedAt) } as ProjectFile : null; } async findByProject(projectId:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE project_id=$1 ORDER BY id",[projectId]); return r.rows.map(row=>({ ...row.payload,id:Number(row.id),uploadedAt:date(row.payload.uploadedAt) } as ProjectFile)); } async markDeleting(id:number) { const r=await this.pool.query("UPDATE project_files SET payload=jsonb_set(payload,'{deleting}','true'::jsonb,true) WHERE id=$1",[id]); if(r.rowCount!==1) throw new NotFoundError("Archivo"); } async delete(id:number) { await this.pool.query("DELETE FROM project_files WHERE id=$1",[id]); } }
+export class PostgresFileRepository implements IFileRepository { constructor(private readonly pool: pg.Pool) {} async save(file: Omit<ProjectFile,"id">) { const r=await this.pool.query("INSERT INTO project_files(project_id,payload,uploaded_at) VALUES($1,$2,$3) RETURNING id",[file.projectId,{...file,uploadedAt:file.uploadedAt.toISOString()},file.uploadedAt]); return { ...file, id:Number(r.rows[0].id) }; } async findById(id:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE id=$1",[id]); return r.rows[0] ? { ...r.rows[0].payload, id:Number(r.rows[0].id), uploadedAt:date(r.rows[0].payload.uploadedAt) } as ProjectFile : null; } async findByProject(projectId:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE project_id=$1 ORDER BY id",[projectId]); return r.rows.map(row=>({ ...row.payload,id:Number(row.id),uploadedAt:date(row.payload.uploadedAt) } as ProjectFile)); } async findDeleting(limit:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE payload->>'deleting'='true' ORDER BY id LIMIT $1",[limit]); return r.rows.map(row=>({ ...row.payload,id:Number(row.id),uploadedAt:date(row.payload.uploadedAt) } as ProjectFile)); } async markDeleting(id:number) { const r=await this.pool.query("UPDATE project_files SET payload=jsonb_set(payload,'{deleting}','true'::jsonb,true) WHERE id=$1",[id]); if(r.rowCount!==1) throw new NotFoundError("Archivo"); } async delete(id:number) { await this.pool.query("DELETE FROM project_files WHERE id=$1",[id]); } }
 
 export class PostgresProfessionalDocumentRepository implements IProfessionalDocumentRepository {
   constructor(private readonly pool: pg.Pool) {}
@@ -228,6 +253,10 @@ export class PostgresProfessionalDocumentRepository implements IProfessionalDocu
   }
   async findByProfessional(professionalId: number) {
     const result = await this.pool.query("SELECT id,payload FROM professional_documents WHERE professional_id=$1 ORDER BY uploaded_at DESC,id DESC", [professionalId]);
+    return result.rows.map(row => ({ ...row.payload, id: Number(row.id), uploadedAt: date(row.payload.uploadedAt) } as ProfessionalDocument));
+  }
+  async findDeleting(limit: number) {
+    const result = await this.pool.query("SELECT id,payload FROM professional_documents WHERE payload->>'deleting'='true' ORDER BY id LIMIT $1", [limit]);
     return result.rows.map(row => ({ ...row.payload, id: Number(row.id), uploadedAt: date(row.payload.uploadedAt) } as ProfessionalDocument));
   }
   async markDeleting(id: number) { const result = await this.pool.query("UPDATE professional_documents SET payload=jsonb_set(payload,'{deleting}','true'::jsonb,true) WHERE id=$1", [id]); if (result.rowCount !== 1) throw new NotFoundError("Documento"); }

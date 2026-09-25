@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { send as sendEmail } from "@emailjs/browser";
 import { SolicitudesApi, useSubmitSolicitud } from "../api/solicitudes.api";
 import { Input, Textarea, Select, Button } from "@/shared/ui";
 import { useNotifications } from "@/shared/ui/notifications";
@@ -9,29 +8,6 @@ import { validateSolicitud } from "../solicitudes.validation";
 
 interface Props { api: SolicitudesApi; onLogin: () => void; }
 const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-
-const emailJsConfig = {
-  serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID,
-  templateId: import.meta.env.VITE_EMAILJS_AUTOREPLY_TEMPLATE_ID,
-  publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY,
-};
-
-/**
- * The API is the source of truth for a contact request. EmailJS is best-effort:
- * an email provider failure must never prevent the request from being saved.
- */
-function sendAutomaticReply(form: { nombre: string; email: string; telefono: string; tipo: string; descripcion: string }) {
-  const { serviceId, templateId, publicKey } = emailJsConfig;
-  if (!serviceId || !templateId || !publicKey) return Promise.resolve();
-
-  return sendEmail(serviceId, templateId, {
-    nombre: form.nombre,
-    email: form.email,
-    telefono: form.telefono,
-    tipo: form.tipo,
-    descripcion: form.descripcion,
-  }, { publicKey });
-}
 
 function FeaturedBathroom() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -116,7 +92,6 @@ export function PublicLanding({ api, onLogin }: Props) {
     setErrors(next); if (Object.keys(next).length) return;
     try {
       await submit(form);
-      void sendAutomaticReply(form).catch(() => undefined);
       push("Solicitud enviada correctamente. Nuestro equipo la revisará y se pondrá en contacto contigo.", "success");
       setForm({ nombre: "", email: "", telefono: "", tipo: "", descripcion: "" });
       setErrors({});

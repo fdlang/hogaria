@@ -139,6 +139,13 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/catalog.use-cases.ts"], tests: ["apps/api/src/application/use-cases/catalog.use-cases.test.ts", "apps/web/e2e/catalog.browser.ts"],
   },
   {
+    id: "HOG-FIN-002", description: "Cada obra nueva conserva instantáneas fiscales inmutables de la propuesta firmada y de cada orden aprobada, sin reinterpretar importes históricos.", origin: "legal_fiscal", owner: "administracion",
+    assumption: "Base imponible, cuota de IVA y total deben poder reconstruirse exactamente desde los documentos contractuales aceptados.", validScale: "Una entidad fiscal y operaciones en euros; requiere ampliar el modelo antes de admitir otras jurisdicciones, monedas o inversión del sujeto pasivo.", validFrom: "2026-09-25", validUntil: null, nextReview: "2026-12-20",
+    metrics: [metric("fiscal_snapshot_coverage", "Obras nuevas con instantánea fiscal completa", "database"), metric("fiscal_snapshot_rectification_rate", "Rectificaciones por discrepancias de base, IVA o total", "audit_log")],
+    externalValidation: "gestor",
+    implementation: ["packages/domain/src/financial.ts", "apps/api/src/application/use-cases/sales.use-cases.ts", "apps/api/src/infrastructure/database/postgresRepositories.ts"], tests: ["packages/domain/src/financial.test.ts", "apps/api/src/application/use-cases/sales.use-cases.test.ts"],
+  },
+  {
     id: "HOG-FIN-001", description: "Importes y porcentajes se validan en rangos finitos antes de persistirse.", origin: "technical", owner: "administracion",
     assumption: "Los importes se expresan en euros y dos decimales bastan para la operativa no contable.", validScale: "Presupuestos de hasta 1.000 millones de euros; no sustituye un libro contable.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("financial_validation_error_rate", "Entradas financieras rechazadas", "audit_log"), metric("rounding_rectification_rate", "Rectificaciones atribuibles a redondeo")],
@@ -199,5 +206,35 @@ export const BUSINESS_RULES = [
     assumption: "Umbrales distintos por operación son válidos si están centralizados y medidos.", validScale: "Tráfico moderado; revisar al incorporar proxy distribuido o múltiples regiones.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("rate_limit_denial_rate", "Solicitudes denegadas por clase de operación"), metric("expired_rate_key_count", "Claves caducadas pendientes de purga")],
     implementation: ["apps/api/src/application/use-cases/auth.use-cases.ts", "apps/api/src/infrastructure/database/postgresCooldownGate.ts"], tests: ["apps/api/src/application/use-cases/account-activation.use-cases.test.ts"],
+  },
+  {
+    id: "HOG-SEC-007", description: "La sesion y el navegador aplican una politica defensiva comun sin permitir recursos de terceros no aprobados.", origin: "security", owner: "seguridad",
+    assumption: "La aplicacion se sirve desde un unico origen y las integraciones de correo se ejecutan en backend.", validScale: "Un despliegue web y API del mismo origen; revisar antes de incorporar CDN o integraciones embebidas.", validFrom: "2026-09-26", validUntil: null, nextReview: "2026-12-20",
+    metrics: [metric("csp_violation_rate", "Violaciones de CSP observadas"), metric("revoked_session_attempt_rate", "Intentos con sesiones revocadas", "audit_log")],
+    implementation: ["vercel.json", "apps/api/src/application/use-cases/auth.use-cases.ts"], tests: ["apps/api/src/interfaces/http/authController.test.ts", "apps/api/src/application/use-cases/security-regressions.test.ts"],
+  },
+  {
+    id: "HOG-PRJ-003", description: "Una obra solo comienza con fechas coherentes, al menos un hito y un profesional asignado.", origin: "business", owner: "operaciones",
+    assumption: "Una planificacion minima evita iniciar obras sin responsable ni referencia de avance.", validScale: "Obras gestionadas por asignaciones e hitos individuales.", validFrom: "2026-09-26", validUntil: null, nextReview: "2026-12-20",
+    metrics: [metric("project_start_denial_rate", "Inicios bloqueados por planificacion incompleta", "audit_log")],
+    implementation: ["packages/domain/src/workflows.ts", "apps/api/src/application/use-cases/project.use-cases.ts"], tests: ["packages/domain/src/workflows.test.ts", "apps/api/src/application/use-cases/project-professionals.use-cases.test.ts"],
+  },
+  {
+    id: "HOG-COM-003", description: "Cada solicitud guardada genera un acuse duradero e idempotente sin depender del navegador.", origin: "business", owner: "comercial",
+    assumption: "El correo confirma la recepcion, pero la solicitud guardada sigue siendo la fuente de verdad.", validScale: "Volumen moderado cubierto por outbox y reintentos diarios.", validFrom: "2026-09-26", validUntil: null, nextReview: "2026-12-20",
+    metrics: [metric("lead_confirmation_delivery_rate", "Acuses entregados frente a solicitudes", "database"), metric("lead_confirmation_retry_rate", "Reintentos de acuse", "database")],
+    implementation: ["apps/api/database/notification-outbox.sql", "apps/api/src/application/notifications/client-notifications.ts"], tests: ["apps/api/src/application/notifications/client-notifications.test.ts", "apps/api/src/application/use-cases/solicitud.use-cases.test.ts"],
+  },
+  {
+    id: "HOG-BIL-001", description: "Facturas y cobros usan estados explicitos y solo transiciones autorizadas.", origin: "legal_fiscal", owner: "administracion",
+    assumption: "El modelo se define antes de implementar emision, cobro y conciliacion.", validScale: "Una entidad fiscal y pagos en euros; pendiente de validar por gestor antes de activar el modulo.", validFrom: "2026-09-26", validUntil: null, nextReview: "2026-12-20", externalValidation: "gestor",
+    metrics: [metric("invoice_transition_denial_rate", "Transiciones de factura rechazadas"), metric("payment_reconciliation_exception_rate", "Excepciones de conciliacion")],
+    implementation: ["packages/domain/src/billing.ts"], tests: ["packages/domain/src/billing.test.ts"],
+  },
+  {
+    id: "HOG-GOV-MET-001", description: "Ninguna regla se declara efectiva sin una metrica con fuente identificada o un pendiente explicito.", origin: "technical", owner: "direccion",
+    assumption: "El catalogo distingue evidencia disponible de instrumentacion pendiente.", validScale: "Todo el catalogo de reglas de Hogaria.", validFrom: "2026-09-26", validUntil: null, nextReview: "2026-12-20",
+    metrics: [metric("unowned_metric_count", "Metricas sin fuente instrumentada")],
+    implementation: ["packages/domain/src/rules/index.ts"], tests: ["packages/domain/src/rules/rules.test.ts"],
   },
 ] as const satisfies readonly BusinessRuleMetadata[];

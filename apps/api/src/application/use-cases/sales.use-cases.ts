@@ -21,13 +21,15 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  RateLimitError,
   ValidationError,
 } from "@reformapro/domain/errors";
 import { validateDraft } from "./estimate-validation.js";
 import type { ClientContext } from "./auth.use-cases.js";
 import type { ISolicitudRepository, ICooldownGate } from "./solicitud.use-cases.js";
+import { ABUSE_LIMITS, canTransitionOpportunity, isOpenOpportunity } from "@reformapro/domain";
 import type { ISignatureCrypto } from "../../infrastructure/crypto/crypto.service.js";
-import { calculateEstimateTotals, isValidSpanishPhone } from "@reformapro/domain";
+import { calculateEstimateTotals, createFiscalSnapshot, isValidSpanishPhone } from "@reformapro/domain";
 
 type OpportunityInput = Pick<
   Opportunity,
@@ -102,20 +104,6 @@ class PassthroughCommercialTransaction
 
 function assertAdmin(user: User | null): asserts user is User {
   if (!user || user.rol !== "admin") throw new ForbiddenError();
-}
-const opportunityTransitions: Record<OpportunityStatus, OpportunityStatus[]> = {
-  nueva: ["contactada", "en_estudio", "descartada"],
-  contactada: ["visita_agendada", "en_estudio", "descartada"],
-  visita_agendada: ["en_estudio", "descartada"],
-  en_estudio: ["ganada", "descartada"],
-  ganada: [],
-  descartada: [],
-};
-function canTransitionOpportunity(from: OpportunityStatus, to: OpportunityStatus) {
-  return from === to || opportunityTransitions[from].includes(to);
-}
-function isOpenOpportunity(status: OpportunityStatus) {
-  return status !== "ganada" && status !== "descartada";
 }
 function publicSnapshot(draft: EstimateDraft): PublicEstimateSnapshot {
   return {
@@ -266,6 +254,7 @@ export class OpportunityUseCases {
     }
     if (changes.estado !== undefined && !["nueva", "contactada", "visita_agendada", "en_estudio", "ganada", "descartada"].includes(changes.estado)) throw new ValidationError("Estado no válido", "estado");
     if (changes.estado !== undefined && changes.estado !== current.estado) {
+      if (changes.estado === "ganada") throw new ConflictError("Transición no permitida: la oportunidad solo se marca como ganada durante la conversión de una propuesta firmada");
       if (!canTransitionOpportunity(current.estado, changes.estado)) throw new ConflictError("Transición comercial no permitida");
     }
     if (changes.fechaVisita !== undefined && changes.fechaVisita !== null && (!(changes.fechaVisita instanceof Date) || !Number.isFinite(changes.fechaVisita.getTime()))) throw new ValidationError("Fecha no válida", "fechaVisita");
@@ -284,6 +273,7 @@ export class EstimateUseCases {
     private readonly events: IEventEmitter,
     private readonly crypto: ISignatureCrypto,
     transaction?: ICommercialTransaction,
+    private readonly gate?: ICooldownGate,
   ) {
     this.transaction =
       transaction ??
@@ -314,6 +304,7 @@ export class EstimateUseCases {
         buffered,
         this.crypto,
         new PassthroughCommercialTransaction(repositories),
+        this.gate,
       );
       service.locked = true;
       return operation(service);
@@ -341,7 +332,10 @@ export class EstimateUseCases {
               !["borrador", "en_revision"].includes(estimate.estado),
           );
     const clientNames = actor.rol === "admin"
-      ? new Map((await this.users.findByRole("cliente")).map(client => [client.id, client.nombre]))
+      ? new Map((await Promise.all([...new Set(items.map((item) => item.clienteId))]
+          .map((id) => this.users.findById(id))))
+          .filter((client): client is User => client?.rol === "cliente")
+          .map((client) => [client.id, client.nombre]))
       : new Map([[actor.id, actor.nombre]]);
     return Promise.all(items.map((item) =>
       this.clientVisibleView(actor, item, clientNames.get(item.clienteId)),
@@ -632,6 +626,9 @@ export class EstimateUseCases {
         "La validez de esta propuesta ha terminado. Solicita una revisión.",
       );
     }
+    if (this.gate && !(await this.gate.check(`estimate-sign:${actor.id}:${id}:${ctx.ip}`, ABUSE_LIMITS.estimateSignature.limit, ABUSE_LIMITS.estimateSignature.windowMs))) {
+      throw new RateLimitError("Demasiados intentos de firma. Espera un minuto antes de volver a intentarlo");
+    }
     const verified = await this.users.verifyPassword(
       actor.email.value,
       input.password,
@@ -707,7 +704,11 @@ export class EstimateUseCases {
         if (!opportunity) throw new NotFoundError("Oportunidad");
         if (!isOpenOpportunity(opportunity.estado))
           throw new ConflictError("La oportunidad ya no está abierta para conversión");
-        const subtotal = calculateEstimateTotals(current.snapshot.partidas).totalSinIva;
+        const fiscalSnapshot = createFiscalSnapshot(
+          current.snapshot.partidas,
+          { type: "estimate", id: estimate.id, version: current.version },
+          current.firmadoAt,
+        );
         const project: Project = {
           id: 0,
           estimateId: estimate.id,
@@ -718,7 +719,8 @@ export class EstimateUseCases {
           tipo: opportunity.tipo,
           estado: "planificacion",
           progreso: Percentage.zero(),
-          presupuesto: Money.of(subtotal),
+          presupuesto: Money.of(fiscalSnapshot.baseAmount),
+          fiscalSnapshots: [fiscalSnapshot],
           fechaInicio: new Date(),
           fechaFinPrevista: new Date(),
           profesionalesAsignados: [],
@@ -864,7 +866,7 @@ export class ChangeOrderUseCases {
     }
     if (!["aprobado", "rechazado"].includes(next)) throw new ValidationError("Acción no válida");
     if (actor.rol !== "cliente" || project.clienteId !== actor.id) throw new ForbiddenError();
-    if (this.gate && !(await this.gate.check(`change-decision:${actorId}`, 5, 60000))) throw new ForbiddenError("Espera un minuto antes de volver a intentarlo");
+    if (this.gate && !(await this.gate.check(`change-decision:${actorId}`, ABUSE_LIMITS.changeDecision.limit, ABUSE_LIMITS.changeDecision.windowMs))) throw new ForbiddenError("Espera un minuto antes de volver a intentarlo");
     if (typeof password !== "string" || password.length > 72 || !(await this.users.verifyPassword(actor.email.value, password))) throw new ForbiddenError("Confirma tu contraseña para registrar la decisión");
     await this.changes.transition(id, projectId, "enviado", next as "aprobado" | "rechazado", actor.id);
     return (await this.list(actorId, projectId)).find(item => item.id === id)!;

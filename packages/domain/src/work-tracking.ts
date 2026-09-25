@@ -10,6 +10,7 @@ export interface WorkRate {
   unitLabel: string;
   effectiveAt: string;
   createdAt: string;
+  createdBy?: number;
 }
 export interface WorkPause {
   startedAt: string;
@@ -37,9 +38,10 @@ export interface WorkEntry {
   approvedBy: number | null;
   approvedAt: string | null;
   reviewReason: string;
+  lastCorrectedBy?: number | null;
   createdAt: string;
 }
-export type PublicWorkEntry = Omit<WorkEntry, "rate" | "approvedCostCents">;
+export type PublicWorkEntry = Omit<WorkEntry, "rate" | "approvedCostCents" | "lastCorrectedBy">;
 export interface WorkEvent {
   id: string;
   professionalId: number;

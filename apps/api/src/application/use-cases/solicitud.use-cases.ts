@@ -12,7 +12,8 @@ import { Email } from "@reformapro/domain/value-objects";
 import { ForbiddenError, NotFoundError, ValidationError, RateLimitError } from "@reformapro/domain/errors";
 import type { IUserRepository } from "@reformapro/domain/repositories";
 import { ClientContext } from "./auth.use-cases.js";
-import { isValidSpanishPhone } from "@reformapro/domain";
+import { ABUSE_LIMITS, isValidSpanishPhone } from "@reformapro/domain";
+import type { PageResult } from "@reformapro/domain/repositories";
 
 type SolicitudStatus = "pendiente" | "contactado" | "rechazado";
 export interface Solicitud {
@@ -22,6 +23,7 @@ export interface Solicitud {
 export interface ISolicitudRepository {
   save(s: Omit<Solicitud, "id" | "motivo">): Promise<{ id: number }>;
   findAll(): Promise<Solicitud[]>;
+  findPage(query: { page: number; limit: number }): Promise<PageResult<Solicitud>>;
   findById(id: number): Promise<Solicitud | null>;
   update(id: number, changes: Pick<Solicitud, "estado" | "motivo">): Promise<Solicitud>;
 }
@@ -35,6 +37,7 @@ export class SubmitSolicitudUseCase {
   constructor(
     private readonly solicitudes: ISolicitudRepository,
     private readonly gate: ICooldownGate,
+    private readonly notifyReceived?: (solicitudId: number) => Promise<void>,
   ) {}
 
   async execute(cmd: {
@@ -43,7 +46,7 @@ export class SubmitSolicitudUseCase {
   }): Promise<{ id: number }> {
     // Rate limit per IP — 3 submissions per hour
     const key = `solicitud:${cmd.ctx.ip}`;
-    if (!(await this.gate.check(key, 3, 60 * 60 * 1000))) {
+    if (!(await this.gate.check(key, ABUSE_LIMITS.contactRequest.limit, ABUSE_LIMITS.contactRequest.windowMs))) {
       throw new RateLimitError();
     }
 
@@ -57,7 +60,7 @@ export class SubmitSolicitudUseCase {
     const email = Email.of(cmd.email); // throws if malformed
 
     // Allowlist + length clamps
-    return this.solicitudes.save({
+    const saved = await this.solicitudes.save({
       nombre:      cmd.nombre.trim().slice(0, 100),
       email:       email.value,
       telefono:   (cmd.telefono ?? "").trim().slice(0, 20),
@@ -67,6 +70,8 @@ export class SubmitSolicitudUseCase {
       estado:      "pendiente",
       ip:          cmd.ctx.ip,
     });
+    await this.notifyReceived?.(saved.id);
+    return saved;
   }
 }
 
@@ -76,6 +81,11 @@ export class ListSolicitudesUseCase {
     const actor = await this.users.findById(actorId);
     if (!actor || actor.rol !== "admin") throw new ForbiddenError();
     return this.solicitudes.findAll();
+  }
+  async executePage(actorId: number, query: { page: number; limit: number }): Promise<PageResult<Solicitud>> {
+    const actor = await this.users.findById(actorId);
+    if (!actor || actor.rol !== "admin") throw new ForbiddenError();
+    return this.solicitudes.findPage(query);
   }
 }
 

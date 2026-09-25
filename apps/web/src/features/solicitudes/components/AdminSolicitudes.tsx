@@ -14,6 +14,7 @@ import { formatDateTime } from "@/shared/lib/formatters";
 export class AdminSolicitudesApi {
   constructor(private readonly http: ApiClient) {}
   list(): Promise<SolicitudDTO[]> { return this.http.get("/solicitudes"); }
+  page(page: number, limit = 20): Promise<SolicitudPage> { return this.http.get(`/solicitudes?page=${page}&limit=${limit}`); }
   convert(id: number, direccion: string): Promise<{ id: number }> { return this.http.post(`/solicitudes/${id}/opportunity`, { direccion }); }
   markContacted(id: number): Promise<void> { return this.http.post(`/solicitudes/${id}/contact`, {}); }
   reject(id: number, reason: string): Promise<void> { return this.http.post(`/solicitudes/${id}/reject`, { reason }); }
@@ -26,6 +27,7 @@ export interface SolicitudDTO {
   estado: "pendiente" | "contactado" | "rechazado";
   ip: string;
 }
+interface SolicitudPage { items: SolicitudDTO[]; total: number; page: number; limit: number; pages: number }
 
 interface Props { api: AdminSolicitudesApi }
 
@@ -34,6 +36,8 @@ export function AdminSolicitudes({ api }: Props) {
   const [converting, setConverting] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [items, setItems]     = useState<SolicitudDTO[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageInfo, setPageInfo] = useState({ total: 0, pages: 1 });
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [detail, setDetail]   = useState<SolicitudDTO | null>(null);
@@ -51,10 +55,10 @@ export function AdminSolicitudes({ api }: Props) {
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
-    try { setItems(await api.list()); }
+    try { const result = await api.page(page); setItems(result.items); setPageInfo({ total: result.total, pages: result.pages }); }
     catch (e) { setError((e as { message?: string }).message ?? "Error"); }
     finally   { setLoading(false); }
-  }, [api]);
+  }, [api, page]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -86,7 +90,7 @@ export function AdminSolicitudes({ api }: Props) {
         <div>
           <h1 style={{ fontSize: 38, fontWeight: 700, color: "#302d29" }}>Solicitudes</h1>
           <p style={{ fontSize: 13, color: "#71685e", marginTop: 6 }}>
-            {pending.length} pendientes · {items.length} totales
+            {pageInfo.total} solicitudes · {pending.length} pendientes en esta página
           </p>
         </div>
         <Button small variant="ghost" onClick={load}>↻ Actualizar</Button>
@@ -120,6 +124,11 @@ export function AdminSolicitudes({ api }: Props) {
               </article>
             ))}
           </div>}
+      <div className="private-pagination" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginTop: 18 }}>
+        <Button small variant="ghost" disabled={page <= 1 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button>
+        <span>Página {page} de {pageInfo.pages}</span>
+        <Button small variant="ghost" disabled={page >= pageInfo.pages || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button>
+      </div>
 
       <Modal open={!!detail} onClose={() => { setDetail(null); setAddress(""); }} title="Detalle de solicitud" width={600}>
         {detail && (

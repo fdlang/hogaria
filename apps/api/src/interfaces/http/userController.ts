@@ -11,6 +11,7 @@ import { ValidationError } from "@reformapro/domain/errors";
 import { HttpRequest, HttpResponse } from "./authController.js";
 
 import { toUserDTO } from "./userDTO.js";
+import { parsePagination, wantsPagination } from "./pagination.js";
 
 export function userController(deps: {
   create: CreateUserUseCase;
@@ -53,7 +54,7 @@ export function userController(deps: {
     // PATCH /users/:id
     async update(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {
-        const body = req.body as { nombre?: string; telefono?: string; profesion?: string; activo?: boolean; newPassword?: string };
+        const body = req.body as { nombre?: string; telefono?: string; profesion?: string; activo?: boolean };
         const user = await deps.update.execute({
           actorId: req.actorId, userId: idOf(req.params.id),
           ctx: ctxOf(req),
@@ -75,10 +76,16 @@ export function userController(deps: {
     },
 
     // GET /users?role=cliente
-    async list(req: HttpRequest & { actorId: number; query: { role?: string } }): Promise<HttpResponse> {
+    async list(req: HttpRequest & { actorId: number; query: { role?: string; status?: string; search?: string; page?: string; limit?: string } }): Promise<HttpResponse> {
       try {
         const cmd: { actorId: number; role?: UserRole } = { actorId: req.actorId };
         if (req.query.role) { if (!["admin","cliente","profesional"].includes(req.query.role)) throw new ValidationError("Rol no válido", "role"); cmd.role = req.query.role as UserRole; }
+        if (wantsPagination(req.query)) {
+          const status = req.query.status ?? "current";
+          if (!["current","active","pending_activation","archived","all"].includes(status)) throw new ValidationError("Estado no válido", "status");
+          const page = await deps.list.executePage({ ...cmd, ...parsePagination(req.query), search: (req.query.search ?? "").trim().slice(0, 100), status: status as "current" | "active" | "pending_activation" | "archived" | "all" });
+          return { status: 200, body: { ...page, items: page.items.map(toUserDTO) } };
+        }
         const users = await deps.list.execute(cmd);
         return { status: 200, body: users.map(toUserDTO) };
       } catch (e) { return toHttpError(e); }

@@ -9,6 +9,7 @@ import { UnauthorizedError, ValidationError } from "@reformapro/domain/errors";
 import { User } from "@reformapro/domain/entities";
 import { RateLimitError } from "@reformapro/domain/errors";
 import type { ICooldownGate } from "./solicitud.use-cases.js";
+import { ABUSE_LIMITS } from "@reformapro/domain";
 
 export interface ITokenService {
   sign(payload: { userId: number; email: string; rol: string; exp: number; sessionVersion: number }): Promise<string>;
@@ -37,7 +38,7 @@ export class LoginUseCase {
 
   async execute(email: string, password: string, ctx: ClientContext): Promise<LoginResult> {
     if (!email || !password) throw new ValidationError("Email y contraseña obligatorios");
-    if (!(await this.loginGate.check(`login:${ctx.ip}:${email.trim().toLowerCase()}`, 8, 15 * 60 * 1000))) {
+    if (!(await this.loginGate.check(`login:${ctx.ip}:${email.trim().toLowerCase()}`, ABUSE_LIMITS.login.limit, ABUSE_LIMITS.login.windowMs))) {
       throw new RateLimitError("Demasiados intentos. Espera unos minutos antes de volver a intentarlo.");
     }
 

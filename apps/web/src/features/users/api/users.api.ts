@@ -22,12 +22,20 @@ export interface ProfessionalDocumentDTO {
   id: number; professionalId: number; uploadedBy: number;
   nombre: string; tipo: string; tamano: number; uploadedAt: string;
 }
+export interface UserPage { items: UserDTO[]; total: number; page: number; limit: number; pages: number }
 
 export class UsersApi {
   constructor(private readonly http: ApiClient) {}
   list(role?: UserDTO["rol"]): Promise<UserDTO[]> { return this.http.get(role ? `/users?role=${role}` : "/users"); }
+  page(query: { page: number; limit?: number; search?: string; role?: UserDTO["rol"] | "all"; status?: string }): Promise<UserPage> {
+    const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit ?? 20) });
+    if (query.search) params.set("search", query.search);
+    if (query.role && query.role !== "all") params.set("role", query.role);
+    if (query.status) params.set("status", query.status);
+    return this.http.get(`/users?${params}`);
+  }
   create(payload: CreateUserPayload): Promise<{ user: UserDTO; invitationSent: boolean }> { return this.http.post("/users", payload); }
-  update(id: number, changes: Partial<UserDTO> & { newPassword?: string }): Promise<UserDTO> { return this.http.patch(`/users/${id}`, changes); }
+  update(id: number, changes: Partial<UserDTO>): Promise<UserDTO> { return this.http.patch(`/users/${id}`, changes); }
   delete(id: number): Promise<void> { return this.http.delete(`/users/${id}`); }
   reactivate(id: number): Promise<{ sent: boolean; status: "sent" | "existing_or_in_progress"; expiresAt?: string; email: string }> { return this.http.post(`/users/${id}/reactivate`, {}); }
   activateAccount(token: string, password: string): Promise<void> { return this.http.post("/auth/activate", { token, password }); }

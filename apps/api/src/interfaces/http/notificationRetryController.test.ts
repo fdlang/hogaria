@@ -1,6 +1,15 @@
 import {describe,it,expect,vi} from "vitest";
 import {notificationRetryController} from "./notificationRetryController.js";
 describe("notification retry endpoint",()=>{
+ it("retries pending Blob deletions after authenticating the scheduler",async()=>{
+  const service={retry:vi.fn(async()=>({processed:0,configured:true}))};
+  const maintenance={execute:vi.fn(async()=>({processed:1,deleted:1,failed:0}))};
+  const handler=notificationRetryController(service,()=>({secret:"test-secret",enabled:false}),maintenance);
+  expect((await handler({headers:{authorization:"Bearer test-secret"}} as never)).status).toBe(200);
+  expect(maintenance.execute).toHaveBeenCalledOnce();
+  await handler({headers:{authorization:"Bearer wrong"}} as never);
+  expect(maintenance.execute).toHaveBeenCalledOnce();
+ });
  it("accepts independent scheduler secrets without replacing the existing cron secret",async()=>{
   const service={retry:vi.fn(async()=>({processed:1,configured:true}))};
   const handler=notificationRetryController(service,()=>({secret:"vercel-secret",retrySecret:"github-secret",enabled:true}));

@@ -33,6 +33,7 @@ export interface IFileRepository {
   save(f: Omit<ProjectFile, "id">): Promise<ProjectFile>;
   findById(id: number): Promise<ProjectFile | null>;
   findByProject(projectId: number): Promise<ProjectFile[]>;
+  findDeleting(limit: number): Promise<ProjectFile[]>;
   markDeleting(id: number): Promise<void>;
   delete(id: number): Promise<void>;
 }
@@ -199,7 +200,9 @@ export class DownloadFileUseCase {
 
 function canReadFile(file:ProjectFile,role:UserRole):boolean {
   if(role==="admin")return true;
-  const classification=file.classification??(file.sensitive?"reservado":"publico");
+  // Historical records without an explicit classification fail closed. An
+  // administrator must classify them before sharing them with another role.
+  const classification=file.classification??"reservado";
   if(role==="profesional")return classification==="publico"||classification==="tecnico";
   if(role==="cliente")return classification!=="reservado";
   return false;

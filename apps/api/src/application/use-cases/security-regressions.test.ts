@@ -19,7 +19,7 @@ async function setup() {
   const admin = await users.save({ id: 0, email: Email.of("admin@test.es"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() });
   const client = await users.save({ id: 0, email: Email.of("client@test.es"), nombre: "Client", rol: "cliente", activo: false, createdAt: new Date() });
   const events = new InMemoryEventEmitter();
-  return { users, admin, client, events, update: new UpdateUserUseCase(users, hasher, events) };
+  return { users, admin, client, events, update: new UpdateUserUseCase(users, events) };
 }
 
 describe("Security and integrity regressions", () => {
@@ -77,15 +77,9 @@ describe("Security and integrity regressions", () => {
     const service = new EstimateUseCases(users, new InMemoryOpportunityRepository(), new InMemoryEstimateRepository(), new InMemoryProjectRepository(), events, {} as never);
     await expect(service.adminDraft(client.id, 1)).rejects.toThrow();
   });
-  it("rejects an invalid password without saving profile changes", async () => {
+  it("requires a personal recovery link instead of an administrator-assigned password", async () => {
     const { users, admin, client, update } = await setup();
-    await expect(update.execute({ actorId: admin.id, userId: client.id, changes: { nombre: "Changed", newPassword: "short" }, ctx })).rejects.toThrow();
-    expect((await users.findById(client.id))?.nombre).toBe("Client");
-  });
-  it("does not save profile changes when hashing fails", async () => {
-    const { users, admin, client, events } = await setup();
-    const update = new UpdateUserUseCase(users, { ...hasher, hash: async () => { throw new Error("Unavailable"); } }, events);
-    await expect(update.execute({ actorId: admin.id, userId: client.id, changes: { nombre: "Changed", newPassword: "SecurePassword123" }, ctx })).rejects.toThrow("Unavailable");
+    await expect(update.execute({ actorId: admin.id, userId: client.id, changes: { nombre: "Changed", newPassword: "SecurePassword123" } as never, ctx })).rejects.toThrow("no permitido");
     expect((await users.findById(client.id))?.nombre).toBe("Client");
   });
   it("prevents self deactivation and removing the last active admin", async () => {
@@ -195,6 +189,7 @@ describe("Security and integrity regressions", () => {
     } as never;
     const dto = toProjectDTO(project, "professional");
     expect(dto).not.toHaveProperty("presupuesto");
+    expect(dto).not.toHaveProperty("financialSummary");
     expect(dto).not.toHaveProperty("estimateId");
     expect(dto).not.toHaveProperty("clienteId");
     expect(dto).toMatchObject({ id: 7, nombre: "Obra", direccion: "Madrid", progreso: 30 });
@@ -220,6 +215,7 @@ describe("Security and integrity regressions", () => {
     const project = {
       id: 8, revision: 1, estimateId: 92, nombre: "Obra cliente", descripcion: "", clienteId: client.id,
       direccion: "Madrid", tipo: "Reforma", estado: "en_curso", progreso: { value: 30 }, presupuesto: { amount: 48500 },
+      fiscalSnapshots: [{ baseAmount: 48500, vatAmount: 10185, totalAmount: 58685, vatBreakdown: [{ rate: 21, baseAmount: 48500, vatAmount: 10185, totalAmount: 58685 }], source: { type: "estimate", id: 92, version: 1 }, capturedAt: new Date() }],
       fechaInicio: new Date(), fechaFinPrevista: new Date(),
       profesionalesAsignados: [{ userId: 41, profesion: "carpintero" }], hitos: [], createdAt: new Date(),
     } as never;
@@ -227,7 +223,7 @@ describe("Security and integrity regressions", () => {
     const response = await controller.list({ actorId: client.id } as never);
     expect(response.status).toBe(200);
     expect((response.body as Array<Record<string, unknown>>)[0]).not.toHaveProperty("profesionalesAsignados");
-    expect((response.body as Array<Record<string, unknown>>)[0]).toMatchObject({ presupuesto: 48500, clienteId: client.id });
+    expect((response.body as Array<Record<string, unknown>>)[0]).toMatchObject({ presupuesto: 48500, clienteId: client.id, financialSummary: { baseAmount: 48500, vatAmount: 10185, totalAmount: 58685 } });
   });
   it("never exposes invoices, contracts or reserved files to an assigned professional", async () => {
     const { users } = await setup();
@@ -245,6 +241,7 @@ describe("Security and integrity regressions", () => {
       { ...base, id: 3, storageKey: "contract", classification: "contrato", sensitive: true },
       { ...base, id: 4, storageKey: "invoice", classification: "factura", sensitive: true },
       { ...base, id: 5, storageKey: "reserved", classification: "reservado", sensitive: true },
+      { ...base, id: 6, storageKey: "legacy-unclassified" },
     ];
     const files = {
       findByProject: vi.fn(async () => stored),
@@ -255,7 +252,7 @@ describe("Security and integrity regressions", () => {
     const storage = { get: vi.fn(async () => new Uint8Array([1])) } as never;
     const download = new DownloadFileUseCase(users, projects, files, storage);
     await expect(download.execute({ actorId: professional.id, fileId: 2 })).resolves.toBeDefined();
-    for (const fileId of [3, 4, 5]) await expect(download.execute({ actorId: professional.id, fileId })).rejects.toThrow();
+    for (const fileId of [3, 4, 5, 6]) await expect(download.execute({ actorId: professional.id, fileId })).rejects.toThrow();
     expect(storage.get).toHaveBeenCalledTimes(1);
   });
   it("does not expose private storage keys in file metadata", () => {

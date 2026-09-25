@@ -56,6 +56,7 @@ import { IAuditRepository, ICatalogRepository, IChangeOrderRepository, IEstimate
 import { PostgresAuditRepository, PostgresCatalogRepository, PostgresChangeOrderRepository, PostgresEstimateRepository, PostgresFileRepository, PostgresOpportunityRepository, PostgresProjectRepository, PostgresSolicitudRepository, PostgresUserRepository } from "./infrastructure/database/postgresRepositories.js";
 import { PostgresProfessionalDocumentRepository } from "./infrastructure/database/postgresRepositories.js";
 import { ProfessionalDocumentUseCases, type IProfessionalDocumentRepository, type ProfessionalDocument } from "./application/use-cases/professional-document.use-cases.js";
+import { RetryPendingDeletionsUseCase } from "./application/use-cases/deletion-retry.use-cases.js";
 import pg from "pg";
 import { auditedPool } from "./infrastructure/audit/request-audit.js";
 import { PostgresCooldownGate } from "./infrastructure/database/postgresCooldownGate.js";
@@ -73,6 +74,7 @@ class InMemorySolicitudRepository implements ISolicitudRepository {
     return { id };
   }
   async findAll(): Promise<Solicitud[]> { return [...this.items].sort((a, b) => b.fecha.getTime() - a.fecha.getTime()); }
+  async findPage(query: { page: number; limit: number }) { const sorted = await this.findAll(); const start = (query.page - 1) * query.limit; return { items: sorted.slice(start, start + query.limit), total: sorted.length, page: query.page, limit: query.limit, pages: Math.max(1, Math.ceil(sorted.length / query.limit)) }; }
   async findById(id: number): Promise<Solicitud | null> { return this.items.find(item => item.id === id) ?? null; }
   async update(id: number, changes: Pick<Solicitud, "estado" | "motivo">): Promise<Solicitud> {
     const index = this.items.findIndex(item => item.id === id);
@@ -97,6 +99,7 @@ class InMemoryFileRepository implements IFileRepository {
   async findByProject(projectId: number): Promise<ProjectFile[]> {
     return this.files.filter(f => f.projectId === projectId);
   }
+  async findDeleting(limit: number): Promise<ProjectFile[]> { return this.files.filter(file => file.deleting).slice(0, limit); }
   async markDeleting(id: number): Promise<void> {
     const file = this.files.find(f => f.id === id);
     if (!file) throw new NotFoundError("Archivo");
@@ -115,6 +118,7 @@ class InMemoryProfessionalDocumentRepository implements IProfessionalDocumentRep
   async save(document: Omit<ProfessionalDocument, "id">) { const saved = { ...document, id: this.nextId++ }; this.documents.push(saved); return saved; }
   async findById(id: number) { return this.documents.find(document => document.id === id) ?? null; }
   async findByProfessional(professionalId: number) { return this.documents.filter(document => document.professionalId === professionalId); }
+  async findDeleting(limit: number) { return this.documents.filter(document => document.deleting).slice(0, limit); }
   async markDeleting(id: number) { const document = await this.findById(id); if (!document) throw new NotFoundError("Documento"); document.deleting = true; }
   async delete(id: number) { const index = this.documents.findIndex(document => document.id === id); if (index === -1) throw new NotFoundError("Documento"); this.documents.splice(index, 1); }
 }
@@ -153,6 +157,7 @@ interface AppDependencies {
     estimateDocuments:         EstimateDocumentUseCases;
     notifications:             ClientNotifications;
     professionalDocuments:     ProfessionalDocumentUseCases;
+    retryPendingDeletions:     RetryPendingDeletionsUseCase;
   };
 }
 
@@ -206,19 +211,19 @@ export async function buildApp(): Promise<AppDependencies> {
   // ── Cross-cutting: audit subscriber ───────────────────────────
   const auditor = new AuditSubscriber(events, audit);
   auditor.start();
-  const notifications = new ClientNotifications(users, projects, estimates, files,
+  const notifications = new ClientNotifications(users, projects, estimates, files, solicitudes,
     pool ? new PostgresNoticeStore(pool) : new MemoryNoticeStore(),
     new ResendClientNotifications(process.env.RESEND_API_KEY, process.env.EMAIL_FROM, process.env.APP_URL));
   if (process.env.CLIENT_NOTIFICATIONS_ENABLED === "true") notifications.start(events, !!pool);
 
   // ── Use cases ──────────────────────────────────────────────────
   const workStore = pool ? new PostgresWorkStore(pool) : new MemoryWorkStore();
-  const estimateCases = new EstimateUseCases(users, opportunities, estimates, projects, events, sigCrypto, pool ? new PostgresCommercialTransaction(pool, hasher) : undefined);
+  const estimateCases = new EstimateUseCases(users, opportunities, estimates, projects, events, sigCrypto, pool ? new PostgresCommercialTransaction(pool, hasher) : undefined, cooldown);
   const useCases = {
     login:                      new LoginUseCase(users, tokens, events, cooldown),
     notifications,
     createUser:                 new CreateUserUseCase(users, hasher, generateTempPassword, events, activation),
-    updateUser:                 new UpdateUserUseCase(users, hasher, events),
+    updateUser:                 new UpdateUserUseCase(users, events),
     deleteUser:                 new DeleteUserUseCase(users, events),
     listUsers:                  new ListUsersUseCase(users),
     updateProject:              new UpdateProjectUseCase(users, projects, events),
@@ -227,7 +232,8 @@ export async function buildApp(): Promise<AppDependencies> {
     assignProjectProfessional:  new AssignProjectProfessionalUseCase(users, projects),
     unassignProjectProfessional:new UnassignProjectProfessionalUseCase(users, projects),
     queryAuditLog:              new QueryAuditLogUseCase(users, audit),
-    submitSolicitud:            new SubmitSolicitudUseCase(solicitudes, cooldown),
+    submitSolicitud:            new SubmitSolicitudUseCase(solicitudes, cooldown,
+      pool ? undefined : (solicitudId) => notifications.receiveLead(solicitudId)),
     listSolicitudes:            new ListSolicitudesUseCase(users, solicitudes),
     updateSolicitudStatus:      new UpdateSolicitudStatusUseCase(users, solicitudes),
     uploadFile:                 new UploadFileUseCase(users, projects, files, fileStorage, events),
@@ -242,6 +248,7 @@ export async function buildApp(): Promise<AppDependencies> {
     activation,
     work: new WorkTrackingUseCases(users, projects, workStore),
     professionalDocuments: new ProfessionalDocumentUseCases(users, professionalDocuments, fileStorage),
+    retryPendingDeletions: new RetryPendingDeletionsUseCase(files, professionalDocuments, fileStorage),
   };
 
   return { users, tokens, useCases };

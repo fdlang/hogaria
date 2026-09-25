@@ -20,6 +20,10 @@ function fixture() {
       clienteId: 1,
       estado: "planificacion",
       progreso: 0,
+      fechaInicio: new Date("2026-10-01"),
+      fechaFinPrevista: new Date("2026-10-31"),
+      profesionalesAsignados: [2],
+      hitos: [{ id: "h1", nombre: "Inicio", completado: false }],
     })),
     update: vi.fn(),
   };
@@ -27,6 +31,7 @@ function fixture() {
     findById: vi.fn(async () => ({ id: 20, clienteId: 1, estado: "enviado" })),
   };
   const files = { findById: vi.fn(async () => ({ id: 30, projectId: 10, classification: "publico" })) };
+  const solicitudes = { findById: vi.fn(async () => ({ id: 40, email: "lead@test.es" })) };
   const mail = { configured: () => true, send: vi.fn(async () => "receipt") },
     store = new MemoryNoticeStore(),
     report = vi.fn();
@@ -35,11 +40,12 @@ function fixture() {
     projects as never,
     estimates as never,
     files as never,
+    solicitudes as never,
     store,
     mail,
     report,
   );
-  return { users, projects, estimates, files, mail, store, service, report };
+  return { users, projects, estimates, files, solicitudes, mail, store, service, report };
 }
 function event(
   type: DomainEvent["type"],
@@ -104,6 +110,14 @@ describe("Client notification privacy and delivery", () => {
     f.files.findById.mockResolvedValue({ id: 30, projectId: 10, classification: "reservado" });
     await f.service.receive(event("FileUploaded"));
     expect(f.mail.send).not.toHaveBeenCalled();
+  });
+  it("confirms a saved public request without requiring a client account", async () => {
+    const f = fixture();
+    await f.service.receiveLead(40, "00000000-0000-4000-8000-000000000040");
+    expect(f.mail.send).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "lead-confirmation", resourceId: 40 }),
+      "lead@test.es",
+    );
   });
   it("persists a failed delivery, waits before retry and rechecks ownership", async () => {
     vi.useFakeTimers();
@@ -198,6 +212,19 @@ describe("Client notification privacy and delivery", () => {
           "http://hogaria.test",
         ).configured(),
       ).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("does not direct a lead without an account to the private area", async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: "1" }) });
+    vi.stubGlobal("fetch", fetcher);
+    try {
+      const mail = new ResendClientNotifications("key", "info@hogaria.test", "https://hogaria.test");
+      await mail.send({ id: "lead", kind: "lead-confirmation", resourceId: 40 }, "lead@test.es");
+      const payload = JSON.parse(fetcher.mock.calls[0]![1].body);
+      expect(payload.text).not.toContain("#/cliente");
+      expect(payload.text).not.toContain("iniciar sesi");
     } finally {
       vi.unstubAllGlobals();
     }

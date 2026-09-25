@@ -5,7 +5,12 @@ CREATE OR REPLACE FUNCTION enqueue_client_account_notice() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE recipient bigint; kind text; notice_id uuid := gen_random_uuid(); resource_id bigint := NEW.id;
 BEGIN
- IF TG_TABLE_NAME='estimates' THEN
+ IF TG_TABLE_NAME='solicitudes' THEN
+  kind:='lead-confirmation';
+  INSERT INTO client_email_notifications(id,payload) VALUES(notice_id,
+   jsonb_build_object('id',notice_id,'kind',kind,'resourceId',resource_id));
+  RETURN NEW;
+ ELSIF TG_TABLE_NAME='estimates' THEN
   IF NEW.estado<>'enviado' OR OLD.estado=NEW.estado THEN RETURN NEW; END IF;
   recipient:=NEW.cliente_id; kind:='estimate';
  ELSIF TG_TABLE_NAME='change_orders' THEN
@@ -38,4 +43,6 @@ DROP TRIGGER IF EXISTS document_client_notice ON project_files;
 CREATE TRIGGER document_client_notice AFTER INSERT ON project_files FOR EACH ROW EXECUTE FUNCTION enqueue_client_account_notice();
 DROP TRIGGER IF EXISTS change_order_client_notice ON change_orders;
 CREATE TRIGGER change_order_client_notice AFTER UPDATE ON change_orders FOR EACH ROW EXECUTE FUNCTION enqueue_client_account_notice();
+DROP TRIGGER IF EXISTS solicitud_received_notice ON solicitudes;
+CREATE TRIGGER solicitud_received_notice AFTER INSERT ON solicitudes FOR EACH ROW EXECUTE FUNCTION enqueue_client_account_notice();
 COMMIT;

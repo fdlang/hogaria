@@ -11,7 +11,7 @@ import { ValidationError, ForbiddenError, NotFoundError, ConflictError } from "@
 import { ClientContext } from "./auth.use-cases.js";
 import { PasswordHasher } from "../../infrastructure/database/inMemoryRepositories.js";
 import { AccountActivationUseCases } from "./account-activation.use-cases.js";
-import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword, isValidSpanishPhone, PROFESIONES } from "@reformapro/domain";
+import { isValidSpanishPhone, PROFESIONES } from "@reformapro/domain";
 
 const isProfesion = (value: unknown): value is Profesion =>
   typeof value === "string" && Object.prototype.hasOwnProperty.call(PROFESIONES, value);
@@ -90,14 +90,13 @@ export class CreateUserUseCase {
 export class UpdateUserUseCase {
   constructor(
     private readonly users: IUserRepository,
-    private readonly hasher: PasswordHasher,
     private readonly events: IEventEmitter,
   ) {}
 
   async execute(cmd: {
     actorId: number;
     userId: number;
-    changes: Partial<Pick<User, "nombre" | "telefono" | "profesion" | "activo">> & { newPassword?: string };
+    changes: Partial<Pick<User, "nombre" | "telefono" | "profesion" | "activo">>;
     ctx: ClientContext;
   }): Promise<User> {
     const actor = await this.users.findById(cmd.actorId);
@@ -106,9 +105,9 @@ export class UpdateUserUseCase {
     const target = await this.users.findById(cmd.userId);
     if (!target) throw new NotFoundError("Usuario");
 
-    const allowed = new Set(["nombre", "telefono", "profesion", "activo", "newPassword"]);
+    const allowed = new Set(["nombre", "telefono", "profesion", "activo"]);
     if (Object.keys(cmd.changes).some(key => !allowed.has(key))) throw new ValidationError("Campo de usuario no permitido");
-    const { newPassword, ...fields } = cmd.changes;
+    const fields = cmd.changes;
     if (fields.activo !== undefined && typeof fields.activo !== "boolean") throw new ValidationError("Estado no válido", "activo");
     if (fields.activo === true && !target.activo) throw new ConflictError("Reactiva la cuenta mediante un enlace de acceso seguro");
     if (fields.nombre !== undefined && (typeof fields.nombre !== "string" || !fields.nombre.trim())) throw new ValidationError("Nombre obligatorio", "nombre");
@@ -118,19 +117,7 @@ export class UpdateUserUseCase {
     }
     if (fields.profesion !== undefined && (target.rol !== "profesional" || !isProfesion(fields.profesion))) throw new ValidationError("Profesión no válida", "profesion");
     if (cmd.actorId === cmd.userId && fields.activo === false) throw new ValidationError("No puedes desactivar tu propia cuenta");
-    if (newPassword !== undefined && !isValidAccountPassword(newPassword)) throw new ValidationError(ACCOUNT_PASSWORD_REQUIREMENTS, "newPassword");
-    const passwordHash = newPassword === undefined ? undefined : await this.hasher.hash(newPassword);
-    const updated = await this.users.update(cmd.userId, fields, passwordHash);
-
-    if (newPassword) {
-      await this.events.emit({
-        type: "UserPasswordReset", eventId: crypto.randomUUID(), occurredAt: new Date(),
-        actorId: actor.id, actorName: actor.nombre,
-        ip: cmd.ctx.ip, userAgent: cmd.ctx.userAgent, userId: target.id,
-      });
-    }
-
-    return updated;
+    return this.users.update(cmd.userId, fields);
   }
 }
 
@@ -164,5 +151,10 @@ export class ListUsersUseCase {
     const actor = await this.users.findById(cmd.actorId);
     if (!actor || actor.rol !== "admin") throw new ForbiddenError();
     return cmd.role ? this.users.findByRole(cmd.role) : this.users.findAll();
+  }
+  async executePage(cmd: { actorId: number; page: number; limit: number; search: string; role?: UserRole; status?: "current" | "active" | "pending_activation" | "archived" | "all" }) {
+    const actor = await this.users.findById(cmd.actorId);
+    if (!actor || actor.rol !== "admin") throw new ForbiddenError();
+    return this.users.findPage(cmd);
   }
 }

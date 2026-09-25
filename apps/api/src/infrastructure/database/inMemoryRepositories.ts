@@ -11,7 +11,7 @@ import {
 import { CatalogItem, ChangeOrder, Estimate, EstimateVersion, Opportunity, OpportunityStatus, User, Project, AuditEntry, UserRole } from "@reformapro/domain/entities";
 import { NotFoundError, ConflictError } from "@reformapro/domain/errors";
 import { Money } from "@reformapro/domain/value-objects";
-import { calculateEstimateTotals } from "@reformapro/domain";
+import { createFiscalSnapshot } from "@reformapro/domain";
 
 // Hashes are stored ONLY hashed, never plaintext.
 export interface PasswordHasher {
@@ -43,6 +43,19 @@ export class InMemoryUserRepository implements IUserRepository {
 
   async findByRole(role: UserRole): Promise<User[]> {
     return this.users.filter(u => u.rol === role).map(u => this.strip(u));
+  }
+
+  async findPage(query: import("@reformapro/domain/repositories").UserPageQuery) {
+    const search = query.search.toLocaleLowerCase("es");
+    const filtered = this.users.filter(user => {
+      if (query.role && user.rol !== query.role) return false;
+      const status = user.accountStatus ?? (user.activo ? "active" : "pending_activation");
+      if (query.status === "current" && status === "archived") return false;
+      if (query.status && !["all", "current"].includes(query.status) && status !== query.status) return false;
+      return !search || user.nombre.toLocaleLowerCase("es").includes(search) || user.email.value.toLocaleLowerCase("es").includes(search);
+    }).sort((left, right) => right.id - left.id);
+    const start = (query.page - 1) * query.limit;
+    return { items: filtered.slice(start, start + query.limit).map(user => this.strip(user)), total: filtered.length, page: query.page, limit: query.limit, pages: Math.max(1, Math.ceil(filtered.length / query.limit)) };
   }
 
   async save(user: User, passwordHash?: string): Promise<User> {
@@ -124,6 +137,12 @@ export class InMemoryProjectRepository implements IProjectRepository {
     return this.projects.filter(p => p.profesionalesAsignados.some(a => a.userId === userId));
   }
   async findAll(): Promise<Project[]> { return [...this.projects]; }
+  async findPage(query: import("@reformapro/domain/repositories").ProjectPageQuery) {
+    const search = query.search.toLocaleLowerCase("es");
+    const filtered = this.projects.filter(project => (!query.status || query.status === "all" || project.estado === query.status) && (!search || project.nombre.toLocaleLowerCase("es").includes(search) || project.direccion.toLocaleLowerCase("es").includes(search))).sort((left, right) => right.id - left.id);
+    const start = (query.page - 1) * query.limit;
+    return { items: filtered.slice(start, start + query.limit), total: filtered.length, page: query.page, limit: query.limit, pages: Math.max(1, Math.ceil(filtered.length / query.limit)) };
+  }
   async save(project: Project): Promise<Project> {
     const id = project.id || this.nextId++;
     if (project.id && id >= this.nextId) this.nextId = id + 1;
@@ -200,8 +219,12 @@ export class InMemoryChangeOrderRepository implements IChangeOrderRepository {
       if (next === "aprobado") {
         const project = await this.projects?.findById(projectId);
         if (!project || !this.projects) throw new NotFoundError("Proyecto");
-        const delta = calculateEstimateTotals(item.payload.partidas).totalSinIva;
-        await this.projects.update(projectId, { presupuesto: project.presupuesto.plus(Money.of(delta)) }, project.revision ?? 0);
+        const approvedAt = new Date();
+        const fiscalSnapshot = createFiscalSnapshot(item.payload.partidas, { type: "change_order", id: item.id }, approvedAt);
+        await this.projects.update(projectId, {
+          presupuesto: project.presupuesto.plus(Money.of(fiscalSnapshot.baseAmount)),
+          ...(project.fiscalSnapshots ? { fiscalSnapshots: [...project.fiscalSnapshots, fiscalSnapshot] } : {}),
+        }, project.revision ?? 0);
       }
       return this.update(id, { estado: next, aprobadoAt: next === "aprobado" ? new Date() : null });
     } finally { this.changing = false; }

@@ -4,6 +4,7 @@ import {
   NotFoundError,
   ValidationError,
   workCostCents,
+  requiresIndependentApproval,
 } from "@reformapro/domain";
 import type {
   WorkEntry,
@@ -176,6 +177,7 @@ export class WorkTrackingUseCases {
       unitLabel,
       effectiveAt,
       createdAt: this.now(),
+      createdBy: actorId,
     };
     return this.store.transaction(professionalId, async (repo) => {
       if (await repo.openEntry(professionalId))
@@ -343,10 +345,16 @@ export class WorkTrackingUseCases {
         entry.approvedAt = null;
         entry.approvedBy = null;
         entry.reviewReason = reason;
+        entry.lastCorrectedBy = actorId;
       } else if (action === "aprobar" || action === "rechazar") {
         if (actor.rol !== "admin") throw new ForbiddenError();
         if (entry.status !== "enviado" || !entry.endedAt)
           throw new ConflictError("Solo se pueden revisar registros enviados");
+        if (action === "aprobar" && requiresIndependentApproval({
+          activeAdministrators: (await this.users.findByRole("admin")).filter((user) => user.activo).length,
+          actorId,
+          originators: [entry.rate.createdBy, entry.lastCorrectedBy],
+        })) throw new ConflictError("La aprobacion requiere otro administrador");
         reason = action === "rechazar" ? text(input.reason, true) : "";
         entry.status = action === "aprobar" ? "aprobado" : "rechazado";
         entry.approvedCostCents =

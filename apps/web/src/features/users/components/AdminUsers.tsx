@@ -5,9 +5,9 @@
  * for a consistent, minimal component. UserFormView inline — tightly coupled.
  */
 
-import { useState, useMemo } from "react";
+import { useDeferredValue, useState } from "react";
 import { UsersApi, UserDTO } from "../api/users.api";
-import { useUsers, useUserMutations } from "../hooks/useUsers";
+import { useUserPage, useUserMutations } from "../hooks/useUsers";
 import { useUserForm } from "../hooks/useUserForm";
 import { usePermissions } from "@/shared/hooks/usePermissions";
 import { useNotifications } from "@/shared/ui/notifications";
@@ -30,7 +30,6 @@ type AccountStatus = NonNullable<UserDTO["accountStatus"]>;
 const accountStatusOf = (user: UserDTO): AccountStatus => user.accountStatus ?? (user.activo ? "active" : "pending_activation");
 
 export function AdminUsers({ api }: Props) {
-  const users     = useUsers(api);
   const mutations = useUserMutations(api);
   const { can }   = usePermissions();
   const { push } = useNotifications();
@@ -40,21 +39,10 @@ export function AdminUsers({ api }: Props) {
   const [filterRol, setFilterRol] = useState<UserDTO["rol"] | "all">("all");
   const [filterStatus, setFilterStatus] = useState<AccountStatus | "current" | "all">("current");
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
+  const [page, setPage] = useState(1);
+  const users = useUserPage(api, page, deferredSearch, filterRol, filterStatus);
   const [reactivatingId, setReactivatingId] = useState<number | null>(null);
-
-  const filtered = useMemo(() => {
-    return (users.data ?? []).filter(u => {
-      if (filterRol !== "all" && u.rol !== filterRol) return false;
-      const status = accountStatusOf(u);
-      if (filterStatus === "current" && status === "archived") return false;
-      if (filterStatus !== "current" && filterStatus !== "all" && status !== filterStatus) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        if (!u.nombre.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }, [users.data, filterRol, filterStatus, search]);
 
   const handleDelete = async (user: UserDTO) => {
     const ok = await confirm({
@@ -116,7 +104,7 @@ export function AdminUsers({ api }: Props) {
     <section className="private-page">
       <PageHeader
         title="Usuarios"
-        subtitle={`${users.data?.length ?? 0} usuarios · ${(users.data ?? []).filter(u => u.activo).length} activos`}
+        subtitle={`${users.data?.total ?? 0} usuarios`}
         actions={
           <>
             <Button small variant="ghost" aria-label="Actualizar usuarios" onClick={users.refresh}>↻</Button>
@@ -127,16 +115,16 @@ export function AdminUsers({ api }: Props) {
 
       <div className="private-filter-bar" style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
-          <Input placeholder="Buscar por nombre o email…" value={search} onChange={e => setSearch(e.target.value)} />
+          <Input placeholder="Buscar por nombre o email…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
         </div>
-        <select value={filterRol} onChange={e => setFilterRol(e.target.value as typeof filterRol)}
+        <select value={filterRol} onChange={e => { setFilterRol(e.target.value as typeof filterRol); setPage(1); }}
           style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", minWidth: 160 }}>
           <option value="all">Todos los roles</option>
           <option value="admin">Admins</option>
           <option value="cliente">Clientes</option>
           <option value="profesional">Profesionales</option>
         </select>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
+        <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value as typeof filterStatus); setPage(1); }}
           style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", minWidth: 145 }}>
           <option value="current">Usuarios actuales</option>
           <option value="active">Activos</option>
@@ -147,7 +135,7 @@ export function AdminUsers({ api }: Props) {
       </div>
 
       <DataTable
-        data={filtered}
+        data={users.data?.items ?? []}
         columns={columns}
         rowKey={u => u.id}
         loading={users.loading}
@@ -162,6 +150,11 @@ export function AdminUsers({ api }: Props) {
           </div>
         )}
       />
+      <div className="private-pagination" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginTop: 18 }}>
+        <Button small variant="ghost" disabled={page <= 1 || users.loading} onClick={() => setPage(value => value - 1)}>Anterior</Button>
+        <span>Página {users.data?.page ?? page} de {users.data?.pages ?? 1}</span>
+        <Button small variant="ghost" disabled={page >= (users.data?.pages ?? 1) || users.loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button>
+      </div>
 
       <Modal open={modal.kind !== "closed"} onClose={() => setModal({ kind: "closed" })}
         title={modal.kind === "edit" ? "Editar usuario" : "Nuevo usuario"} width={560}>
@@ -234,16 +227,6 @@ function UserFormView({ api, initialUser, onSaved, onCancel }: {
       <Input label="Teléfono (opcional)"
         value={form.state.telefono ?? ""} error={form.errors.telefono}
         onChange={e => form.setField("telefono", e.target.value)} />
-
-      {initialUser && (
-        <>
-          <Input label="Nueva contraseña (dejar en blanco para no cambiar)"
-            type="password" placeholder="Mínimo 12 caracteres, letras y números"
-            value={form.state.newPassword ?? ""} error={form.errors.newPassword}
-            onChange={e => form.setField("newPassword", e.target.value)} />
-
-        </>
-      )}
 
       <footer style={{ display: "flex", justifyContent: "space-between", marginTop: 20, paddingTop: 16, borderTop: "1px solid #d8c4ad" }}>
         <Button variant="ghost" onClick={onCancel} disabled={form.submitting}>Cancelar</Button>

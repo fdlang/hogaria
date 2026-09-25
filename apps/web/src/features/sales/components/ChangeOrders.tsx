@@ -3,13 +3,14 @@ import { Button } from "@/shared/ui";
 import type { ProjectsApi } from "@/features/projects/api/projects.api";
 import type { ChangeOrderDTO } from "../api/sales.api";
 import { formatMoney } from "@/shared/lib/formatters";
+import { CURRENT_FISCAL_POLICY } from "@reformapro/domain";
 
 export function ChangeOrders({ api, projectId, admin, onChanged }: { api: ProjectsApi; projectId: number; admin: boolean; onChanged: () => Promise<unknown> }) {
   const [items, setItems] = useState<ChangeOrderDTO[]>([]);
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [conditions, setConditions] = useState("");
-  const [vat, setVat] = useState(21);
+  const [vat, setVat] = useState(CURRENT_FISCAL_POLICY.defaultVatRate);
   const [editing, setEditing] = useState<ChangeOrderDTO | null>(null);
   const [password, setPassword] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
@@ -35,7 +36,7 @@ export function ChangeOrders({ api, projectId, admin, onChanged }: { api: Projec
     }); }}>
       <label>Alcance de la ampliación<textarea required value={description} onChange={event => setDescription(event.target.value)} /></label>
       <label>Importe sin IVA (€)<input type="number" required min="0.01" step="0.01" value={price} onChange={event => setPrice(event.target.value)} /></label>
-      <label>IVA (%)<select value={vat} onChange={event => setVat(Number(event.target.value))}>{[21,10,4,0].map(value => <option key={value} value={value}>{value} %</option>)}</select></label>
+      <label>IVA (%)<select value={vat} onChange={event => setVat(Number(event.target.value))}>{CURRENT_FISCAL_POLICY.selectableVatRates.map(value => <option key={value} value={value}>{value} %</option>)}</select></label>
       <label>Condiciones de pago<textarea required value={conditions} onChange={event => setConditions(event.target.value)} /></label>
       <Button type="submit" loading={busy}>{editing ? "Guardar cambios del borrador" : "Guardar ampliación como borrador"}</Button>
       {editing && <Button type="button" variant="ghost" disabled={busy} onClick={() => { setEditing(null); setDescription(""); setPrice(""); setConditions(""); }}>Cancelar edición</Button>}

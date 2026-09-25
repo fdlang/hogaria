@@ -109,6 +109,24 @@ describe("work tracking isolation and lifecycle", () => {
       "approvedCostCents",
     );
   });
+  it("separates tariff or correction authorship from approval when another admin exists", async () => {
+    const s = await setup();
+    await s.users.save({
+      id: 5,
+      rol: "admin",
+      email: Email.of("u5@test.es"),
+      nombre: "Persona 5",
+      activo: true,
+      createdAt: new Date(),
+    });
+    let entry = await s.start();
+    s.at("2026-09-19T10:00:00Z");
+    entry = await s.work.action(2, entry.id, { action: "salida", revision: entry.revision });
+    await expect(s.work.action(1, entry.id, { action: "aprobar", revision: entry.revision }))
+      .rejects.toThrow("otro administrador");
+    await expect(s.work.action(5, entry.id, { action: "aprobar", revision: entry.revision }))
+      .resolves.toMatchObject({ status: "aprobado", approvedBy: 5 });
+  });
   it("serializes simultaneous clock-ins and makes retries idempotent", async () => {
     const s = await setup(),
       operationId = crypto.randomUUID();

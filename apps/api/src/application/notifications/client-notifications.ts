@@ -5,14 +5,17 @@ import type {
   IEstimateRepository,
 } from "@reformapro/domain/repositories";
 import type { IFileRepository } from "../use-cases/file.use-cases.js";
+import type { ISolicitudRepository } from "../use-cases/solicitud.use-cases.js";
 
-type NoticeKind = "estimate" | "document" | "project" | "project-update";
-export type Notice = {
+type AccountNoticeKind = "estimate" | "document" | "project" | "project-update";
+type AccountNotice = {
   id: string;
   clientId: number;
-  kind: NoticeKind;
+  kind: AccountNoticeKind;
   resourceId: number;
 };
+type LeadNotice = { id: string; kind: "lead-confirmation"; resourceId: number };
+export type Notice = AccountNotice | LeadNotice;
 export interface NoticeStore {
   enqueue(notice: Notice): Promise<void>;
   claim(id?: string): Promise<Notice | null>;
@@ -40,6 +43,7 @@ export class ClientNotifications {
     private readonly projects: IProjectRepository,
     private readonly estimates: IEstimateRepository,
     private readonly files: IFileRepository,
+    private readonly solicitudes: ISolicitudRepository,
     private readonly store: NoticeStore,
     private readonly email: NoticeEmail,
     private readonly report: (code: string) => void = (code) =>
@@ -65,7 +69,7 @@ export class ClientNotifications {
       estimateId?: number;
       fileId?: number;
     };
-    let kind: NoticeKind, resourceId: number, clientId: number;
+    let kind: AccountNoticeKind, resourceId: number, clientId: number;
     if (event.type === "EstimateSent") {
       const estimate = await this.estimates.findById(Number(data.estimateId));
       if (!estimate || estimate.estado !== "enviado") return;
@@ -97,7 +101,17 @@ export class ClientNotifications {
     if (this.email.configured()) await this.deliver(event.eventId);
     else this.report("CLIENT_NOTIFICATION_EMAIL_NOT_CONFIGURED");
   }
+  async receiveLead(solicitudId: number, id = crypto.randomUUID()) {
+    const solicitud = await this.solicitudes.findById(solicitudId);
+    if (!solicitud) return;
+    await this.store.enqueue({ id, kind: "lead-confirmation", resourceId: solicitudId });
+    if (this.email.configured()) await this.deliver(id);
+    else this.report("CLIENT_NOTIFICATION_EMAIL_NOT_CONFIGURED");
+  }
   private async recipient(notice: Notice) {
+    if (notice.kind === "lead-confirmation") {
+      return (await this.solicitudes.findById(notice.resourceId))?.email ?? null;
+    }
     const client = await this.users.findById(notice.clientId);
     if (!client?.activo || client.rol !== "cliente") return null;
     if (notice.kind === "estimate") {

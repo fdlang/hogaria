@@ -25,4 +25,13 @@ describe("SubmitSolicitudUseCase", () => {
     await expect(service.execute({ ...valid, descripcion: "1234567890123456789 " })).rejects.toThrow("20 caracteres");
     expect(save).not.toHaveBeenCalled();
   });
+
+  it("queues the confirmation only after the request has been saved", async () => {
+    const order: string[] = [];
+    const save = vi.fn(async () => { order.push("saved"); return { id: 7 }; });
+    const notify = vi.fn(async (id: number) => { order.push(`notified:${id}`); });
+    const service = new SubmitSolicitudUseCase({ save } as never, { check: async () => true }, notify);
+    await expect(service.execute(valid)).resolves.toEqual({ id: 7 });
+    expect(order).toEqual(["saved", "notified:7"]);
+  });
 });

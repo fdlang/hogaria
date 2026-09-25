@@ -19,6 +19,7 @@ export interface IProfessionalDocumentRepository {
   save(document: Omit<ProfessionalDocument, "id">): Promise<ProfessionalDocument>;
   findById(id: number): Promise<ProfessionalDocument | null>;
   findByProfessional(professionalId: number): Promise<ProfessionalDocument[]>;
+  findDeleting(limit: number): Promise<ProfessionalDocument[]>;
   markDeleting(id: number): Promise<void>;
   delete(id: number): Promise<void>;
 }

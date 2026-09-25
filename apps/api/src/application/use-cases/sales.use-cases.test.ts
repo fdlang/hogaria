@@ -7,6 +7,7 @@ import { ChangeOrderUseCases, EstimateUseCases, OpportunityUseCases } from "./sa
 import { AssignProjectProfessionalUseCase, ListProjectsUseCase } from "./project.use-cases.js";
 import { PermissionPolicy } from "@reformapro/domain/services";
 import { Money, Percentage } from "@reformapro/domain/value-objects";
+import { aggregateFiscalSnapshots, createFiscalSnapshot } from "@reformapro/domain";
 
 const hasher = { hash: async () => "hash", verify: async (_plain: string, hash: string) => hash === "hash" };
 const cryptoPort = { hashDocument: async () => ({ value: "sha256:test" }), generateSignatureToken: async () => "token", verifySignatureToken: async () => true };
@@ -61,7 +62,8 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     const {users,clientA,clientB} = await setup();
     const admin = await users.save({id:0,nombre:"Admin",email:Email.of("admin@test.es"),rol:"admin",activo:true,createdAt:new Date()},"hash");
     const projects = new InMemoryProjectRepository();
-    const project = await projects.save({id:0,estimateId:1,clienteId:clientA.id,nombre:"Obra",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"planificacion",progreso:Percentage.zero(),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date()});
+    const initialSnapshot = createFiscalSnapshot([{ cantidad: 1, precioVentaUnitario: 100, descuento: 0, iva: 21 }], { type: "estimate", id: 1, version: 1 }, new Date("2026-09-20T09:00:00.000Z"));
+    const project = await projects.save({id:0,estimateId:1,clienteId:clientA.id,nombre:"Obra",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"planificacion",progreso:Percentage.zero(),presupuesto:Money.of(100),fiscalSnapshots:[initialSnapshot],fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date()});
     const repository = new InMemoryChangeOrderRepository(projects);
     const service = new ChangeOrderUseCases(users,projects,repository);
     const change = await service.create(admin.id,project.id,draft);
@@ -72,7 +74,10 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     await expect(service.transition(clientA.id,project.id,change.id,"aprobado")).rejects.toThrow();
     const result = await service.transition(clientA.id,project.id,change.id,"aprobado","valid");
     expect(JSON.stringify(result)).not.toContain("costeUnitario");
-    expect((await projects.findById(project.id))?.presupuesto.amount).toBe(300);
+    const updatedProject = await projects.findById(project.id);
+    expect(updatedProject?.presupuesto.amount).toBe(300);
+    expect(updatedProject?.fiscalSnapshots).toHaveLength(2);
+    expect(aggregateFiscalSnapshots(updatedProject?.fiscalSnapshots ?? [])).toMatchObject({ baseAmount: 300, vatAmount: 63, totalAmount: 363 });
     await expect(service.transition(clientA.id,project.id,change.id,"aprobado","valid")).rejects.toThrow();
   });
   it("only returns the authenticated client's proposals", async () => {
@@ -176,6 +181,14 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     const project = await service.accept(admin.id, estimateA.id, { ip: "test", userAgent: "test" });
 
     expect(project.estimateId).toBe(estimateA.id);
+    expect(project.presupuesto.amount).toBe(200);
+    expect(project.fiscalSnapshots).toHaveLength(1);
+    expect(project.fiscalSnapshots?.[0]).toMatchObject({
+      baseAmount: 200,
+      vatAmount: 42,
+      totalAmount: 242,
+      source: { type: "estimate", id: estimateA.id, version: 1 },
+    });
     expect((await opportunities.findById(opportunityA.id))?.estado).toBe("ganada");
   });
 
@@ -222,6 +235,19 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     await estimates.update(estimateA.id, { versionActual: 2 });
     await expect(estimateUseCases.sign(clientA.id, estimateA.id, { version: 2, password: "hash", canvasSignature: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAoAAAAAAAAAAAA", consentimiento: "Acepto" }, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("validez");
     expect((await estimateUseCases.publicGet(clientA.id, estimateA.id)).estado).toBe("caducado");
+  });
+
+  it("rate limits repeated identity checks when signing", async () => {
+    const { users, clientA, estimateA, estimates, opportunities, projects } = await setup();
+    const gate = { check: async () => false };
+    const service = new EstimateUseCases(users, opportunities, estimates, projects, new InMemoryEventEmitter(), cryptoPort, undefined, gate);
+
+    await expect(service.sign(clientA.id, estimateA.id, {
+      version: 1,
+      password: "hash",
+      canvasSignature: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAoAAAAAAAAAAAA",
+      consentimiento: "Acepto",
+    }, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toThrow("Demasiados intentos");
   });
 
   it.each(["descartada", "ganada"] as const)("does not permit signing after the opportunity is %s", async (estado) => {
@@ -303,8 +329,7 @@ describe("OpportunityUseCases — governed pipeline", () => {
     await expect(service.update(admin.id, opportunity.id, { estado: "ganada" })).rejects.toThrow("Transición");
     await service.update(admin.id, opportunity.id, { estado: "contactada" });
     await service.update(admin.id, opportunity.id, { estado: "en_estudio" });
-    await service.update(admin.id, opportunity.id, { estado: "ganada" });
-    await expect(service.update(admin.id, opportunity.id, { estado: "contactada" })).rejects.toThrow("Transición");
+    await expect(service.update(admin.id, opportunity.id, { estado: "ganada" })).rejects.toThrow("conversión");
   });
 
   it("does not create proposals for a terminal opportunity", async () => {

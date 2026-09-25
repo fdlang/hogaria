@@ -9,7 +9,7 @@
  * duplication across roles.
  */
 
-import { useRef, useState } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { ProjectsApi, type ProjectDTO } from "../api/projects.api";
 import { UsersApi } from "@/features/users/api/users.api";
 import { useProject, useProgressUpdater, useMilestoneToggler } from "../hooks/useProjects";
@@ -47,6 +47,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const [transitioning, setTransitioning] = useState<ProjectDTO["estado"] | null>(null);
   const projectAction = useRef(new ExclusiveAction());
   const [projectSaving, setProjectSaving] = useState(false);
+  const [planningSaving, setPlanningSaving] = useState(false);
 
   const runProjectAction = (action: () => Promise<unknown>) => projectAction.current.run(async () => {
     setProjectSaving(true);
@@ -94,6 +95,32 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
     finally { setTransitioning(null); }
   };
 
+  const handlePlanningSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const milestoneName = String(form.get("milestoneName") ?? "").trim();
+    const milestoneDate = String(form.get("milestoneDate") ?? "");
+    const hitos = milestoneName
+      ? [...(project.data?.hitos ?? []), { id: crypto.randomUUID(), nombre: milestoneName, completado: false, fecha: milestoneDate }]
+      : project.data?.hitos ?? [];
+    try {
+      setPlanningSaving(true);
+      await apis.projects.update(projectId, {
+        fechaInicio: String(form.get("startDate")),
+        fechaFinPrevista: String(form.get("endDate")),
+        hitos,
+        revision: project.data?.revision ?? 0,
+      });
+      await project.refresh();
+      event.currentTarget.reset();
+      push("Planificacion guardada", "success");
+    } catch (cause) {
+      push((cause as { message?: string }).message ?? "No se pudo guardar la planificacion", "error");
+    } finally {
+      setPlanningSaving(false);
+    }
+  };
+
   const handleFileUpload = async (file: File, sensitive: boolean, classification?: "publico" | "tecnico" | "contrato" | "factura" | "reservado") => {
     try { await files.upload(file, sensitive, classification); push(`${file.name} subido`, "success"); }
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
@@ -136,6 +163,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const projectAssignments = p.profesionalesAsignados ?? [];
   const assignableProfessionals = (professionals.data ?? []).filter(item => item.activo && item.profesion && !projectAssignments.some(assignment => assignment.userId === item.id));
   const nextStates: Record<ProjectDTO["estado"], ProjectDTO["estado"][]> = { planificacion: ["en_curso"], en_curso: ["pausado", "finalizado"], pausado: ["en_curso", "finalizado"], finalizado: [] };
+  const startReady = new Date(p.fechaFinPrevista).getTime() > new Date(p.fechaInicio).getTime() && projectAssignments.length > 0 && p.hitos.length > 0;
 
   return (
     <section className="project-detail">
@@ -156,13 +184,26 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
         </>}
       />
       {isAdmin && nextStates[p.estado].length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-        {nextStates[p.estado].map(estado => <Button key={estado} small variant="ghost" loading={transitioning === estado} disabled={transitioning !== null || (estado === "finalizado" && p.progreso !== 100)} onClick={() => void handleTransition(estado)}>{estado === "en_curso" ? "Iniciar/Reanudar obra" : estado === "pausado" ? "Pausar obra" : "Finalizar obra"}</Button>)}
+        {nextStates[p.estado].map(estado => <Button key={estado} small variant="ghost" loading={transitioning === estado} disabled={transitioning !== null || (estado === "en_curso" && p.estado === "planificacion" && !startReady) || (estado === "finalizado" && p.progreso !== 100)} onClick={() => void handleTransition(estado)}>{estado === "en_curso" ? "Iniciar/Reanudar obra" : estado === "pausado" ? "Pausar obra" : "Finalizar obra"}</Button>)}
+        {p.estado === "planificacion" && !startReady && <p style={{ width: "100%", color: "#71685e", fontSize: 12 }}>Completa las fechas, asigna un profesional y crea al menos un hito para iniciar la obra.</p>}
         {nextStates[p.estado].includes("finalizado") && p.progreso !== 100 && <p style={{ width: "100%", color: "#71685e", fontSize: 12 }}>Completa el progreso al 100 % para finalizar la obra.</p>}
       </div>}
 
       <div className="project-detail-layout" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24, alignItems: "flex-start" }}>
         {/* ─── MAIN ──────────────────────────────────── */}
         <div className="project-detail__main">
+          {isAdmin && p.estado === "planificacion" && (
+            <section className="project-detail__section" style={{ marginBottom: 30 }}>
+              <h2 style={sectionTitle}>Planificacion de inicio</h2>
+              <form className="private-filter-bar" onSubmit={handlePlanningSave}>
+                <label>Fecha de inicio<input name="startDate" type="date" required defaultValue={p.fechaInicio.slice(0, 10)} /></label>
+                <label>Entrega prevista<input name="endDate" type="date" required defaultValue={p.fechaFinPrevista.slice(0, 10)} /></label>
+                <label>Nuevo hito<input name="milestoneName" maxLength={300} placeholder={p.hitos.length ? "Opcional" : "Ej. Demoliciones terminadas"} required={p.hitos.length === 0} /></label>
+                <label>Fecha del hito<input name="milestoneDate" type="date" defaultValue={p.fechaFinPrevista.slice(0, 10)} required={p.hitos.length === 0} /></label>
+                <Button type="submit" small loading={planningSaving}>Guardar planificacion</Button>
+              </form>
+            </section>
+          )}
           {/* Progress */}
           <section className="project-detail__section" style={{ marginBottom: 30 }}>
             <h2 style={sectionTitle}>Progreso</h2>
@@ -249,7 +290,12 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           <div className="project-detail__aside-card" style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10, marginBottom: 14 }}>
             <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Detalles</h3>
             <dl style={{ display: "grid", gap: 10, fontSize: 12 }}>
-              {(isAdmin || isCliente) && p.presupuesto !== undefined && <Meta k="Base imponible" v={formatMoney(p.presupuesto)} />}
+              {(isAdmin || isCliente) && p.financialSummary && <>
+                <Meta k="Base imponible" v={formatMoney(p.financialSummary.baseAmount)} />
+                <Meta k="IVA" v={formatMoney(p.financialSummary.vatAmount)} />
+                <Meta k="Total" v={formatMoney(p.financialSummary.totalAmount)} />
+              </>}
+              {(isAdmin || isCliente) && !p.financialSummary && p.presupuesto !== undefined && <Meta k="Base imponible histórica" v={formatMoney(p.presupuesto)} />}
               <Meta k="Fecha inicio"      v={formatDate(p.fechaInicio)} />
               <Meta k="Entrega prevista"  v={formatDate(p.fechaFinPrevista)} />
               <Meta k="Tipo"               v={p.tipo} />

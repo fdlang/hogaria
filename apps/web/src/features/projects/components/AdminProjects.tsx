@@ -5,9 +5,9 @@
  * Filters are local; sorting is provided by DataTable.
  */
 
-import { useState, useMemo } from "react";
+import { useDeferredValue, useState } from "react";
 import { ProjectsApi, ProjectDTO } from "../api/projects.api";
-import { useProjects } from "../hooks/useProjects";
+import { useProjectPage } from "../hooks/useProjects";
 import { Button, Input } from "@/shared/ui";
 import { PageHeader } from "@/shared/ui/page-header";
 import { DataTable, ColumnDef } from "@/shared/ui/data-table";
@@ -20,19 +20,11 @@ interface Props {
 }
 
 export function AdminProjects({ api, onOpenProject }: Props) {
-  const projects = useProjects(api);
-
   const [searchTerm, setSearchTerm]     = useState("");
   const [statusFilter, setStatusFilter] = useState<ProjectDTO["estado"] | "all">("all");
-
-  const filtered = useMemo(() => {
-    const data = projects.data ?? [];
-    return data.filter(p => {
-      if (statusFilter !== "all" && p.estado !== statusFilter) return false;
-      if (searchTerm && !p.nombre.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      return true;
-    });
-  }, [projects.data, searchTerm, statusFilter]);
+  const deferredSearch = useDeferredValue(searchTerm);
+  const [page, setPage] = useState(1);
+  const projects = useProjectPage(api, page, deferredSearch, statusFilter);
 
   const columns: ColumnDef<ProjectDTO>[] = [
     { key: "nombre",      header: "Proyecto", sortBy: p => p.nombre,
@@ -54,8 +46,8 @@ export function AdminProjects({ api, onOpenProject }: Props) {
         </div>
       )
     },
-    { key: "presupuesto", header: "Base imponible", sortBy: p => p.presupuesto ?? 0, align: "right",
-      render: p => formatMoney(p.presupuesto ?? 0) },
+    { key: "presupuesto", header: "Importe de obra", sortBy: p => p.financialSummary?.totalAmount ?? p.presupuesto ?? 0, align: "right",
+      render: p => <div>{formatMoney(p.financialSummary?.totalAmount ?? p.presupuesto ?? 0)}{!p.financialSummary && <small style={{ display: "block", color: "#71685e" }}>Base sin IVA</small>}</div> },
     { key: "entrega",     header: "Entrega",  sortBy: p => p.fechaFinPrevista, align: "right",
       render: p => formatDate(p.fechaFinPrevista) },
   ];
@@ -64,7 +56,7 @@ export function AdminProjects({ api, onOpenProject }: Props) {
     <section className="private-page">
       <PageHeader
         title="Proyectos"
-        subtitle={`${projects.data?.length ?? 0} proyectos totales`}
+        subtitle={`${projects.data?.total ?? 0} proyectos`}
         actions={
           <>
             <Button small variant="ghost" onClick={projects.refresh}>↻ Actualizar</Button>
@@ -74,9 +66,9 @@ export function AdminProjects({ api, onOpenProject }: Props) {
 
       <div className="private-filter-bar" style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
-          <Input placeholder="Buscar por nombre…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <Input placeholder="Buscar por nombre o dirección…" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setPage(1); }} />
         </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1); }}
           style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", minWidth: 160 }}>
           <option value="all">Todos</option>
           <option value="planificacion">Planificación</option>
@@ -87,7 +79,7 @@ export function AdminProjects({ api, onOpenProject }: Props) {
       </div>
 
       <DataTable
-        data={filtered}
+        data={projects.data?.items ?? []}
         columns={columns}
         rowKey={p => p.id}
         onRowClick={p => onOpenProject(p.id)}
@@ -95,6 +87,11 @@ export function AdminProjects({ api, onOpenProject }: Props) {
         error={projects.error}
         emptyMessage="No hay proyectos que coincidan con los filtros"
       />
+      <div className="private-pagination" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginTop: 18 }}>
+        <Button small variant="ghost" disabled={page <= 1 || projects.loading} onClick={() => setPage(value => value - 1)}>Anterior</Button>
+        <span>Página {projects.data?.page ?? page} de {projects.data?.pages ?? 1}</span>
+        <Button small variant="ghost" disabled={page >= (projects.data?.pages ?? 1) || projects.loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button>
+      </div>
     </section>
   );
 }

@@ -109,7 +109,8 @@ function getRuntime(): Promise<Runtime> {
   // Commercial pipeline: opportunity -> versioned estimate -> project.
   route("GET", "/estimates/:id/pdf", documents.pdf, { protected:true }),
   route("GET", "/internal/notifications/retry", notificationRetryController(app.useCases.notifications,
-    () => ({secret:process.env.CRON_SECRET,retrySecret:process.env.NOTIFICATION_RETRY_SECRET,enabled:process.env.CLIENT_NOTIFICATIONS_ENABLED==="true"}))),
+    () => ({secret:process.env.CRON_SECRET,retrySecret:process.env.NOTIFICATION_RETRY_SECRET,enabled:process.env.CLIENT_NOTIFICATIONS_ENABLED==="true"}),
+    app.useCases.retryPendingDeletions)),
   route("GET",   "/catalog",             req => catalog.list(req as never), { protected: true }),
   route("POST",  "/catalog",             req => catalog.create(req as never), { protected: true }),
   route("PATCH", "/catalog/:id",         req => catalog.update(req as never), { protected: true }),

@@ -56,6 +56,17 @@ describe("project professional assignments", () => {
     const ctx = { ip: "test", userAgent: "test" };
 
     await expect(update.execute({ actorId: professional.id, projectId: project.id, changes: { progreso: 90, revision: 0 }, ctx })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(update.execute({ actorId: admin.id, projectId: project.id, changes: { progreso: 90, revision: 0 }, ctx })).rejects.toThrow("100 %");
     await expect(update.execute({ actorId: admin.id, projectId: project.id, changes: { presupuesto: 200, revision: 0 }, ctx })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("requires dates, a milestone and an assigned professional before starting", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const projects = new InMemoryProjectRepository();
+    const admin = await users.save({ id: 0, email: Email.of("admin-ready@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() });
+    const project = await projects.save({ id: 0, estimateId: 1, nombre: "Obra", descripcion: "", clienteId: 20, direccion: "Calle", tipo: "Reforma", estado: "planificacion", progreso: Percentage.zero(), presupuesto: Money.of(0), fechaInicio: new Date("2026-09-01"), fechaFinPrevista: new Date("2026-09-01"), profesionalesAsignados: [], hitos: [], createdAt: new Date() });
+    const update = new UpdateProjectUseCase(users, projects, new InMemoryEventEmitter());
+
+    await expect(update.execute({ actorId: admin.id, projectId: project.id, changes: { estado: "en_curso", revision: 0 }, ctx: { ip: "test", userAgent: "test" } })).rejects.toThrow("planificación");
   });
 });

@@ -16,6 +16,9 @@ export class InMemoryActivationTokenRepository
     private readonly users: Pick<InMemoryUserRepository, "activateAccount" | "activationRevision">,
   ) {}
   async reserve(token: ActivationToken, now: Date) {
+    const expired = this.items.filter((item) => item.expiresAt <= now || item.usedAt);
+    expired.forEach((item) => this.revisions.delete(item.tokenHash));
+    this.items = this.items.filter((item) => item.expiresAt > now && !item.usedAt);
     if (this.items.some(item => item.userId === token.userId && !item.usedAt && item.expiresAt > now)) return false;
     await this.stage(token);
     return true;
@@ -59,6 +62,7 @@ export class PostgresActivationTokenRepository
   async reserve(token: ActivationToken, now: Date) {
     return this.transaction(async (client) => {
       await client.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [token.userId]);
+      await client.query("DELETE FROM account_activation_tokens WHERE expires_at<=$1 OR used_at IS NOT NULL", [now]);
       const current = await client.query("SELECT 1 FROM account_activation_tokens WHERE user_id=$1 AND used_at IS NULL AND expires_at>$2 LIMIT 1", [token.userId, now]);
       if (current.rowCount === 1) return false;
       await client.query(

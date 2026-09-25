@@ -10,6 +10,10 @@ export function useUsers(api: UsersApi, role?: UserDTO["rol"], enabled = true) {
   return useResource<UserDTO[]>(() => enabled ? api.list(role) : Promise.resolve([]), [api, role, enabled]);
 }
 
+export function useUserPage(api: UsersApi, page: number, search: string, role: UserDTO["rol"] | "all", status: string) {
+  return useResource(() => api.page({ page, search, role, status }), [api, page, search, role, status]);
+}
+
 export function useUserMutations(api: UsersApi) {
   const remove = useMutation((id: number) => api.delete(id));
   return { remove };

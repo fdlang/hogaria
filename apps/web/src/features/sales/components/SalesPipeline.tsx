@@ -20,6 +20,7 @@ import {
 import { useCatalog } from "@/features/catalog/useCatalog";
 import { CatalogLoadState } from "@/features/catalog/CatalogLoadState";
 import { blankOpportunity, opportunityForSelection } from "../sales-pipeline.utils";
+import { CURRENT_FISCAL_POLICY } from "@reformapro/domain";
 
 const steps = ["Oportunidad", "Alcance", "Partidas", "Revisión"];
 
@@ -32,7 +33,7 @@ const newLine = () => ({
   precioVentaUnitario: 0,
   costeUnitario: null,
   descuento: 0,
-  iva: 21,
+  iva: CURRENT_FISCAL_POLICY.defaultVatRate,
 });
 
 const blankDraft = (): EstimateDraftDTO => ({
@@ -624,6 +625,7 @@ export function SalesPipeline({
                   key={line.id}
                   index={index}
                   line={line}
+                  categories={catalog.map((category) => category.categoria)}
                   canRemove={draft.partidas.length > 1}
                   onChange={(changes) => updateLine(index, changes)}
                   onRemove={() => removeLine(index)}
@@ -834,12 +836,14 @@ function RecentEstimates({
 function EstimateLineEditor({
   index,
   line,
+  categories,
   canRemove,
   onChange,
   onRemove,
 }: {
   index: number;
   line: EstimateDraftDTO["partidas"][number];
+  categories: string[];
   canRemove: boolean;
   onChange: (changes: Partial<EstimateDraftDTO["partidas"][number]>) => void;
   onRemove: () => void;
@@ -884,6 +888,9 @@ function EstimateLineEditor({
             <option value="Instalaciones">Instalaciones</option>
             <option value="Carpintería">Carpintería</option>
             <option value="Acabados">Acabados</option>
+            {categories.filter((category) => !["General", "Demoliciones", "Instalaciones", "Acabados"].includes(category)).map((category) => (
+              <option key={category} value={category}>{category}</option>
+            ))}
           </select>
         </label>
         <label>

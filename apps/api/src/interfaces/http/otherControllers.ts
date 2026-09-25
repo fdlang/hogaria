@@ -12,6 +12,7 @@ import { toHttpError } from "./errorMiddleware.js";
 import { HttpRequest, HttpResponse } from "./authController.js";
 import { ProfessionalDocumentUseCases, type ProfessionalDocument } from "../../application/use-cases/professional-document.use-cases.js";
 import { pageIndex, positiveId, validDate } from "./requestValidation.js";
+import { parsePagination, wantsPagination } from "./pagination.js";
 
 // ─────────────────────────────────────────────────────────────
 // Audit
@@ -73,8 +74,12 @@ export function solicitudController(deps: { submit: SubmitSolicitudUseCase; list
     },
 
     // GET /solicitudes â€” admin only
-    async list(req: HttpRequest & { actorId: number }): Promise<HttpResponse> {
+    async list(req: HttpRequest & { actorId: number; query: { page?: string; limit?: string } }): Promise<HttpResponse> {
       try {
+        if (wantsPagination(req.query)) {
+          const page = await deps.list.executePage(req.actorId, parsePagination(req.query));
+          return { status: 200, body: { ...page, items: page.items.map(toSolicitudDTO) } };
+        }
         const solicitudes = await deps.list.execute(req.actorId);
         return { status: 200, body: solicitudes.map(toSolicitudDTO) };
       } catch (e) { return toHttpError(e); }

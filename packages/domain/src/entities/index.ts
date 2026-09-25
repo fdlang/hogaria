@@ -1,4 +1,5 @@
 import { Email, Money, Percentage } from "../value-objects/index.js";
+import type { FiscalSnapshot } from "../financial.js";
 
 export type UserRole = "admin" | "cliente" | "profesional";
 export type UserAccountStatus = "pending_activation" | "active" | "archived";
@@ -8,7 +9,7 @@ export interface User { id: number; email: Email; nombre: string; rol: UserRole;
 export type ProjectStatus = "planificacion" | "en_curso" | "pausado" | "finalizado";
 export interface ProjectProfessional { userId: number; profesion?: Profesion; }
 export interface ProjectMilestone { id: string; nombre: string; completado: boolean; fecha: Date; }
-export interface Project { id: number; revision?: number; estimateId: number; nombre: string; descripcion: string; clienteId: number; direccion: string; tipo: string; estado: ProjectStatus; progreso: Percentage; presupuesto: Money; fechaInicio: Date; fechaFinPrevista: Date; profesionalesAsignados: ProjectProfessional[]; hitos: ProjectMilestone[]; createdAt: Date; }
+export interface Project { id: number; revision?: number; estimateId: number; nombre: string; descripcion: string; clienteId: number; direccion: string; tipo: string; estado: ProjectStatus; progreso: Percentage; presupuesto: Money; fiscalSnapshots?: FiscalSnapshot[]; fechaInicio: Date; fechaFinPrevista: Date; profesionalesAsignados: ProjectProfessional[]; hitos: ProjectMilestone[]; createdAt: Date; }
 
 export type OpportunityStatus = "nueva" | "contactada" | "visita_agendada" | "en_estudio" | "ganada" | "descartada";
 export interface Opportunity { id: number; clienteId: number | null; nombre: string; email: string | null; telefono: string | null; direccion: string; tipo: string; descripcion: string; estado: OpportunityStatus; fechaVisita: Date | null; notasInternas: string; createdAt: Date; updatedAt: Date; }

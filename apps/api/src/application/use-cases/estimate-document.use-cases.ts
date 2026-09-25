@@ -7,6 +7,7 @@ import {
 import type { IUserRepository } from "@reformapro/domain/repositories";
 import type { EstimateUseCases } from "./sales.use-cases.js";
 import type { ICooldownGate } from "./solicitud.use-cases.js";
+import { ABUSE_LIMITS } from "@reformapro/domain";
 
 export type EstimateDocument = Awaited<
   ReturnType<EstimateUseCases["publicGet"]>
@@ -54,7 +55,7 @@ export class EstimateDocumentUseCases {
   }
   async download(actorId: number, id: number, version: number) {
     const { document } = await this.document(actorId, id, version);
-    if (!(await this.gate.check(`estimate-pdf:${actorId}`, 60, 60_000)))
+    if (!(await this.gate.check(`estimate-pdf:${actorId}`, ABUSE_LIMITS.estimatePdf.limit, ABUSE_LIMITS.estimatePdf.windowMs)))
       throw new RateLimitError();
     return {
       bytes: await this.pdf.render(document),

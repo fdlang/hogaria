@@ -1,14 +1,15 @@
-- Estado: corrección de la auditoría UX privada validada.
-- Acceso: logout revoca sesiones del servidor y la caducidad redirige con explicación.
-- Cuentas: reactivación segura y reenvío solo cuando no existe enlace vigente.
-- Invitaciones: errores de correo accionables; token retirado de la URL tras leerlo.
-- Cliente: Mis obras y Presupuestos son vistas distintas; estados y contadores corregidos.
-- Economía: el importe de obra se presenta como Base imponible; total con IVA pendiente de validar por gestor.
-- Accesibilidad: firma operable con teclado y controles críticos etiquetados.
-- Recuperación: reintentos en proyectos, profesionales, documentos y actividad.
-- Operativa: rechazo de solicitudes mediante modal y acciones con textos precisos.
-- API: identificadores, páginas y fechas se validan antes de persistencia.
-- Notificaciones: publicar una orden de cambio activa el procesado inmediato.
-- Validación: 243 pruebas unitarias, 108 de navegador, typecheck y build correctos.
-- Pendiente: cola operativa para reintentar borrados de Blob marcados como deleting.
-- Pendiente: paginación server-side de listados administrativos al crecer el volumen.
+- Estado: cambios confirmados aplicados; validacion y revision final en curso.
+- Disparador: cambio de producto por nuevos flujos, notificaciones y controles operativos.
+- Dominio: transiciones de oportunidad, arranque/cierre de obra y estados de facturacion centralizados.
+- Seguridad: documentos historicos fallan cerrado; firma y operaciones sensibles tienen limite antiabuso.
+- Identidad: retirada la contrasena directa de administracion; invitaciones siguen siendo de un solo uso.
+- Sesion/web: CSP y HSTS endurecidos; EmailJS retirado del navegador.
+- Solicitudes: acuse duradero mediante outbox, reintentos e idempotencia en backend.
+- Gobierno: segundo administrador obligatorio para aprobar costes originados o corregidos por el mismo actor.
+- Fiscal: IVA parametrizado por vigencia y snapshots historicos conservados.
+- Catalogo: categorias reales disponibles al crear partidas manuales.
+- Fiabilidad: fallos de suscriptores visibles y limpieza de tokens/ventanas antiabuso caducados.
+- Escala: listados administrativos y presupuestos paginados; nombres de cliente resueltos por pagina.
+- Validacion parcial: 26 API/202 tests, 17 web/52 tests y 8 domain/17 tests correctos.
+- Pendiente externo: reglas fiscales/contables por gestor y retencion por gestor/DPD.
+- Proxima revision recomendada: 2026-12-20.
