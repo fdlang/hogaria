@@ -127,6 +127,30 @@ describe("work tracking isolation and lifecycle", () => {
     await expect(s.work.action(5, entry.id, { action: "aprobar", revision: entry.revision }))
       .resolves.toMatchObject({ status: "aprobado", approvedBy: 5 });
   });
+  it("keeps the four-eyes requirement after the other administrator is deactivated", async () => {
+    const s = await setup();
+    await s.users.save({
+      id: 5,
+      rol: "admin",
+      email: Email.of("u5@test.es"),
+      nombre: "Persona 5",
+      activo: true,
+      createdAt: new Date(),
+    });
+    let entry = await s.start();
+    s.at("2026-09-19T10:00:00Z");
+    entry = await s.work.action(2, entry.id, { action: "salida", revision: entry.revision });
+    entry = await s.work.action(1, entry.id, {
+      action: "corregir",
+      revision: entry.revision,
+      startedAt: entry.startedAt,
+      endedAt: "2026-09-19T09:30:00Z",
+      reason: "Salida corregida",
+    });
+    await s.users.update(5, { activo: false });
+    await expect(s.work.action(1, entry.id, { action: "aprobar", revision: entry.revision }))
+      .rejects.toThrow("otro administrador");
+  });
   it("serializes simultaneous clock-ins and makes retries idempotent", async () => {
     const s = await setup(),
       operationId = crypto.randomUUID();

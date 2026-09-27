@@ -16,7 +16,8 @@
     "dev:web":   "npm run dev --workspace @reformapro/web",
     "build":     "npm run build --workspaces --if-present",
     "test":      "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "preflight:production": "npm run preflight:production --workspace @reformapro/api"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

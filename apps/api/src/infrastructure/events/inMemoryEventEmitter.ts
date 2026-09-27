@@ -15,11 +15,26 @@ type Handler = (event: DomainEvent) => void | Promise<void>;
 
 export class InMemoryEventEmitter implements IEventEmitter {
   private readonly handlers = new Map<DomainEvent["type"], Set<Handler>>();
+  constructor(
+    private readonly report: (eventType: string, error: unknown) => void =
+      (eventType) => console.error("DOMAIN_EVENT_SUBSCRIBER_FAILED", eventType),
+    private readonly blockingTypes = new Set<DomainEvent["type"]>([
+      "LoginSuccess",
+      "UserAccessResetRequested",
+    ]),
+  ) {}
 
   async emit(event: DomainEvent): Promise<void> {
     const subs = this.handlers.get(event.type);
     if (!subs) return;
-    await Promise.all([...subs].map(h => Promise.resolve().then(() => h(event))));
+    const results = await Promise.allSettled([...subs].map(h => Promise.resolve().then(() => h(event))));
+    const failures: unknown[] = [];
+    results.forEach((result) => {
+      if (result.status === "rejected") this.report(event.type, result.reason);
+      if (result.status === "rejected") failures.push(result.reason);
+    });
+    if (failures.length && this.blockingTypes.has(event.type))
+      throw new AggregateError(failures, `No se pudo auditar ${event.type}`);
   }
 
   subscribe(type: DomainEvent["type"], handler: Handler): () => void {

@@ -2,6 +2,7 @@ import type { IUserRepository } from "@reformapro/domain/repositories";
 import { ConflictError, ForbiddenError, ValidationError } from "@reformapro/domain/errors";
 import type { ClientContext } from "./auth.use-cases.js";
 import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword } from "@reformapro/domain";
+import type { IEventEmitter } from "@reformapro/domain/events";
 
 export interface ActivationToken { userId: number; tokenHash: string; expiresAt: Date; usedAt: Date | null; }
 export interface IActivationTokenRepository {
@@ -14,7 +15,7 @@ export interface IActivationTokenRepository {
   /** Consume a still-valid link and activate its account in one transaction. */
   complete(tokenHash: string, passwordHash: string): Promise<void>;
 }
-export interface ITransactionalEmail { isConfigured(): boolean; sendActivation(input: { to: string; name: string; activationUrl: string; expiresAt: Date }): Promise<void>; }
+export interface ITransactionalEmail { isConfigured(): boolean; sendActivation(input: { to: string; name: string; activationUrl: string; expiresAt: Date; purpose?: "activation" | "password_reset" }): Promise<void>; }
 
 const encoder = new TextEncoder();
 const base64Url = (bytes: Uint8Array) => btoa(Array.from(bytes, byte => String.fromCharCode(byte)).join(""))
@@ -23,7 +24,7 @@ const tokenHash = async (token: string) => Array.from(new Uint8Array(await crypt
 const newToken = () => base64Url(crypto.getRandomValues(new Uint8Array(32)));
 
 export class AccountActivationUseCases {
-  constructor(private readonly users: IUserRepository, private readonly tokens: IActivationTokenRepository, private readonly email: ITransactionalEmail, private readonly appUrl: string, private readonly ttlMs = 24 * 60 * 60 * 1000) {}
+  constructor(private readonly users: IUserRepository, private readonly tokens: IActivationTokenRepository, private readonly email: ITransactionalEmail, private readonly appUrl: string, private readonly ttlMs = 24 * 60 * 60 * 1000, private readonly events?: IEventEmitter) {}
   ensureConfigured() {
     let hasPublicUrl = false;
     try {
@@ -35,10 +36,34 @@ export class AccountActivationUseCases {
     }
   }
   async invite(actorId: number, userId: number, context: ClientContext) {
-    this.ensureConfigured(); const actor = await this.users.findById(actorId); if (!actor || actor.rol !== "admin") throw new ForbiddenError();
+    const actor = await this.users.findById(actorId); if (!actor || actor.rol !== "admin") throw new ForbiddenError(); this.ensureConfigured();
     const user = await this.users.findById(userId);
     if (!user) throw new ValidationError("La cuenta no existe", "userId");
     if (user.activo) throw new ConflictError("La cuenta ya está activada");
+    return this.deliverAccess(user, context, "activation");
+  }
+  async resetAccess(actorId: number, userId: number, context: ClientContext) {
+    const actor = await this.users.findById(actorId); if (!actor || actor.rol !== "admin") throw new ForbiddenError(); this.ensureConfigured();
+    const user = await this.users.findById(userId);
+    if (!user) throw new ValidationError("La cuenta no existe", "userId");
+    if (!user.activo || user.accountStatus !== "active") throw new ConflictError("Solo se puede restablecer una cuenta activa");
+    await this.events?.emit({
+      type: "UserAccessResetRequested",
+      eventId: crypto.randomUUID(),
+      occurredAt: new Date(),
+      actorId: actor.id,
+      actorName: actor.nombre,
+      ip: context.ip,
+      userAgent: context.userAgent,
+      userId: user.id,
+    });
+    return this.deliverAccess(user, context, "password_reset");
+  }
+  private async deliverAccess(
+    user: NonNullable<Awaited<ReturnType<IUserRepository["findById"]>>>,
+    context: ClientContext,
+    purpose: "activation" | "password_reset",
+  ) {
     const reactivating = user.accountStatus === "archived";
     const token = newToken(); const expiresAt = new Date(Date.now() + this.ttlMs); const hash = await tokenHash(token);
     const activationUrl = `${this.appUrl.replace(/\/$/, "")}/#/activar-cuenta?token=${encodeURIComponent(token)}`;
@@ -50,7 +75,7 @@ export class AccountActivationUseCases {
       // Only the reservation winner changes the archived account. Doing this
       // before delivery prevents a fast activation from being overwritten.
       if (reactivating) await this.users.update(user.id, { accountStatus: "pending_activation" });
-      await this.email.sendActivation({ to: user.email.value, name: user.nombre, activationUrl, expiresAt });
+      await this.email.sendActivation({ to: user.email.value, name: user.nombre, activationUrl, expiresAt, purpose });
     } catch (error) {
       await this.tokens.discard(hash).catch(() => undefined);
       throw error;

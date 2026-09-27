@@ -20,11 +20,11 @@ for (const width of [320, 390, 768, 1024, 1440]) {
 test('activation link survives a reload until it is consumed', async ({ page }) => {
   const token = 'a'.repeat(48);
   await page.goto(`/#/activar-cuenta?token=${token}`);
-  await expect(page.getByRole('heading', { name: 'Activa tu cuenta' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Crea tu contraseña' })).toBeVisible();
   await expect(page).not.toHaveURL(/token=/);
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('hogaria_activation_token'))).toBe(token);
 
   await page.reload();
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('hogaria_activation_token'))).toBe(token);
-  await expect(page.getByRole('heading', { name: 'Activa tu cuenta' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Crea tu contraseña' })).toBeVisible();
 });

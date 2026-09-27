@@ -1,15 +1,15 @@
-- Estado: cambios confirmados aplicados; validacion y revision final en curso.
-- Disparador: cambio de producto por nuevos flujos, notificaciones y controles operativos.
-- Dominio: transiciones de oportunidad, arranque/cierre de obra y estados de facturacion centralizados.
-- Seguridad: documentos historicos fallan cerrado; firma y operaciones sensibles tienen limite antiabuso.
-- Identidad: retirada la contrasena directa de administracion; invitaciones siguen siendo de un solo uso.
-- Sesion/web: CSP y HSTS endurecidos; EmailJS retirado del navegador.
-- Solicitudes: acuse duradero mediante outbox, reintentos e idempotencia en backend.
-- Gobierno: segundo administrador obligatorio para aprobar costes originados o corregidos por el mismo actor.
-- Fiscal: IVA parametrizado por vigencia y snapshots historicos conservados.
-- Catalogo: categorias reales disponibles al crear partidas manuales.
-- Fiabilidad: fallos de suscriptores visibles y limpieza de tokens/ventanas antiabuso caducados.
-- Escala: listados administrativos y presupuestos paginados; nombres de cliente resueltos por pagina.
-- Validacion parcial: 26 API/202 tests, 17 web/52 tests y 8 domain/17 tests correctos.
-- Pendiente externo: reglas fiscales/contables por gestor y retencion por gestor/DPD.
-- Proxima revision recomendada: 2026-12-20.
+- Estado: correcciones prioritarias completadas; falta ejecutar el preflight de solo lectura con el entorno de produccion.
+- Alcance auditado: 251 ficheros; frontend, backend y seguridad revisados en paralelo y contrastados.
+- Hecho: runner versionado con ledger, checksum, lock exclusivo, rollback seguro y todas las migraciones legacy.
+- Hecho: firmas v3 separadas de sesion, key-id, rotacion, comparacion constante y verificacion v2 solo con clave legacy dedicada.
+- Hecho: eventos post-commit no generan falsos 500; login y solicitud de recuperacion fallan cerrados si no pueden auditarse.
+- Hecho: cron y reintentos separados, secretos distintos de 32+ caracteres y mantenimiento reservado al cron.
+- Hecho: cuatro ojos persistente y cierre seguro ante autoria historica desconocida, incluso con un solo admin.
+- Hecho: recuperacion de cuenta activa con enlace de un solo uso, auditoria y revocacion de sesiones.
+- Hecho: acuse de solicitudes inmediato con outbox; politica IVA aplicada en API y selectores; redondeo UI en centimos.
+- Hecho: limites de formularios alineados con API, planificacion de hitos corregida y login limitado por IP y cuenta.
+- Validacion: typecheck y build correctos; 287 tests y 108 flujos Chromium/WebKit correctos; npm audit 0.
+- Hecho: preflight bloqueante para secretos, ledger/checksums y firmas historicas v1/v2/v3, sin mostrar valores ni modificar datos.
+- Bloqueo produccion: el preflight debe confirmar cero v1/desconocidas y claves disponibles para toda firma v2/v3.
+- Pendiente gestor/DPD: validar IVA/defensa fiscal SQL y aprobar retencion de IP, user-agent y auditoria.
+- Deuda media: concurrencia optimista de oportunidades, guardas SQL adicionales, paginacion global y reintento durable de auditoria semantica no critica.

@@ -20,7 +20,7 @@ import {
 import { useCatalog } from "@/features/catalog/useCatalog";
 import { CatalogLoadState } from "@/features/catalog/CatalogLoadState";
 import { blankOpportunity, opportunityForSelection } from "../sales-pipeline.utils";
-import { CURRENT_FISCAL_POLICY } from "@reformapro/domain";
+import { calculateEstimateTotals, CURRENT_FISCAL_POLICY, hasAtMostTwoDecimals } from "@reformapro/domain";
 
 const steps = ["Oportunidad", "Alcance", "Partidas", "Revisión"];
 
@@ -166,31 +166,39 @@ export function SalesPipeline({
         line.descripcion.trim() &&
         Number.isFinite(line.cantidad) &&
         line.cantidad > 0 &&
+        line.cantidad <= 1_000_000 &&
         Number.isFinite(line.precioVentaUnitario) &&
         line.precioVentaUnitario >= 0 &&
+        line.precioVentaUnitario <= 100_000_000 &&
+        hasAtMostTwoDecimals(line.precioVentaUnitario) &&
+        (line.costeUnitario == null ||
+          (Number.isFinite(line.costeUnitario) &&
+            line.costeUnitario >= 0 &&
+            line.costeUnitario <= 100_000_000 &&
+            hasAtMostTwoDecimals(line.costeUnitario))) &&
+        Number.isFinite(line.descuento) &&
+        line.descuento >= 0 &&
+        line.descuento <= 100 &&
+        hasAtMostTwoDecimals(line.descuento) &&
         Number.isFinite(line.iva) &&
-        line.iva >= 0,
-    );
+        line.iva >= 0 &&
+        line.iva <= 100 &&
+        hasAtMostTwoDecimals(line.iva) &&
+        CURRENT_FISCAL_POLICY.selectableVatRates.includes(line.iva),
+    ) &&
+    draft.partidas.reduce(
+      (total, line) => total + line.cantidad * line.precioVentaUnitario,
+      0,
+    ) <= 1_000_000_000;
   const totals = useMemo(
-    () =>
-      draft.partidas.reduce(
-        (result, line) => {
-          const sale =
-            line.cantidad *
-            line.precioVentaUnitario *
-            (1 - line.descuento / 100);
-          const cost =
-            line.costeUnitario == null
-              ? null
-              : line.cantidad * line.costeUnitario;
-          return {
-            sale: result.sale + sale,
-            cost:
-              cost == null || result.cost == null ? null : result.cost + cost,
-          };
-        },
-        { sale: 0, cost: 0 as number | null },
-      ),
+    () => {
+      const sale = calculateEstimateTotals(draft.partidas).totalSinIva;
+      const costCents = draft.partidas.reduce<number | null>((result, line) =>
+        result == null || line.costeUnitario == null
+          ? null
+          : result + Math.round(line.cantidad * line.costeUnitario * 100), 0);
+      return { sale, cost: costCents == null ? null : costCents / 100 };
+    },
     [draft.partidas],
   );
 
@@ -946,15 +954,14 @@ function EstimateLineEditor({
         </label>
         <label>
           IVA (%)
-          <input
-            required
-            min="0"
-            max="100"
-            step="0.01"
-            type="number"
+          <select
             value={line.iva}
             onChange={(event) => onChange({ iva: Number(event.target.value) })}
-          />
+          >
+            {CURRENT_FISCAL_POLICY.selectableVatRates.map((rate) => (
+              <option key={rate} value={rate}>{rate}%</option>
+            ))}
+          </select>
         </label>
       </div>
       <details className="estimate-line__internal" open>

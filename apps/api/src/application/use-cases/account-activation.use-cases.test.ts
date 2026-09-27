@@ -10,6 +10,14 @@ const hasher = {
 };
 
 describe("AccountActivationUseCases", () => {
+  it("checks administrator permission before exposing email configuration state", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const client = await users.save({ id: 0, email: Email.of("caller@hogaria.test"), nombre: "Caller", rol: "cliente", activo: true, createdAt: new Date() }, "hash:client");
+    const target = await users.save({ id: 0, email: Email.of("target@hogaria.test"), nombre: "Target", rol: "cliente", activo: false, createdAt: new Date() }, "");
+    const useCases = new AccountActivationUseCases(users, new InMemoryActivationTokenRepository(users), { isConfigured: () => false, sendActivation: async () => undefined }, "http://invalid.local");
+    await expect(useCases.invite(client.id, target.id, { ip: "127.0.0.1", userAgent: "vitest" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("rejects duplicate email identities regardless of letter case", async () => {
     const users = new InMemoryUserRepository(hasher);
     await users.save({ id: 0, email: Email.of("pro@hogaria.test"), nombre: "Uno", rol: "profesional", profesion: "reformista", activo: false, createdAt: new Date() });
@@ -38,6 +46,40 @@ describe("AccountActivationUseCases", () => {
     await useCases.activate(token!, "ClaveSegura2026");
     expect((await users.findById(client.id))?.activo).toBe(true);
     await expect(useCases.activate(token!, "OtraClave2026")).rejects.toThrow("caducado");
+  });
+
+  it("lets an administrator issue a one-time password reset for an active account", async () => {
+    configureActivationPasswordHasher(hasher.hash);
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("admin-reset@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
+    const client = await users.save({ id: 0, email: Email.of("reset@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: true, accountStatus: "active", createdAt: new Date() }, "hash:old");
+    let deliveredUrl = "";
+    let purpose = "";
+    const events = { emit: async (event: { type: string; actorId: number; userId?: number }) => { expect(event).toMatchObject({ type: "UserAccessResetRequested", actorId: admin.id, userId: client.id }); }, subscribe: () => () => undefined };
+    const useCases = new AccountActivationUseCases(users, new InMemoryActivationTokenRepository(users), {
+      isConfigured: () => true,
+      sendActivation: async (input) => { deliveredUrl = input.activationUrl; purpose = input.purpose ?? ""; },
+    }, "https://hogaria.test", undefined, events);
+
+    await expect(useCases.resetAccess(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" }))
+      .resolves.toMatchObject({ sent: true, email: client.email.value });
+    expect(purpose).toBe("password_reset");
+    await expect(users.findById(client.id)).resolves.toMatchObject({ activo: true, accountStatus: "active" });
+    const token = new URLSearchParams(deliveredUrl.split("?")[1]).get("token")!;
+    const previousSessionVersion = (await users.findById(client.id))?.sessionVersion ?? 0;
+    await useCases.activate(token, "NuevaClave2026");
+    expect((await users.verifyPassword(client.email.value, "NuevaClave2026"))?.id).toBe(client.id);
+    expect((await users.findById(client.id))?.sessionVersion).toBe(previousSessionVersion + 1);
+    await expect(useCases.activate(token, "OtraClave2026")).rejects.toThrow("caducado");
+  });
+
+  it("does not use password reset to reactivate an archived account", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("admin-reset-archived@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash:admin");
+    const client = await users.save({ id: 0, email: Email.of("archived-reset@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: false, accountStatus: "archived", createdAt: new Date() }, "");
+    const useCases = new AccountActivationUseCases(users, new InMemoryActivationTokenRepository(users), { isConfigured: () => true, sendActivation: async () => undefined }, "https://hogaria.test");
+    await expect(useCases.resetAccess(admin.id, client.id, { ip: "127.0.0.1", userAgent: "vitest" }))
+      .rejects.toThrow("activa");
   });
 
   it("invites a professional through the same one-time activation flow", async () => {

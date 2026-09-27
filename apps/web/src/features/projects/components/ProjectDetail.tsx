@@ -97,9 +97,14 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
 
   const handlePlanningSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const milestoneName = String(form.get("milestoneName") ?? "").trim();
     const milestoneDate = String(form.get("milestoneDate") ?? "");
+    if (milestoneName && !milestoneDate) {
+      push("Indica la fecha del nuevo hito", "error");
+      return;
+    }
     const hitos = milestoneName
       ? [...(project.data?.hitos ?? []), { id: crypto.randomUUID(), nombre: milestoneName, completado: false, fecha: milestoneDate }]
       : project.data?.hitos ?? [];
@@ -112,7 +117,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
         revision: project.data?.revision ?? 0,
       });
       await project.refresh();
-      event.currentTarget.reset();
+      formElement.reset();
       push("Planificacion guardada", "success");
     } catch (cause) {
       push((cause as { message?: string }).message ?? "No se pudo guardar la planificacion", "error");

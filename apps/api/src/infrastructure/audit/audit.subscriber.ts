@@ -20,6 +20,7 @@ const ACTION_CODES: Record<DomainEvent["type"], string> = {
   UserCreated:                 "USUARIO_CREADO",
   UserDeactivated:             "USUARIO_DESACTIVADO",
   UserPasswordReset:           "CONTRASENA_RESETEADA",
+  UserAccessResetRequested:    "RESTABLECIMIENTO_ACCESO_SOLICITADO",
   ProjectCreated:              "PROYECTO_CREADO",
   ProjectCompleted:            "PROYECTO_FINALIZADO",
   ProjectUpdated:              "PROYECTO_ACTUALIZADO",

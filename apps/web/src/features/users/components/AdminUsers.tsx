@@ -77,6 +77,22 @@ export function AdminUsers({ api }: Props) {
     finally { setReactivatingId(null); }
   };
 
+  const handleResetAccess = async (user: UserDTO) => {
+    if (reactivatingId !== null) return;
+    const ok = await confirm({
+      title: "Restablecer acceso",
+      message: <>Se enviará a <strong>{user.email}</strong> un enlace de un solo uso para crear una nueva contraseña. Al utilizarlo se cerrarán sus sesiones anteriores.</>,
+      confirmLabel: "Enviar enlace",
+    });
+    if (!ok) return;
+    try {
+      setReactivatingId(user.id);
+      const result = await api.resetAccess(user.id);
+      push(result.sent ? "Enlace para restablecer el acceso enviado" : "Ya existe un enlace vigente o un envío en curso", result.sent ? "success" : "info");
+    } catch (e) { push((e as { message?: string }).message ?? "No se pudo restablecer el acceso", "error"); }
+    finally { setReactivatingId(null); }
+  };
+
   const columns: ColumnDef<UserDTO>[] = [
     { key: "nombre", header: "Usuario", sortBy: u => u.nombre,
       render: u => (
@@ -146,6 +162,7 @@ export function AdminUsers({ api }: Props) {
             {can("user.manage") && <Button small variant="ghost" onClick={() => setModal({ kind: "edit", user: u })}>Editar</Button>}
             {can("user.manage") && accountStatusOf(u) === "pending_activation" && <Button small loading={reactivatingId === u.id} disabled={reactivatingId !== null} onClick={() => void handleReactivate(u)}>Reenviar acceso</Button>}
             {can("user.manage") && accountStatusOf(u) === "archived" && <Button small loading={reactivatingId === u.id} disabled={reactivatingId !== null} onClick={() => void handleReactivate(u)}>Reactivar</Button>}
+            {can("user.manage") && accountStatusOf(u) === "active" && <Button small variant="ghost" loading={reactivatingId === u.id} disabled={reactivatingId !== null} onClick={() => void handleResetAccess(u)}>Restablecer acceso</Button>}
             {can("user.manage") && u.activo && <Button small variant="danger" aria-label={`Archivar a ${u.nombre}`} onClick={() => handleDelete(u)}>✕</Button>}
           </div>
         )}
