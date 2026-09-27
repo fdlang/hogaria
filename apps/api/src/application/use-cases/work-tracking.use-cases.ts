@@ -66,7 +66,13 @@ function uuid(value: unknown): string {
   return value;
 }
 function publicWork(entry: WorkEntry): PublicWorkEntry {
-  const { rate: _rate, approvedCostCents: _cost, ...publicEntry } = entry;
+  const {
+    rate: _rate,
+    approvedCostCents: _cost,
+    lastCorrectedBy: _corrector,
+    independentApprovalRequired: _approval,
+    ...publicEntry
+  } = entry;
   return publicEntry;
 }
 
@@ -168,6 +174,9 @@ export class WorkTrackingUseCases {
     const unitLabel = rateUnit === "unidad" ? text(input.unitLabel) : rateUnit;
     if (!unitLabel || unitLabel.length > 80)
       throw new ValidationError("Indica una unidad de hasta 80 caracteres");
+    const activeAdministrators = (await this.users.findByRole("admin")).filter(
+      (administrator) => administrator.activo,
+    ).length;
     const rate: WorkRate = {
       id: crypto.randomUUID(),
       professionalId,
@@ -178,6 +187,7 @@ export class WorkTrackingUseCases {
       effectiveAt,
       createdAt: this.now(),
       createdBy: actorId,
+      independentApprovalRequired: activeAdministrators > 1,
     };
     return this.store.transaction(professionalId, async (repo) => {
       if (await repo.openEntry(professionalId))
@@ -346,14 +356,24 @@ export class WorkTrackingUseCases {
         entry.approvedBy = null;
         entry.reviewReason = reason;
         entry.lastCorrectedBy = actorId;
+        entry.independentApprovalRequired =
+          entry.independentApprovalRequired ||
+          (await this.users.findByRole("admin")).filter((user) => user.activo)
+            .length > 1;
       } else if (action === "aprobar" || action === "rechazar") {
         if (actor.rol !== "admin") throw new ForbiddenError();
         if (entry.status !== "enviado" || !entry.endedAt)
           throw new ConflictError("Solo se pueden revisar registros enviados");
         if (action === "aprobar" && requiresIndependentApproval({
           activeAdministrators: (await this.users.findByRole("admin")).filter((user) => user.activo).length,
+          independentApprovalRequired:
+            Boolean(entry.independentApprovalRequired) ||
+            Boolean(entry.rate.independentApprovalRequired),
           actorId,
-          originators: [entry.rate.createdBy, entry.lastCorrectedBy],
+          originators: [
+            entry.rate.createdBy,
+            ...(entry.lastCorrectedBy == null ? [] : [entry.lastCorrectedBy]),
+          ],
         })) throw new ConflictError("La aprobacion requiere otro administrador");
         reason = action === "rechazar" ? text(input.reason, true) : "";
         entry.status = action === "aprobar" ? "aprobado" : "rechazado";

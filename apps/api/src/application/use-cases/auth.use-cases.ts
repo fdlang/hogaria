@@ -38,7 +38,12 @@ export class LoginUseCase {
 
   async execute(email: string, password: string, ctx: ClientContext): Promise<LoginResult> {
     if (!email || !password) throw new ValidationError("Email y contraseña obligatorios");
-    if (!(await this.loginGate.check(`login:${ctx.ip}:${email.trim().toLowerCase()}`, ABUSE_LIMITS.login.limit, ABUSE_LIMITS.login.windowMs))) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const [ipAllowed, accountAllowed] = await Promise.all([
+      this.loginGate.check(`login:ip:${ctx.ip}`, ABUSE_LIMITS.login.limit, ABUSE_LIMITS.login.windowMs),
+      this.loginGate.check(`login:account:${normalizedEmail}`, ABUSE_LIMITS.login.limit, ABUSE_LIMITS.login.windowMs),
+    ]);
+    if (!ipAllowed || !accountAllowed) {
       throw new RateLimitError("Demasiados intentos. Espera unos minutos antes de volver a intentarlo.");
     }
 

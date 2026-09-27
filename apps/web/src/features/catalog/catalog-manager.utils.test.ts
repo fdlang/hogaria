@@ -31,5 +31,7 @@ describe("catalog manager utilities", () => {
   it("does not treat an empty required price as zero", () => {
     expect(validateCatalogForm({ reference: "DEM-1", category: "Demoliciones", description: "Trabajo", unit: "ud", salePrice: "", vatRate: "21" })).toHaveProperty("salePrice");
     expect(validateCatalogForm({ reference: "DEM-1", category: "Demoliciones", description: "Trabajo", unit: "ud", salePrice: "0", vatRate: "21" })).toEqual({});
+    expect(validateCatalogForm({ reference: "DEM-1", category: "Demoliciones", description: "Trabajo", unit: "ud", salePrice: "1.001", vatRate: "21" })).toHaveProperty("salePrice");
+    expect(validateCatalogForm({ reference: "DEM-1", category: "Demoliciones", description: "Trabajo", unit: "ud", salePrice: "1000000000", vatRate: "21" })).toHaveProperty("salePrice");
   });
 });

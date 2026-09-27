@@ -1,6 +1,6 @@
 import { ValidationError } from "@reformapro/domain/errors";
 import type { EstimateDraft } from "@reformapro/domain/entities";
-import { hasAtMostTwoDecimals } from "@reformapro/domain";
+import { fiscalPolicyAt, hasAtMostTwoDecimals } from "@reformapro/domain";
 export function validateDraft(value: unknown): asserts value is EstimateDraft {
   const fail = (field?: string): never => {
     throw new ValidationError(
@@ -49,6 +49,8 @@ export function validateDraft(value: unknown): asserts value is EstimateDraft {
     number(line.precioVentaUnitario, 0, 100_000_000, `${prefix}.precioVentaUnitario`);
     number(line.descuento, 0, 100, `${prefix}.descuento`);
     number(line.iva, 0, 100, `${prefix}.iva`);
+    if (!fiscalPolicyAt(new Date()).selectableVatRates.includes(line.iva as number))
+      fail(`${prefix}.iva`);
     if (line.costeUnitario != null) number(line.costeUnitario, 0, 100_000_000, `${prefix}.costeUnitario`);
     if (!hasAtMostTwoDecimals(line.precioVentaUnitario as number) ||
         !hasAtMostTwoDecimals(line.descuento as number) ||

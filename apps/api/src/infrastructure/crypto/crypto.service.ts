@@ -7,6 +7,7 @@
 
 import { ITokenService } from "../../application/use-cases/auth.use-cases.js";
 import { DocumentHash } from "@reformapro/domain/value-objects";
+import { timingSafeEqual } from "node:crypto";
 
 /** Cryptographic operations used to seal a proposal version. */
 export interface ISignatureCrypto {
@@ -16,6 +17,12 @@ export interface ISignatureCrypto {
 }
 
 const enc = new TextEncoder();
+
+function safeEqual(left: string, right: string): boolean {
+  const leftBytes = enc.encode(left);
+  const rightBytes = enc.encode(right);
+  return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
+}
 
 function toHex(buf: ArrayBuffer): string {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
@@ -69,25 +76,43 @@ export class WebCryptoTokenService implements ITokenService {
 }
 
 export class WebCryptoSignatureService implements ISignatureCrypto {
-  constructor(private readonly keys: HMACKeyProvider) {}
+  private readonly verificationKeys: Map<string, HMACKeyProvider>;
+  constructor(
+    private readonly keys: HMACKeyProvider,
+    private readonly activeKeyId = "current",
+    previousKeys: ReadonlyMap<string, HMACKeyProvider> = new Map(),
+    private readonly v2Keys?: HMACKeyProvider,
+  ) {
+    if (!/^[A-Za-z0-9_-]{1,32}$/.test(activeKeyId)) throw new Error("Invalid signature key id");
+    this.verificationKeys = new Map(previousKeys);
+    this.verificationKeys.set(activeKeyId, keys);
+  }
 
   async generateSignatureToken(docId: number, userId: number, timestamp: number, documentHash: string): Promise<string> {
     const key  = await this.keys.getKey();
     const raw  = `${docId}::${userId}::${timestamp}::${documentHash}`;
     const sig  = await crypto.subtle.sign("HMAC", key, enc.encode(raw));
-    return `rp-sig-v2-${toHex(sig).slice(0, 32)}`;
+    return `rp-sig-v3-${this.activeKeyId}-${toHex(sig).slice(0, 32)}`;
   }
 
   // Timing-safe: uses crypto.subtle.verify internally, then a final equality
   // check on a derived value the attacker cannot influence.
   async verifySignatureToken(token: string, docId: number, userId: number, timestamp: number, documentHash: string): Promise<boolean> {
     try {
-      const key  = await this.keys.getKey();
-      const legacy = token.startsWith("rp-sig-") && !token.startsWith("rp-sig-v2-");
-      const raw  = legacy ? `${docId}::${userId}::${timestamp}` : `${docId}::${userId}::${timestamp}::${documentHash}`;
-      const sig  = await crypto.subtle.sign("HMAC", key, enc.encode(raw));
-      const expected = `${legacy ? "rp-sig-" : "rp-sig-v2-"}${toHex(sig).slice(0, 32)}`;
-      return token === expected;
+      if (token.startsWith("rp-sig-") && !token.startsWith("rp-sig-v2-") && !token.startsWith("rp-sig-v3-")) return false;
+      const raw = `${docId}::${userId}::${timestamp}::${documentHash}`;
+      if (token.startsWith("rp-sig-v2-")) {
+        if (!this.v2Keys) return false;
+        const sig = await crypto.subtle.sign("HMAC", await this.v2Keys.getKey(), enc.encode(raw));
+        return safeEqual(token, `rp-sig-v2-${toHex(sig).slice(0, 32)}`);
+      }
+      const match = /^rp-sig-v3-([A-Za-z0-9_-]{1,32})-([a-f0-9]{32})$/.exec(token);
+      if (!match) return false;
+      const provider = this.verificationKeys.get(match[1]!);
+      if (!provider) return false;
+      const sig = await crypto.subtle.sign("HMAC", await provider.getKey(), enc.encode(raw));
+      const expected = `rp-sig-v3-${match[1]}-${toHex(sig).slice(0, 32)}`;
+      return safeEqual(token, expected);
     } catch { return false; }
   }
 

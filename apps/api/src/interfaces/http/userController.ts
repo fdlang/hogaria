@@ -51,6 +51,13 @@ export function userController(deps: {
       } catch (e) { return toHttpError(e); }
     },
 
+    async resetAccess(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        const result = await deps.activation.resetAccess(req.actorId, idOf(req.params.id), ctxOf(req));
+        return { status: result.sent ? 202 : 200, body: result };
+      } catch (e) { return toHttpError(e); }
+    },
+
     // PATCH /users/:id
     async update(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
       try {

@@ -8,17 +8,18 @@ export function notificationRetryController(
  return async(req:HttpRequest):Promise<HttpResponse>=>{
   const {secret,retrySecret,enabled}=config();
   const supplied=new TextEncoder().encode(String(req.headers.authorization??""));
-  let authorized=false;
-  for(const candidate of [secret,retrySecret]){
-   if(!candidate?.trim())continue;
+  const matches=(candidate:string|undefined)=>{
+   if(!candidate?.trim())return false;
    const expected=new TextEncoder().encode(`Bearer ${candidate}`);
-   if(supplied.length===expected.length&&timingSafeEqual(supplied,expected))authorized=true;
-  }
-  if(!authorized)
+   return supplied.length===expected.length&&timingSafeEqual(supplied,expected);
+  };
+  const cronAuthorized=matches(secret);
+  const retryAuthorized=matches(retrySecret);
+  if(!cronAuthorized&&!retryAuthorized)
    return {status:401,body:{message:"No autorizado"}};
   const headers={"Cache-Control":"no-store"};
   const notificationResult=enabled?await service.retry():{enabled:false};
-  await maintenance?.execute();
+  if(cronAuthorized)await maintenance?.execute();
   return {status:200,headers,body:notificationResult};
  };
 }
