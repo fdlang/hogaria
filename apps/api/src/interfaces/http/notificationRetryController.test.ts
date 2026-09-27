@@ -12,8 +12,7 @@ describe("notification retry endpoint",()=>{
  });
  it("accepts independent scheduler secrets without replacing the existing cron secret",async()=>{
   const service={retry:vi.fn(async()=>({processed:1,configured:true}))};
-  const maintenance={execute:vi.fn(async()=>({processed:1,deleted:1,failed:0}))};
-  const handler=notificationRetryController(service,()=>({secret:"vercel-secret",retrySecret:"github-secret",enabled:true}),maintenance);
+  const handler=notificationRetryController(service,()=>({secret:"vercel-secret",retrySecret:"github-secret",enabled:true}));
   for(const secret of ["vercel-secret","github-secret"]){
    expect((await handler({headers:{authorization:`Bearer ${secret}`}} as never)).status).toBe(200);
   }
@@ -21,7 +20,6 @@ describe("notification retry endpoint",()=>{
    expect((await handler({headers:{authorization}} as never)).status).toBe(401);
   }
   expect(service.retry).toHaveBeenCalledTimes(2);
-  expect(maintenance.execute).toHaveBeenCalledOnce();
  });
  it("supports a retry secret alone and respects the off switch for it",async()=>{
   const service={retry:vi.fn(async()=>({processed:1,configured:true}))};

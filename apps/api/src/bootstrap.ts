@@ -167,36 +167,12 @@ export async function buildApp(): Promise<AppDependencies> {
   const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
   const databaseUrl = process.env.DATABASE_URL;
   const hmacSecret = process.env.HMAC_SECRET;
-  const signatureSecret = process.env.SIGNATURE_HMAC_SECRET;
-  const legacyV2SignatureSecret = process.env.SIGNATURE_HMAC_LEGACY_V2_SECRET;
-  const signatureKeyId = process.env.SIGNATURE_HMAC_KEY_ID ?? "development";
   if (isProduction && !databaseUrl) throw new Error("DATABASE_URL es obligatoria en producción");
   if (isProduction && (!hmacSecret || hmacSecret.length < 32)) throw new Error("HMAC_SECRET debe tener al menos 32 caracteres en producción");
 
-  if (isProduction && (!signatureSecret || signatureSecret.length < 32)) throw new Error("SIGNATURE_HMAC_SECRET must have at least 32 characters in production");
-  if (isProduction && !process.env.SIGNATURE_HMAC_KEY_ID) throw new Error("SIGNATURE_HMAC_KEY_ID is required in production");
-  if (isProduction && signatureSecret === hmacSecret) throw new Error("SIGNATURE_HMAC_SECRET must be different from HMAC_SECRET");
-  if (isProduction && legacyV2SignatureSecret === hmacSecret) throw new Error("SIGNATURE_HMAC_LEGACY_V2_SECRET must be different from HMAC_SECRET");
-  if (legacyV2SignatureSecret && legacyV2SignatureSecret.length < 32) throw new Error("SIGNATURE_HMAC_LEGACY_V2_SECRET must have at least 32 characters");
-  if (isProduction && process.env.CRON_SECRET && process.env.CRON_SECRET === process.env.NOTIFICATION_RETRY_SECRET) throw new Error("CRON_SECRET and NOTIFICATION_RETRY_SECRET must be different");
-  if (isProduction && process.env.CRON_SECRET && process.env.CRON_SECRET.length < 32) throw new Error("CRON_SECRET must have at least 32 characters");
-  if (isProduction && process.env.NOTIFICATION_RETRY_SECRET && process.env.NOTIFICATION_RETRY_SECRET.length < 32) throw new Error("NOTIFICATION_RETRY_SECRET must have at least 32 characters");
   const hmacKeys  = new HMACKeyProvider(hmacSecret);
   const tokens    = new WebCryptoTokenService(hmacKeys);
-  const previousSignatureKeys = new Map<string, HMACKeyProvider>();
-  if (process.env.SIGNATURE_HMAC_PREVIOUS_KEYS) {
-    const parsed = JSON.parse(process.env.SIGNATURE_HMAC_PREVIOUS_KEYS) as Record<string, unknown>;
-    for (const [keyId, secret] of Object.entries(parsed)) {
-      if (!/^[A-Za-z0-9_-]{1,32}$/.test(keyId) || typeof secret !== "string" || secret.length < 32) throw new Error("SIGNATURE_HMAC_PREVIOUS_KEYS is invalid");
-      previousSignatureKeys.set(keyId, new HMACKeyProvider(secret));
-    }
-  }
-  const sigCrypto = new WebCryptoSignatureService(
-    new HMACKeyProvider(signatureSecret),
-    signatureKeyId,
-    previousSignatureKeys,
-    legacyV2SignatureSecret ? new HMACKeyProvider(legacyV2SignatureSecret) : undefined,
-  );
+  const sigCrypto = new WebCryptoSignatureService(hmacKeys);
   const events    = new InMemoryEventEmitter();
   const memoryCooldown = new InMemoryCooldownGate();
 
@@ -215,7 +191,7 @@ export async function buildApp(): Promise<AppDependencies> {
   const catalog: ICatalogRepository = pool ? new PostgresCatalogRepository(pool) : new InMemoryCatalogRepository();
   const activationTokens: IActivationTokenRepository = pool ? new PostgresActivationTokenRepository(pool) : new InMemoryActivationTokenRepository(users as InMemoryUserRepository);
   configureActivationPasswordHasher(value => hasher.hash(value));
-  const activation = new AccountActivationUseCases(users, activationTokens, new ResendTransactionalEmail(process.env.RESEND_API_KEY, process.env.EMAIL_FROM), process.env.APP_URL ?? "http://localhost:5173", undefined, events);
+  const activation = new AccountActivationUseCases(users, activationTokens, new ResendTransactionalEmail(process.env.RESEND_API_KEY, process.env.EMAIL_FROM), process.env.APP_URL ?? "http://localhost:5173");
 
   // Development seed. PostgreSQL deployments use the same credentials only
   // during the first bootstrap; override all values through environment vars.
@@ -257,9 +233,7 @@ export async function buildApp(): Promise<AppDependencies> {
     unassignProjectProfessional:new UnassignProjectProfessionalUseCase(users, projects),
     queryAuditLog:              new QueryAuditLogUseCase(users, audit),
     submitSolicitud:            new SubmitSolicitudUseCase(solicitudes, cooldown,
-      pool
-        ? async () => { await notifications.retry(1).catch(() => console.error("LEAD_CONFIRMATION_DISPATCH_FAILED")); }
-        : (solicitudId) => notifications.receiveLead(solicitudId)),
+      pool ? undefined : (solicitudId) => notifications.receiveLead(solicitudId)),
     listSolicitudes:            new ListSolicitudesUseCase(users, solicitudes),
     updateSolicitudStatus:      new UpdateSolicitudStatusUseCase(users, solicitudes),
     uploadFile:                 new UploadFileUseCase(users, projects, files, fileStorage, events),

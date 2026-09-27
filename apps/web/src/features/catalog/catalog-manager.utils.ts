@@ -1,5 +1,4 @@
 import type { CatalogItemDTO } from "@/features/sales/api/sales.api";
-import { CURRENT_FISCAL_POLICY, hasAtMostTwoDecimals } from "@reformapro/domain";
 
 export type CatalogGroup = {
   category: string;
@@ -14,8 +13,8 @@ export function validateCatalogForm(form: CatalogFormValues): Partial<Record<key
   if (!form.category.trim()) errors.category = "La categoría es obligatoria";
   if (!form.description.trim()) errors.description = "La descripción es obligatoria";
   if (!form.unit.trim()) errors.unit = "La unidad es obligatoria";
-  if (!form.salePrice.trim() || !Number.isFinite(Number(form.salePrice)) || Number(form.salePrice) < 0 || Number(form.salePrice) > 999_999_999.99 || !hasAtMostTwoDecimals(Number(form.salePrice))) errors.salePrice = "Indica un precio válido con hasta dos decimales";
-  if (!form.vatRate.trim() || !CURRENT_FISCAL_POLICY.selectableVatRates.includes(Number(form.vatRate))) errors.vatRate = "Selecciona un IVA vigente";
+  if (!form.salePrice.trim() || !Number.isFinite(Number(form.salePrice)) || Number(form.salePrice) < 0) errors.salePrice = "Indica un precio válido";
+  if (!form.vatRate.trim() || !Number.isInteger(Number(form.vatRate)) || Number(form.vatRate) < 0 || Number(form.vatRate) > 100) errors.vatRate = "Indica un IVA válido";
   return errors;
 }
 

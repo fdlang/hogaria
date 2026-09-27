@@ -40,8 +40,8 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/file.use-cases.ts"], tests: ["apps/api/src/application/use-cases/audit-regressions.test.ts", "apps/api/src/application/use-cases/security-regressions.test.ts"],
   },
   {
-    id: "HOG-SEC-003", description: "El alta, la reactivación y el restablecimiento de acceso usan enlaces de un solo uso y una única emisión vigente.", origin: "security", owner: "seguridad",
-    assumption: "El correo es el canal de incorporación y recuperación verificado y cada cuenta mantiene como máximo un enlace vigente.", validScale: "Altas y recuperaciones ocasionales; requiere cola duradera al crecer el volumen de accesos.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
+    id: "HOG-SEC-003", description: "El alta envía una única invitación automática, de un solo uso; solo se reenvía tras caducar o al reactivar.", origin: "security", owner: "seguridad",
+    assumption: "El correo es el canal de incorporación verificado y cada cuenta mantiene como máximo una invitación vigente.", validScale: "Altas ocasionales; requiere cola duradera al crecer el volumen de invitaciones.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("activation_expiry_rate", "Invitaciones caducadas sin activación", "database"), metric("duplicate_identity_attempt_rate", "Altas duplicadas bloqueadas")],
     implementation: ["apps/api/src/application/use-cases/account-activation.use-cases.ts", "apps/api/src/infrastructure/database/activationTokenRepositories.ts"], tests: ["apps/api/src/application/use-cases/account-activation.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
   },

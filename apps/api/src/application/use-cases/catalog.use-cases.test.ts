@@ -31,11 +31,6 @@ describe("CatalogUseCases — administración exclusiva", () => {
     expect((await catalog.list(admin.id, true))[0]?.active).toBe(false);
   });
 
-  it("rechaza tipos de IVA fuera de la política fiscal vigente", async () => {
-    const { admin, catalog } = await setup();
-    await expect(catalog.create(admin.id, { ...input, vatRate: 17 })).rejects.toThrow("IVA");
-  });
-
   it("updates only explicitly supplied fields after normalization", async () => {
     const users = new InMemoryUserRepository(hasher);
     const admin = await users.save({ id: 0, email: Email.of("patch@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() });

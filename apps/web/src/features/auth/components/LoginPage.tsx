@@ -69,7 +69,7 @@ export function LoginPage({ onSuccess, onBack }: Props) {
         </Button>
 
         {onBack && (
-          <Button type="button" variant="ghost" onClick={onBack} style={{ width: "100%", marginTop: 10 }} small>
+          <Button variant="ghost" onClick={onBack} style={{ width: "100%", marginTop: 10 }} small>
             ← Volver a la página principal
           </Button>
         )}

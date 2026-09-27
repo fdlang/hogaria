@@ -97,13 +97,9 @@ npm run db:migrate --workspace @reformapro/api
 | `APP_URL` | URL pública, p. ej. `https://www.hogaria.design`. |
 | `BLOB_READ_WRITE_TOKEN` | Acceso al almacén privado de documentos. |
 | `CLIENT_NOTIFICATIONS_ENABLED` | Activa los avisos transaccionales al cliente (`true`/`false`). |
-| `CRON_SECRET` | Secreto de al menos 32 caracteres usado por el cron de Vercel. |
-| `NOTIFICATION_RETRY_SECRET` | Secreto alternativo de al menos 32 caracteres, distinto del cron. |
-| `HMAC_SECRET` | Secreto de al menos 32 caracteres exclusivo para sesiones. Obligatorio en producción. |
-| `SIGNATURE_HMAC_SECRET` | Secreto independiente para emitir sellos de firma. Obligatorio en producción. |
-| `SIGNATURE_HMAC_KEY_ID` | Identificador estable de la clave de firma activa. |
-| `SIGNATURE_HMAC_PREVIOUS_KEYS` | JSON con claves v3 antiguas que aún deban verificarse. |
-| `SIGNATURE_HMAC_LEGACY_V2_SECRET` | Para sellos v2 antiguos: conserva aquí el `HMAC_SECRET` anterior y rota el `HMAC_SECRET` de sesiones; ambos deben quedar distintos. |
+| `CRON_SECRET` | Secreto usado por el cron de Vercel para reintentar avisos. |
+| `NOTIFICATION_RETRY_SECRET` | Secreto alternativo del workflow de reintentos de GitHub Actions. |
+| `HMAC_SECRET` | Secreto de al menos 32 caracteres para sesiones y firmas. Obligatorio en producción. |
 | `ALLOWED_ORIGINS` | Orígenes CORS adicionales, separados por comas. |
 | `SEED_ADMIN_EMAIL` | Email del administrador inicial. |
 | `SEED_ADMIN_PASSWORD` | Contraseña del administrador inicial. |
@@ -137,15 +133,13 @@ ruta concreta; no debe reutilizarse el destino de otra obra.
 ## Seguridad y producción
 
 - Producción no permite usar repositorios en memoria: requiere PostgreSQL.
-- Las claves de sesión y firma persisten separadas; cada sello nuevo incluye el identificador de su clave.
+- Las claves HMAC persisten mediante `HMAC_SECRET`; no se generan por instancia.
 - CORS se limita a mismo origen y a `ALLOWED_ORIGINS`.
 - No subas `apps/api/.env`, credenciales ni secretos al repositorio.
 - Las cuentas creadas desde administración nacen inactivas y reciben un enlace
   de activación de un solo uso. El enlace caduca, queda invalidado tras fijar la
   contraseña y solo se envía automáticamente durante el alta inicial. Un
-  administrador puede reenviarlo si ha caducado, reactivar una cuenta archivada
-  o emitir un enlace de restablecimiento para una cuenta activa; al usarlo se
-  revocan las sesiones anteriores.
+  administrador puede reenviarlo si ha caducado o reactivar una cuenta archivada.
 - Los binarios se guardan en Vercel Blob privado (`BLOB_READ_WRITE_TOKEN`).
   PostgreSQL conserva sus metadatos y clasificación; la API comprueba permisos
   específicos de contrato/factura antes de servir cada descarga. Los documentos

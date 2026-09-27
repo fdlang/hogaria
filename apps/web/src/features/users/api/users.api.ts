@@ -38,7 +38,6 @@ export class UsersApi {
   update(id: number, changes: Partial<UserDTO>): Promise<UserDTO> { return this.http.patch(`/users/${id}`, changes); }
   delete(id: number): Promise<void> { return this.http.delete(`/users/${id}`); }
   reactivate(id: number): Promise<{ sent: boolean; status: "sent" | "existing_or_in_progress"; expiresAt?: string; email: string }> { return this.http.post(`/users/${id}/reactivate`, {}); }
-  resetAccess(id: number): Promise<{ sent: boolean; status: "sent" | "existing_or_in_progress"; expiresAt?: string; email: string }> { return this.http.post(`/users/${id}/reset-access`, {}); }
   activateAccount(token: string, password: string): Promise<void> { return this.http.post("/auth/activate", { token, password }); }
   listProfessionalDocuments(id: number): Promise<ProfessionalDocumentDTO[]> { return this.http.get(`/professionals/${id}/documents`); }
   async uploadProfessionalDocument(id: number, file: File): Promise<ProfessionalDocumentDTO> {

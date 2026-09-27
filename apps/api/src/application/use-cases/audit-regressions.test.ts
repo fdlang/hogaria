@@ -47,7 +47,6 @@ describe("Audit: strict DTOs", () => {
     { cantidad: NaN },
     { precioVentaUnitario: Infinity },
     { iva: 101 },
-    { iva: 17 },
     { costeUnitario: -1 },
     { id: "" },
     { descripcion: 7 },

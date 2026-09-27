@@ -13,19 +13,13 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
 
    El runner principal aplica de forma idempotente el esquema base y todas las
    ampliaciones incluidas en el repositorio.
-   A continuación ejecuta `npm run preflight:production`: esta comprobación es
-   de solo lectura y bloquea el despliegue si faltan migraciones, las sumas de
-   control no coinciden o hay firmas históricas sin una clave verificable.
 4. Configura estas variables para Preview y Production:
 
    - `DATABASE_URL`: URL de PostgreSQL gestionado.
    - `RESEND_API_KEY`: clave API de Resend para invitaciones de cuentas.
    - `EMAIL_FROM`: remitente verificado, por ejemplo `Hogaria <info@hogaria.design>`.
    - `APP_URL`: `https://www.hogaria.design`.
-   - `HMAC_SECRET`: secreto aleatorio de al menos 32 caracteres, exclusivo para sesiones.
-   - `SIGNATURE_HMAC_SECRET`: secreto distinto para firmas, de al menos 32 caracteres.
-   - `SIGNATURE_HMAC_KEY_ID`: identificador de la clave de firma activa (por ejemplo, `sig-2026-09`).
-   - `SIGNATURE_HMAC_LEGACY_V2_SECRET`: si existen sellos v2, copia aquí el antiguo `HMAC_SECRET` y rota simultáneamente `HMAC_SECRET`; la rotación cierra las sesiones actuales y deja ambas claves separadas.
+   - `HMAC_SECRET`: secreto aleatorio de al menos 32 caracteres.
    - `ALLOWED_ORIGINS`: dominios adicionales autorizados, separados por comas.
      El dominio del propio despliegue se admite automáticamente.
    - `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`: opcionales,
@@ -33,8 +27,8 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
    - `VITE_API_URL`: opcional. Déjalo vacío para usar `/api` en el mismo dominio.
    - `BLOB_READ_WRITE_TOKEN`: obligatorio para documentos privados.
    - `CLIENT_NOTIFICATIONS_ENABLED`: `true` para activar avisos de cuenta.
-   - `CRON_SECRET`: secreto aleatorio de al menos 32 caracteres usado por el cron de Vercel.
-   - `NOTIFICATION_RETRY_SECRET`: secreto alternativo de al menos 32 caracteres, distinto del cron, si se usa el workflow de GitHub.
+   - `CRON_SECRET`: secreto aleatorio usado por el cron de Vercel.
+   - `NOTIFICATION_RETRY_SECRET`: secreto alternativo si se usa el workflow de GitHub.
    - `VITE_EMAILJS_SERVICE_ID`, `VITE_EMAILJS_AUTOREPLY_TEMPLATE_ID` y
      `VITE_EMAILJS_PUBLIC_KEY`: opcionales. Habilitan el email de confirmación
      de EmailJS tras registrar una solicitud. La clave pública puede estar en

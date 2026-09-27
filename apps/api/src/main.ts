@@ -140,7 +140,6 @@ function getRuntime(): Promise<Runtime> {
   route("POST",   "/users",        req => users.create(req as never), { protected: true }),
   route("PATCH",  "/users/:id",    req => users.update(req as never), { protected: true }),
   route("POST",   "/users/:id/reactivate", req => users.reactivate(req as never), { protected: true }),
-  route("POST",   "/users/:id/reset-access", req => users.resetAccess(req as never), { protected: true }),
   route("DELETE", "/users/:id",    req => users.delete(req as never), { protected: true }),
   route("GET", "/professionals/:id/documents", req => professionalDocuments.list(req as never), { protected: true }),
   route("POST", "/professionals/:id/documents", req => professionalDocuments.upload(req as never), { protected: true }),
