@@ -26,11 +26,15 @@ test('public footer actions form a readable column on mobile', async ({ page }) 
   await expect(footer.getByText('Instagram', { exact: true })).toBeVisible();
   await expect(footer).toHaveCSS('flex-direction', 'column');
   await expect(links).toHaveCSS('flex-direction', 'column');
+  const footerOrder = await footer.locator(':scope > *').evaluateAll(elements => elements.map(element => element.className || element.tagName.toLowerCase()));
+  expect(footerOrder).toEqual(['footer-brand', 'footer-contact', 'footer-links', 'footer-signature']);
   const instagramLink = links.getByRole('link', { name: 'Instagram de Hogaria' });
   await expect(instagramLink).toHaveAttribute('href', 'https://www.instagram.com/hogaria.desing?stkn=MTlvYzRnbHVsY2FmYg==');
   const instagram = await instagramLink.boundingBox();
   const privacy = await links.getByRole('link', { name: 'Privacidad' }).boundingBox();
   const client = await links.getByRole('button', { name: 'Área cliente' }).boundingBox();
+  await expect(links.getByRole('button', { name: 'Área cliente' })).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(links.getByRole('button', { name: 'Área cliente' })).toHaveCSS('border-top-width', '0px');
   expect(privacy!.y).toBeGreaterThanOrEqual(instagram!.y + instagram!.height);
   expect(client!.y).toBeGreaterThanOrEqual(privacy!.y + privacy!.height);
 });
@@ -39,10 +43,10 @@ test('portrait portfolio video stays inside the mobile viewport without changing
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   const section = page.locator('.project-showcase__video');
-  const frame = section.locator('.project-showcase__video-frame');
-  const video = frame.locator('video');
+  const video = section.locator(':scope > video');
   await section.scrollIntoViewIfNeeded();
-  await expect(frame.locator('.project-showcase__sound')).toHaveCount(0);
+  await expect(section.locator('.project-showcase__video-frame')).toHaveCount(0);
+  await expect(section.locator('.project-showcase__sound')).toHaveCount(0);
   await expect(video).toHaveAttribute('controls', '');
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).videoWidth)).toBeGreaterThan(0);
   const dimensions = await video.evaluate(element => {
