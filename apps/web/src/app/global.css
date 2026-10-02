@@ -722,18 +722,22 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .works h3 { font-size: 25px; line-height: 1.05; }
   .works .works__action { min-height: 38px; justify-self: start; border-color: var(--copper-dark); background: transparent; color: var(--copper-dark); }
 
-  .portfolio footer { align-items: flex-start; flex-direction: column; gap: 18px; padding: 28px 24px 34px; }
+  .contact { margin-bottom: 24px; padding-bottom: 32px; }
+  .portfolio footer { align-items: flex-start; flex-direction: column; gap: 12px; padding: 24px 20px 28px; }
   .portfolio footer > .footer-brand { width: auto; }
-  .portfolio footer div { align-items: center; gap: 14px; }
-  .portfolio footer .footer-contact { align-items: flex-start; gap: 6px; }
+  .portfolio footer > .footer-brand img:first-child { width: 36px; height: 36px; }
+  .portfolio footer > .footer-brand img:last-child { width: 138px; height: 34px; }
+  .portfolio footer p { font-size: 12px; line-height: 1.5; }
+  .portfolio footer div { align-items: center; gap: 12px; }
+  .portfolio footer .footer-contact { align-items: flex-start; gap: 2px; }
   .private-access__desktop { display: none; }
   .private-access__mobile { display: inline; }
   .portfolio footer button, .portfolio nav button.private-access, .portfolio nav button.private-access:hover { min-height: 38px; padding: 7px 10px; border: 1px solid rgba(193,113,72,.42); border-radius: 5px; background: rgba(193,113,72,.08); font-weight: 700; }
-  .portfolio footer .footer-links { flex-direction: column; align-items: flex-start; gap: 4px; }
-  .portfolio footer .footer-links > a, .portfolio footer .footer-links > button { min-height: 44px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .portfolio footer .footer-links { flex-direction: column; align-items: flex-start; gap: 0; padding-top: 8px; border-top: 1px solid var(--line); }
+  .portfolio footer .footer-links > a, .portfolio footer .footer-links > button { min-height: 44px; font-size: 12px; font-weight: 650; letter-spacing: .03em; text-transform: none; }
   .portfolio footer .footer-links > a:not(.footer-instagram) { display: inline-flex; align-items: center; }
-  .portfolio footer .footer-instagram { justify-content: flex-start; width: auto; height: 44px; gap: 10px; padding: 8px 0; border: 0; border-radius: 0; }
-  .portfolio footer .footer-instagram svg { width: 22px; height: 22px; }
+  .portfolio footer .footer-instagram { justify-content: flex-start; width: auto; height: 44px; gap: 9px; padding: 8px 0; border: 0; border-radius: 0; }
+  .portfolio footer .footer-instagram svg { width: 20px; height: 20px; }
   .portfolio footer .footer-instagram__label { display: inline; }
   .portfolio footer .footer-links > button { padding: 8px 12px; }
 }

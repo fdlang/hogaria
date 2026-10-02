@@ -26,7 +26,9 @@ test('public footer actions form a readable column on mobile', async ({ page }) 
   await expect(footer.getByText('Instagram', { exact: true })).toBeVisible();
   await expect(footer).toHaveCSS('flex-direction', 'column');
   await expect(links).toHaveCSS('flex-direction', 'column');
-  const instagram = await links.getByRole('link', { name: 'Instagram de Hogaria' }).boundingBox();
+  const instagramLink = links.getByRole('link', { name: 'Instagram de Hogaria' });
+  await expect(instagramLink).toHaveAttribute('href', 'https://www.instagram.com/hogaria.desing?stkn=MTlvYzRnbHVsY2FmYg==');
+  const instagram = await instagramLink.boundingBox();
   const privacy = await links.getByRole('link', { name: 'Privacidad' }).boundingBox();
   const client = await links.getByRole('button', { name: 'Área cliente' }).boundingBox();
   expect(privacy!.y).toBeGreaterThanOrEqual(instagram!.y + instagram!.height);
