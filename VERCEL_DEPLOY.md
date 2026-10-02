@@ -17,6 +17,9 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
    A continuación ejecuta `npm run preflight:production`: esta comprobación es
    de solo lectura y bloquea el despliegue si faltan migraciones, las sumas de
    control no coinciden o hay firmas históricas sin una clave verificable.
+   Si los secretos están protegidos exclusivamente en Vercel, usa
+   `npm run preflight:database`; comprueba Neon en modo de solo lectura y deja
+   la validación de secretos a la barrera del build de Production.
 4. Configura estas variables para Preview y Production:
 
    - `DATABASE_URL`: URL de PostgreSQL gestionado.

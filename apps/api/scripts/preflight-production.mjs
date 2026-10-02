@@ -110,8 +110,8 @@ export async function inspectProductionDatabase(pool, env) {
   return { errors, warnings, signatures };
 }
 
-export async function runProductionPreflight(env = process.env) {
-  const environment = inspectProductionEnvironment(env);
+export async function runProductionPreflight(env = process.env, options = {}) {
+  const environment = options.databaseOnly ? { errors: [], warnings: [] } : inspectProductionEnvironment(env);
   if (!env.DATABASE_URL) return { errors: environment.errors, warnings: environment.warnings, signatures: null };
   const pool = new pg.Pool({ connectionString: env.DATABASE_URL, max: 1, connectionTimeoutMillis: 10_000, statement_timeout: 15_000 });
   let client;
@@ -128,7 +128,11 @@ export async function runProductionPreflight(env = process.env) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const result = await runProductionPreflight();
+  const databaseOnly = process.argv.includes("--database-only");
+  const env = process.argv.includes("--legacy-v2-session-key")
+    ? { ...process.env, SIGNATURE_HMAC_LEGACY_V2_USE_SESSION_KEY: "true" }
+    : process.env;
+  const result = await runProductionPreflight(env, { databaseOnly });
   console.log(`Firmas: ${result.signatures ? `v3=${result.signatures.v3}, v2=${result.signatures.v2}, v1=${result.signatures.v1}, desconocidas=${result.signatures.unknown}` : "no comprobadas"}`);
   for (const warning of result.warnings) console.warn(`[aviso] ${warning}`);
   for (const error of result.errors) console.error(`[bloqueo] ${error}`);

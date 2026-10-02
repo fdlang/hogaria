@@ -8,6 +8,7 @@
     "test": "vitest run --no-file-parallelism",
     "typecheck": "tsc --noEmit",
     "preflight:production": "node --env-file=.env ./scripts/preflight-production.mjs",
+    "preflight:database": "node --env-file=.env ./scripts/preflight-production.mjs --database-only --legacy-v2-session-key",
     "db:migrate": "node --env-file=.env ./scripts/migrate.mjs",
     "notifications:queue": "node --env-file=.env ./scripts/notification-queue.mjs",
     "db:migrate-client-notifications": "node --env-file=.env ./scripts/migrate-client-notifications.mjs",
