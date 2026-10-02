@@ -40,6 +40,8 @@ test('portrait portfolio video stays inside the mobile viewport without changing
   const frame = section.locator('.project-showcase__video-frame');
   const video = frame.locator('video');
   await section.scrollIntoViewIfNeeded();
+  await expect(frame.locator('.project-showcase__sound')).toHaveCount(0);
+  await expect(video).toHaveAttribute('controls', '');
   await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).videoWidth)).toBeGreaterThan(0);
   const dimensions = await video.evaluate(element => {
     const media = element as HTMLVideoElement;

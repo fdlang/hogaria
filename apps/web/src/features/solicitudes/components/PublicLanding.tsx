@@ -11,7 +11,6 @@ const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behav
 
 function FeaturedBathroom() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted] = useState(true);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -60,16 +59,10 @@ function FeaturedBathroom() {
 
       <div className="project-showcase__video">
         <div className="project-showcase__video-frame">
-          <video ref={videoRef} controls muted={muted} loop preload="metadata" playsInline poster="/images/portfolio/bano-pinto-detalle.jpg" aria-label="Recorrido por el Baño Pinto reformado">
+          <video ref={videoRef} controls muted loop preload="metadata" playsInline poster="/images/portfolio/bano-pinto-detalle.jpg" aria-label="Recorrido por el Baño Pinto reformado">
             <source src="/images/portfolio/bano-pinto.mp4" type="video/mp4" />
             Tu navegador no puede reproducir este vídeo.
           </video>
-          <button className="project-showcase__sound" type="button" aria-pressed={!muted} onClick={() => {
-            setMuted(value => !value);
-            void videoRef.current?.play().catch(() => undefined);
-          }}>
-            {muted ? "🔇 Activar sonido" : "🔊 Silenciar"}
-          </button>
         </div>
         <p>Recorrido por el resultado final.</p>
       </div>
