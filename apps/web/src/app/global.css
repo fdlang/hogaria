@@ -199,8 +199,8 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
 .project-showcase__materials { border-top: 1px solid var(--line); }
 .project-showcase__materials h3 { max-width: 520px; margin: 14px 0; color: var(--ink); font-size: clamp(21px, 2vw, 28px); line-height: 1.16; }
 .project-showcase__video { grid-column: 1 / -1; padding: clamp(18px, 3vw, 36px); background: var(--marble); }
-.project-showcase__video-frame { position: relative; width: 100%; }
-.project-showcase__video video { display: block; width: 100%; height: auto; border: 1px solid rgba(84,80,72,.28); background: var(--graphite); object-fit: contain; }
+.project-showcase__video-frame { position: relative; display: flex; justify-content: center; width: 100%; }
+.project-showcase__video video { display: block; width: auto; max-width: 100%; height: auto; max-height: min(72svh, 680px); border: 1px solid rgba(84,80,72,.28); background: var(--graphite); object-fit: contain; }
 .project-showcase__sound { position: absolute; top: 12px; left: 12px; min-height: 34px; padding: 6px 10px; border: 1px solid rgba(255,253,250,.58); border-radius: 5px; background: rgba(48,45,41,.74); color: var(--marble-light); font-size: 11px; font-weight: 700; backdrop-filter: blur(6px); }
 .project-showcase__sound:hover, .project-showcase__sound:focus-visible { background: var(--copper-dark); border-color: var(--copper-dark); color: var(--marble-light); }
 .project-showcase__video p { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
@@ -724,7 +724,8 @@ em { color: var(--copper); font-family: "Playfair Display", serif; font-weight: 
   .works h3 { font-size: 25px; line-height: 1.05; }
   .works .works__action { min-height: 38px; justify-self: start; border-color: var(--copper-dark); background: transparent; color: var(--copper-dark); }
 
-  .portfolio footer { gap: 20px; padding: 28px 24px 34px; }
+  .portfolio footer { align-items: flex-start; flex-direction: column; gap: 18px; padding: 28px 24px 34px; }
+  .portfolio footer > .footer-brand { width: auto; }
   .portfolio footer div { align-items: center; gap: 14px; }
   .portfolio footer .footer-contact { align-items: flex-start; gap: 6px; }
   .private-access__desktop { display: none; }

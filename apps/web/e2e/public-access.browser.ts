@@ -24,6 +24,7 @@ test('public footer actions form a readable column on mobile', async ({ page }) 
   const links = footer.locator('.footer-links');
   await footer.scrollIntoViewIfNeeded();
   await expect(footer.getByText('Instagram', { exact: true })).toBeVisible();
+  await expect(footer).toHaveCSS('flex-direction', 'column');
   await expect(links).toHaveCSS('flex-direction', 'column');
   const instagram = await links.getByRole('link', { name: 'Instagram de Hogaria' }).boundingBox();
   const privacy = await links.getByRole('link', { name: 'Privacidad' }).boundingBox();
@@ -32,8 +33,8 @@ test('public footer actions form a readable column on mobile', async ({ page }) 
   expect(client!.y).toBeGreaterThanOrEqual(privacy!.y + privacy!.height);
 });
 
-test('portfolio video fills its container without changing its aspect ratio', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+test('portrait portfolio video stays inside the mobile viewport without changing its aspect ratio', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   const section = page.locator('.project-showcase__video');
   const frame = section.locator('.project-showcase__video-frame');
@@ -48,11 +49,16 @@ test('portfolio video fills its container without changing its aspect ratio', as
       renderedRatio: box.width / box.height,
       intrinsicRatio: media.videoWidth / media.videoHeight,
       renderedWidth: box.width,
+      renderedHeight: box.height,
       frameWidth: frameBox.width,
+      pageWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
     };
   });
-  expect(Math.abs(dimensions.renderedWidth - dimensions.frameWidth)).toBeLessThan(1);
+  expect(dimensions.renderedWidth).toBeLessThanOrEqual(dimensions.frameWidth);
+  expect(dimensions.renderedHeight).toBeLessThanOrEqual(608);
   expect(Math.abs(dimensions.renderedRatio - dimensions.intrinsicRatio)).toBeLessThan(0.02);
+  expect(dimensions.pageWidth).toBeLessThanOrEqual(dimensions.viewportWidth);
 });
 
 test('activation link survives a reload until it is consumed', async ({ page }) => {
