@@ -1,5 +1,14 @@
 import { build } from "esbuild";
 
+if (process.env.VERCEL_ENV === "production") {
+  const { inspectProductionEnvironment } = await import("../apps/api/scripts/preflight-production.mjs");
+  const validation = inspectProductionEnvironment(process.env);
+  validation.warnings.forEach((warning) => console.warn(`[production config warning] ${warning}`));
+  if (validation.errors.length) {
+    throw new Error(`Production configuration is incomplete:\n- ${validation.errors.join("\n- ")}`);
+  }
+}
+
 await build({
   entryPoints: ["apps/api/src/main.ts"],
   outfile: "api/_app.cjs",

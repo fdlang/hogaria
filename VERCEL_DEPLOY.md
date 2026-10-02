@@ -7,7 +7,8 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
 
 1. Importa el repositorio en Vercel con la raíz del repositorio, no `apps/web`.
 2. Vercel leerá `vercel.json`, instalará los workspaces y ejecutará el build de
-   `@reformapro/web`.
+   `@reformapro/web`. En Production, el build valida las variables críticas y
+   falla antes de sustituir la versión estable si falta alguna.
 3. Crea una base PostgreSQL gestionada y aplica la migración antes de publicar:
    `npm run db:migrate --workspace @reformapro/api`.
 
