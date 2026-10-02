@@ -26,6 +26,7 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
    - `SIGNATURE_HMAC_SECRET`: secreto distinto para firmas, de al menos 32 caracteres.
    - `SIGNATURE_HMAC_KEY_ID`: identificador de la clave de firma activa (por ejemplo, `sig-2026-09`).
    - `SIGNATURE_HMAC_LEGACY_V2_SECRET`: si existen sellos v2, copia aquí el antiguo `HMAC_SECRET` y rota simultáneamente `HMAC_SECRET`; la rotación cierra las sesiones actuales y deja ambas claves separadas.
+   - `SIGNATURE_HMAC_LEGACY_V2_USE_SESSION_KEY`: alternativa temporal con valor `true` si el secreto anterior está oculto y no puede copiarse. Solo verifica sellos v2 existentes; las firmas nuevas usan la clave v3 independiente.
    - `ALLOWED_ORIGINS`: dominios adicionales autorizados, separados por comas.
      El dominio del propio despliegue se admite automáticamente.
    - `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`: opcionales,

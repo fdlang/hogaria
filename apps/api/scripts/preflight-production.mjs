@@ -54,7 +54,9 @@ export function assessSignatureInventory(inventory, env) {
   const keyring = configuredSignatureKeyIds(env);
   if (keyring.error) errors.push(keyring.error);
   if (inventory.v1 > 0) errors.push(`${inventory.v1} firma(s) v1 no estan vinculadas criptograficamente al documento`);
-  if (inventory.v2 > 0 && !env.SIGNATURE_HMAC_LEGACY_V2_SECRET) errors.push(`${inventory.v2} firma(s) v2 requieren SIGNATURE_HMAC_LEGACY_V2_SECRET`);
+  const v2UsesSessionKey = env.SIGNATURE_HMAC_LEGACY_V2_USE_SESSION_KEY === "true";
+  if (inventory.v2 > 0 && !env.SIGNATURE_HMAC_LEGACY_V2_SECRET && !v2UsesSessionKey) errors.push(`${inventory.v2} firma(s) v2 requieren una clave legacy verificable`);
+  if (inventory.v2 > 0 && v2UsesSessionKey) warnings.push(`${inventory.v2} firma(s) v2 usan temporalmente la clave de sesion; desactiva la compatibilidad cuando dejen de ser necesarias`);
   if (inventory.unknown > 0) errors.push(`${inventory.unknown} firma(s) tienen un formato desconocido o incompleto`);
   const missingIds = inventory.v3KeyIds.filter((id) => !keyring.ids.has(id));
   if (missingIds.length) errors.push(`Faltan claves de verificacion v3 para: ${missingIds.join(", ")}`);

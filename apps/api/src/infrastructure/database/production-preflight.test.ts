@@ -27,4 +27,13 @@ describe("production preflight", () => {
     );
     expect(result.errors).toEqual([]);
   });
+
+  it("allows an explicit, temporary session-key fallback for legacy v2 signatures", () => {
+    const result = assessSignatureInventory(
+      { v1: 0, v2: 3, v3: 0, unknown: 0, v3KeyIds: [] },
+      { ...validEnvironment, SIGNATURE_HMAC_LEGACY_V2_USE_SESSION_KEY: "true" },
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([expect.stringContaining("temporalmente")]);
+  });
 });

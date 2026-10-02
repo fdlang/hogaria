@@ -104,6 +104,7 @@ npm run db:migrate --workspace @reformapro/api
 | `SIGNATURE_HMAC_KEY_ID` | Identificador estable de la clave de firma activa. |
 | `SIGNATURE_HMAC_PREVIOUS_KEYS` | JSON con claves v3 antiguas que aún deban verificarse. |
 | `SIGNATURE_HMAC_LEGACY_V2_SECRET` | Para sellos v2 antiguos: conserva aquí el `HMAC_SECRET` anterior y rota el `HMAC_SECRET` de sesiones; ambos deben quedar distintos. |
+| `SIGNATURE_HMAC_LEGACY_V2_USE_SESSION_KEY` | Compatibilidad temporal (`true`) para verificar sellos v2 con la clave de sesión existente cuando el proveedor no permite recuperarla. Las firmas nuevas siguen usando v3. |
 | `ALLOWED_ORIGINS` | Orígenes CORS adicionales, separados por comas. |
 | `SEED_ADMIN_EMAIL` | Email del administrador inicial. |
 | `SEED_ADMIN_PASSWORD` | Contraseña del administrador inicial. |

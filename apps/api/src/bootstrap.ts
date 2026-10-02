@@ -169,6 +169,7 @@ export async function buildApp(): Promise<AppDependencies> {
   const hmacSecret = process.env.HMAC_SECRET;
   const signatureSecret = process.env.SIGNATURE_HMAC_SECRET;
   const legacyV2SignatureSecret = process.env.SIGNATURE_HMAC_LEGACY_V2_SECRET;
+  const legacyV2UsesSessionKey = process.env.SIGNATURE_HMAC_LEGACY_V2_USE_SESSION_KEY === "true";
   const signatureKeyId = process.env.SIGNATURE_HMAC_KEY_ID ?? "development";
   if (isProduction && !databaseUrl) throw new Error("DATABASE_URL es obligatoria en producción");
   if (isProduction && (!hmacSecret || hmacSecret.length < 32)) throw new Error("HMAC_SECRET debe tener al menos 32 caracteres en producción");
@@ -195,7 +196,11 @@ export async function buildApp(): Promise<AppDependencies> {
     new HMACKeyProvider(signatureSecret),
     signatureKeyId,
     previousSignatureKeys,
-    legacyV2SignatureSecret ? new HMACKeyProvider(legacyV2SignatureSecret) : undefined,
+    legacyV2SignatureSecret
+      ? new HMACKeyProvider(legacyV2SignatureSecret)
+      : legacyV2UsesSessionKey
+        ? hmacKeys
+        : undefined,
   );
   const events    = new InMemoryEventEmitter();
   const memoryCooldown = new InMemoryCooldownGate();
