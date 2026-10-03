@@ -39,11 +39,14 @@ test('public footer actions form a readable column on mobile', async ({ page }) 
   expect(client!.y).toBeGreaterThanOrEqual(privacy!.y + privacy!.height);
 });
 
-test('portrait portfolio video stays inside the mobile viewport without changing its aspect ratio', async ({ page }) => {
+test('portfolio media keeps its orientation and the video starts automatically in view', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   const section = page.locator('.project-showcase__video');
   const video = section.locator(':scope > video');
+  const featuredImage = page.locator('.project-showcase__image img');
+  await expect.poll(() => featuredImage.evaluate(image => (image as HTMLImageElement).naturalHeight)).toBeGreaterThan(0);
+  expect(await featuredImage.evaluate(image => (image as HTMLImageElement).naturalHeight > (image as HTMLImageElement).naturalWidth)).toBe(true);
   await section.scrollIntoViewIfNeeded();
   await expect(section.locator('.project-showcase__video-frame')).toHaveCount(0);
   await expect(section.locator('.project-showcase__sound')).toHaveCount(0);
@@ -64,6 +67,7 @@ test('portrait portfolio video stays inside the mobile viewport without changing
   expect(dimensions.renderedHeight).toBeLessThanOrEqual(608);
   expect(dimensions.objectFit).toBe('contain');
   expect(dimensions.pageWidth).toBeLessThanOrEqual(dimensions.viewportWidth);
+  await expect.poll(() => video.evaluate(element => !(element as HTMLVideoElement).paused), { timeout: 10_000 }).toBe(true);
 });
 
 test('activation link survives a reload until it is consumed', async ({ page }) => {

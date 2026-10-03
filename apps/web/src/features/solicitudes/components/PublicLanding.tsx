@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SolicitudesApi, useSubmitSolicitud } from "../api/solicitudes.api";
 import { Input, Textarea, Select, Button } from "@/shared/ui";
 import { useNotifications } from "@/shared/ui/notifications";
@@ -19,6 +19,22 @@ export const publicSolicitudError = (cause: unknown) => {
 };
 
 function FeaturedBathroom() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting && entry.intersectionRatio >= 0.6) {
+        void video.play().catch(() => undefined);
+      } else {
+        video.pause();
+      }
+    }, { threshold: [0, 0.6] });
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <section id="proceso" className="project-showcase" aria-labelledby="bano-pinto-title">
       <div className="project-showcase__intro">
@@ -28,7 +44,7 @@ function FeaturedBathroom() {
       </div>
 
       <figure className="project-showcase__image">
-        <img src="/images/portfolio/bano-pinto-960.jpg" srcSet="/images/portfolio/bano-pinto-960.jpg 960w, /images/portfolio/bano-pinto-1600.jpg 1600w" sizes="(max-width: 720px) calc(100vw - 48px), 50vw" alt="Baño Pinto reformado con mueble de madera, espejo iluminado y ducha amplia" width="1600" height="1200" loading="lazy" decoding="async" />
+        <img src="/images/portfolio/bano-pinto-960.jpg" srcSet="/images/portfolio/bano-pinto-960.jpg 720w, /images/portfolio/bano-pinto-1600.jpg 1200w" sizes="(max-width: 720px) calc(100vw - 48px), 50vw" alt="Baño Pinto reformado con mueble de madera, espejo iluminado y ducha amplia" width="1200" height="1600" loading="lazy" decoding="async" />
       </figure>
 
       <div className="project-showcase__story">
@@ -49,7 +65,7 @@ function FeaturedBathroom() {
       </div>
 
       <div className="project-showcase__video">
-        <video controls muted loop preload="none" playsInline poster="/images/portfolio/bano-pinto-detalle-960.jpg" aria-label="Recorrido por el Baño Pinto reformado">
+        <video ref={videoRef} controls muted loop preload="none" playsInline poster="/images/portfolio/bano-pinto-detalle-960.jpg" aria-label="Recorrido por el Baño Pinto reformado">
           <source src="/images/portfolio/bano-pinto.mp4" type="video/mp4" />
           Tu navegador no puede reproducir este vídeo.
         </video>
