@@ -66,7 +66,7 @@ export function ProfesionalDashboard({ apis, onOpenProject, onOpenWork }: Props)
         <StatCard label="Proyectos finalizados"   value={stats.finalizados}   accent="#c17248" />
       </div>
 
-      <h2 style={{ fontSize: 15, fontWeight: 700, color: "#c17248", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: "var(--copper-dark)", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>
         Proyectos asignados
       </h2>
 

@@ -79,4 +79,23 @@ describe("SalesApi", () => {
     await api.downloadPdf(7, 2, "revision", { reuse: false });
     expect(http.download).toHaveBeenCalledTimes(2);
   });
+
+  it("uses one look-ahead item to expose reliable pagination", async () => {
+    const http = createHttp();
+    vi.mocked(http.get).mockResolvedValue(Array.from({ length: 21 }, (_, index) => ({ id: index + 1, numero: `HOG-${index}`, clienteNombre: "Cliente", titulo: "Obra", estado: "enviado", versionActual: 1, motivoRechazo: null, propuesta: null, createdAt: "2026-01-01", updatedAt: "2026-01-01" })));
+    const api = new SalesApi(http);
+
+    const result = await api.estimatesPage(2, "cocina", "enviado");
+    expect(result.items).toHaveLength(20);
+    expect(result.hasNext).toBe(true);
+    expect(http.get).toHaveBeenCalledWith("/estimates?page=2&limit=21&search=cocina&status=enviado");
+  });
+
+  it("rejects malformed estimate responses instead of trusting a TypeScript cast", async () => {
+    const http = createHttp();
+    vi.mocked(http.get).mockResolvedValue([{ id: "not-a-number" }]);
+    const api = new SalesApi(http);
+
+    await expect(api.estimates()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
 });

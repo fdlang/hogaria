@@ -3,7 +3,7 @@
  * Rate-limited server-side.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { ApiClient } from "@/shared/lib/api-client";
 
 export interface SolicitudPayload {
@@ -19,8 +19,11 @@ export class SolicitudesApi {
 export function useSubmitSolicitud(api: SolicitudesApi) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone]             = useState(false);
+  const pending = useRef(false);
 
   const submit = useCallback(async (payload: SolicitudPayload) => {
+    if (pending.current) return;
+    pending.current = true;
     setSubmitting(true);
     try {
       // Basic client-side validation mirroring server rules
@@ -34,7 +37,7 @@ export function useSubmitSolicitud(api: SolicitudesApi) {
       setDone(true);
     } catch (e) {
       throw e;
-    } finally { setSubmitting(false); }
+    } finally { pending.current = false; setSubmitting(false); }
   }, [api]);
 
   const reset = useCallback(() => { setDone(false); }, []);

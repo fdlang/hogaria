@@ -133,8 +133,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ l
       {label && <label htmlFor={inputId} style={{ display: "block", fontSize: 12, fontWeight: 600, color: error ? "#b5483f" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
       <input
         {...props} id={inputId} ref={ref}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errId : undefined}
+        aria-invalid={error ? true : props["aria-invalid"]}
+        aria-describedby={error ? [props["aria-describedby"], errId].filter(Boolean).join(" ") : props["aria-describedby"]}
         style={{ width: "100%", background: "#fffaf4", border: `1px solid ${error ? "#b5483f" : "#cdb69d"}`, borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", ...props.style }}
       />
       {error && <p id={errId} role="alert" style={{ fontSize: 12, color: "#b5483f", marginTop: 3 }}>{error}</p>}
@@ -154,8 +154,8 @@ export function Textarea({ label, error, id: explicitId, ...props }: TextareaPro
     <div style={{ marginBottom: 14 }}>
       {label && <label htmlFor={taId} style={{ display: "block", fontSize: 12, fontWeight: 600, color: error ? "#b5483f" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
       <textarea {...props} id={taId}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errId : undefined}
+        aria-invalid={error ? true : props["aria-invalid"]}
+        aria-describedby={error ? [props["aria-describedby"], errId].filter(Boolean).join(" ") : props["aria-describedby"]}
         style={{ width: "100%", background: "#fffaf4", border: `1px solid ${error ? "#b5483f" : "#cdb69d"}`, borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", resize: "vertical", minHeight: 80, ...props.style }} />
       {error && <p id={errId} role="alert" style={{ fontSize: 12, color: "#b5483f", marginTop: 3 }}>{error}</p>}
     </div>
@@ -170,7 +170,7 @@ export function Select({ label, error, children, id: explicitId, ...props }: Sel
   return (
     <div style={{ marginBottom: 14 }}>
       {label && <label htmlFor={selId} style={{ display: "block", fontSize: 12, fontWeight: 600, color: error ? "#b5483f" : "#71685e", marginBottom: 5, textTransform: "uppercase", letterSpacing: ".07em" }}>{label}</label>}
-      <select {...props} id={selId} aria-invalid={error ? true : undefined} aria-describedby={error ? errId : undefined}
+      <select {...props} id={selId} aria-invalid={error ? true : props["aria-invalid"]} aria-describedby={error ? [props["aria-describedby"], errId].filter(Boolean).join(" ") : props["aria-describedby"]}
         style={{ width: "100%", background: "#fffaf4", border: `1px solid ${error ? "#b5483f" : "#cdb69d"}`, borderRadius: 8, padding: "9px 13px", color: "#302d29", fontSize: 14, outline: "none", cursor: "pointer", ...props.style }}>{children}</select>
       {error && <p id={errId} role="alert" style={{ fontSize: 12, color: "#b5483f", marginTop: 3 }}>{error}</p>}
     </div>

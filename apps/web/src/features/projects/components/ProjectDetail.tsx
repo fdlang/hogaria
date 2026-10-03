@@ -228,7 +228,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                   <input type="range" aria-label="Porcentaje de progreso de la obra" min="0" max="100" value={editingProgress}
                     onChange={e => setEditingProgress(parseInt(e.target.value, 10))}
                     style={{ flex: 1 }} />
-                  <strong style={{ minWidth: 50, textAlign: "right", color: "#c17248" }}>{editingProgress}%</strong>
+                  <strong style={{ minWidth: 50, textAlign: "right", color: "var(--copper-dark)" }}>{editingProgress}%</strong>
                   <Button small loading={projectSaving} disabled={projectSaving} onClick={handleProgressSave}>Guardar</Button>
                   <Button small variant="ghost" disabled={projectSaving} onClick={() => setEditingProgress(null)}>Cancelar</Button>
                 </div>
@@ -336,7 +336,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   );
 }
 
-const sectionTitle = { fontSize: 12, fontWeight: 700, color: "#c17248", textTransform: "uppercase" as const, letterSpacing: ".05em", marginBottom: 10 };
+const sectionTitle = { fontSize: 12, fontWeight: 700, color: "var(--copper-dark)", textTransform: "uppercase" as const, letterSpacing: ".05em", marginBottom: 10 };
 
 function Meta({ k, v }: { k: string; v: string }) {
   return (

@@ -262,3 +262,29 @@ test("request changes uses one modal, clears cancelled text and preserves the pr
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Solicitar cambios" })).toBeVisible();
 });
+
+test("request-change errors remain visible inside the active modal", async ({ page }) => {
+  await fixture(page, "cliente");
+  await page.route("**/api/estimates/1/reject", route => route.fulfill({
+    status: 409,
+    json: { code: "CONFLICT", message: "La propuesta ha cambiado. Actualiza antes de continuar." },
+  }));
+  await page.getByRole("button", { name: /Ver propuesta/ }).click();
+  await page.getByRole("button", { name: "Solicitar cambios" }).click();
+  const dialog = page.getByRole("dialog", { name: "Solicitar cambios" });
+  await dialog.getByRole("textbox", { name: "Cambios solicitados" }).fill("Cambiar el revestimiento seleccionado");
+  await dialog.getByRole("button", { name: "Enviar solicitud" }).click();
+
+  const alert = dialog.getByRole("alert");
+  await expect(alert).toContainText("La propuesta ha cambiado");
+  await expect(alert).toBeFocused();
+});
+
+test("an exact full page does not expose an empty next page", async ({ page }) => {
+  await fixture(page, "cliente");
+  await page.route("**/api/estimates?*", route => route.fulfill({
+    json: Array.from({ length: 20 }, (_, index) => ({ ...proposal, id: index + 1, numero: `HOG-2026-${index + 1}` })),
+  }));
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+});

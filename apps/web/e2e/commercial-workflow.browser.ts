@@ -8,7 +8,7 @@ async function authenticated(page: Page, role: string) {
 }
 const line = {id:"line",categoria:"Obra",descripcion:"Ampliación de iluminación",cantidad:1,unidad:"global",precioVentaUnitario:100,descuento:0,iva:21};
 const proposal = {titulo:"Propuesta",validezDias:30,condicionesPago:"A la entrega",garantia:"",notasCliente:"",partidas:[line],totalSinIva:100,totalIva:21,totalConIva:121,enviadoAt:"2026-09-01",expiresAt:"2026-10-01",firmadoAt:null,hash:null};
-const estimate = {id:1,numero:"HOG-001",titulo:"Propuesta",estado:"enviado",versionActual:2,motivoRechazo:null,createdAt:"2026-09-01",updatedAt:"2026-09-01",propuesta:proposal};
+const estimate = {id:1,numero:"HOG-001",clienteNombre:"Cliente Hogaria",titulo:"Propuesta",estado:"enviado",versionActual:2,motivoRechazo:null,createdAt:"2026-09-01",updatedAt:"2026-09-01",propuesta:proposal};
 
 test("request conversion opens an existing opportunity without creating a duplicate", async ({page}) => {
   await authenticated(page,"admin");
@@ -46,7 +46,7 @@ test("client pagination searches beyond the current page", async ({page}) => {
     const url = new URL(route.request().url());
     const searching = url.searchParams.get("search");
     const second = url.searchParams.get("page")==="1";
-    return route.fulfill({json:searching ? [{...estimate,id:51,titulo:"Reforma lejana"}] : second ? [{...estimate,id:21,titulo:"Página segunda"}] : Array.from({length:20},(_,i)=>({...estimate,id:i+1,numero:`HOG-${i+1}`}))});
+    return route.fulfill({json:searching ? [{...estimate,id:51,titulo:"Reforma lejana"}] : second ? [{...estimate,id:21,titulo:"Página segunda"}] : Array.from({length:21},(_,i)=>({...estimate,id:i+1,numero:`HOG-${i+1}`}))});
   });
   await page.goto("/cliente/budgets");
   await page.getByRole("button",{name:"Siguiente",exact:true}).click();

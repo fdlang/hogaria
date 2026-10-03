@@ -15,7 +15,7 @@ import { UsersApi }       from "@/features/users/api/users.api";
 import { FilesApi }       from "@/features/files/api/files.api";
 import { AuditApi }       from "@/features/audit/api/audit.api";
 import { SolicitudesApi } from "@/features/solicitudes/api/solicitudes.api";
-import { AdminSolicitudesApi } from "@/features/solicitudes/components/AdminSolicitudes";
+import { AdminSolicitudesApi } from "@/features/solicitudes/api/admin-solicitudes.api";
 import { SalesApi } from "@/features/sales/api/sales.api";
 import { App } from "./App";
 import { WorkApi } from "@/features/work/work.api";

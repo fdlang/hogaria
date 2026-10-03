@@ -16,10 +16,12 @@ export class ApiClient {
   private token: string | null = null;
   private readonly baseUrl: string;
   private readonly onUnauthorized: () => void;
+  private readonly timeoutMs: number;
 
-  constructor(opts: { baseUrl: string; onUnauthorized: () => void }) {
+  constructor(opts: { baseUrl: string; onUnauthorized: () => void; timeoutMs?: number }) {
     this.baseUrl = opts.baseUrl;
     this.onUnauthorized = opts.onUnauthorized;
+    this.timeoutMs = opts.timeoutMs ?? 15_000;
   }
 
   setToken(token: string | null): void { this.token = token; }
@@ -28,12 +30,20 @@ export class ApiClient {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
 
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      method: opts.method ?? "GET",
-      headers,
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
-      signal: opts.signal,
-    });
+    const request = this.requestSignal(opts.signal, this.timeoutMs);
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        method: opts.method ?? "GET",
+        headers,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+        signal: request.signal,
+      });
+    } catch (cause) {
+      throw this.transportError(cause, request.timedOut());
+    } finally {
+      request.cleanup();
+    }
 
     if (res.status === 401) {
       // A failed login is expected form validation, not an expired session.
@@ -55,7 +65,15 @@ export class ApiClient {
   async download(path: string): Promise<Blob> {
     const headers: Record<string, string> = {};
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
-    const res = await fetch(`${this.baseUrl}${path}`, { headers });
+    const request = this.requestSignal(undefined, 45_000);
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, { headers, signal: request.signal });
+    } catch (cause) {
+      throw this.transportError(cause, request.timedOut());
+    } finally {
+      request.cleanup();
+    }
     if (res.status === 401 && this.token) this.onUnauthorized();
     if (!res.ok) throw this.mapError(res, await res.json().catch(() => ({})));
     return res.blob();
@@ -68,5 +86,32 @@ export class ApiClient {
       message: body.message ?? res.statusText,
       field: body.field,
     };
+  }
+
+  private requestSignal(external: AbortSignal | undefined, timeoutMs: number) {
+    const controller = new AbortController();
+    let timedOut = false;
+    const abortFromCaller = () => controller.abort(external?.reason);
+    if (external?.aborted) abortFromCaller();
+    else external?.addEventListener("abort", abortFromCaller, { once: true });
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    return {
+      signal: controller.signal,
+      timedOut: () => timedOut,
+      cleanup: () => {
+        clearTimeout(timer);
+        external?.removeEventListener("abort", abortFromCaller);
+      },
+    };
+  }
+
+  private transportError(cause: unknown, timedOut: boolean): ApiError {
+    if (timedOut) return { status: 0, code: "TIMEOUT", message: "La solicitud ha tardado demasiado. Inténtalo de nuevo." };
+    if ((cause as { name?: string } | null)?.name === "AbortError")
+      return { status: 0, code: "ABORTED", message: "La solicitud se ha cancelado." };
+    return { status: 0, code: "NETWORK_ERROR", message: "No se ha podido conectar con el servidor." };
   }
 }

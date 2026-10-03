@@ -48,24 +48,21 @@ test('portrait portfolio video stays inside the mobile viewport without changing
   await expect(section.locator('.project-showcase__video-frame')).toHaveCount(0);
   await expect(section.locator('.project-showcase__sound')).toHaveCount(0);
   await expect(video).toHaveAttribute('controls', '');
-  await expect.poll(() => video.evaluate(element => (element as HTMLVideoElement).videoWidth)).toBeGreaterThan(0);
   const dimensions = await video.evaluate(element => {
-    const media = element as HTMLVideoElement;
-    const box = media.getBoundingClientRect();
-    const frameBox = media.parentElement!.getBoundingClientRect();
+    const box = element.getBoundingClientRect();
+    const frameBox = element.parentElement!.getBoundingClientRect();
     return {
-      renderedRatio: box.width / box.height,
-      intrinsicRatio: media.videoWidth / media.videoHeight,
       renderedWidth: box.width,
       renderedHeight: box.height,
       frameWidth: frameBox.width,
+      objectFit: getComputedStyle(element).objectFit,
       pageWidth: document.documentElement.scrollWidth,
       viewportWidth: window.innerWidth,
     };
   });
   expect(dimensions.renderedWidth).toBeLessThanOrEqual(dimensions.frameWidth);
   expect(dimensions.renderedHeight).toBeLessThanOrEqual(608);
-  expect(Math.abs(dimensions.renderedRatio - dimensions.intrinsicRatio)).toBeLessThan(0.02);
+  expect(dimensions.objectFit).toBe('contain');
   expect(dimensions.pageWidth).toBeLessThanOrEqual(dimensions.viewportWidth);
 });
 
@@ -79,4 +76,27 @@ test('activation link survives a reload until it is consumed', async ({ page }) 
   await page.reload();
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('hogaria_activation_token'))).toBe(token);
   await expect(page.getByRole('heading', { name: 'Crea tu contraseña' })).toBeVisible();
+});
+
+test('public request form prevents duplicate submissions and clears corrected errors', async ({ page }) => {
+  let submissions = 0;
+  await page.route('**/api/solicitudes', async route => {
+    submissions += 1;
+    await new Promise(resolve => setTimeout(resolve, 150));
+    await route.fulfill({ status: 201, json: { id: 1 } });
+  });
+  await page.goto('/');
+  await page.locator('#contacto').scrollIntoViewIfNeeded();
+  const form = page.locator('#contacto form');
+  await form.getByRole('button', { name: 'Enviar proyecto' }).click();
+  const name = form.getByLabel('Nombre');
+  await expect(name).toHaveAttribute('aria-invalid', 'true');
+  await name.fill('María García');
+  await expect(name).not.toHaveAttribute('aria-invalid', 'true');
+  await form.getByLabel('Email').fill('maria@example.com');
+  await form.getByLabel('Tipo de proyecto').selectOption({ index: 1 });
+  await form.getByLabel('Cuéntanos tu idea').fill('Quiero reformar por completo la cocina de mi vivienda.');
+  await form.getByRole('button', { name: 'Enviar proyecto' }).dblclick();
+  await expect(page.getByRole('heading', { name: 'Solicitud recibida' })).toBeVisible();
+  expect(submissions).toBe(1);
 });

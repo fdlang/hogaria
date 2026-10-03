@@ -41,7 +41,7 @@ export function CatalogPicker({ onPickItem, onImportCategory, catalog }: Props) 
       {filtered.map(cat => (
         <section key={cat.categoria} style={{ marginBottom: 20 }}>
           <header className="catalog-category-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <h4 style={{ fontSize: 13, fontWeight: 700, color: "#c17248" }}>{cat.categoria}</h4>
+            <h4 style={{ fontSize: 13, fontWeight: 700, color: "var(--copper-dark)" }}>{cat.categoria}</h4>
             <Button small variant="ghost" onClick={() => onImportCategory(cat.categoria, cat.items)}>
               + Importar categoría ({cat.items.length})
             </Button>
@@ -52,7 +52,7 @@ export function CatalogPicker({ onPickItem, onImportCategory, catalog }: Props) 
               <li className="catalog-item" key={item.ref}
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 8 }}>
                 <div className="catalog-item__description" style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-                  <code style={{ fontSize: 12, background: "#fffaf4", color: "#c17248", padding: "2px 6px", borderRadius: 4 }}>{item.ref}</code>
+                  <code style={{ fontSize: 12, background: "#fffaf4", color: "var(--copper-dark)", padding: "2px 6px", borderRadius: 4 }}>{item.ref}</code>
                   <span style={{ fontSize: 12, color: "#302d29", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.descripcion}</span>
                 </div>
                 <div className="catalog-item__actions" style={{ display: "flex", alignItems: "center", gap: 12 }}>

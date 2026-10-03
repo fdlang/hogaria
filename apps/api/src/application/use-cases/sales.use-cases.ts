@@ -312,14 +312,16 @@ export class EstimateUseCases {
     for (const event of events) await this.events.emit(event);
     return result;
   }
-  async publicList(actorId: number, query: { page?: number; search?: string; status?: string } = {}) {
+  async publicList(actorId: number, query: { page?: number; limit?: number; search?: string; status?: string } = {}) {
     const actor = await this.users.findById(actorId);
     if (!actor?.activo) throw new ForbiddenError();
     if (!["admin", "cliente"].includes(actor.rol)) throw new ForbiddenError();
     const page = query.page ?? 0;
     if (!Number.isSafeInteger(page) || page < 0 || page > 100000) throw new ValidationError("Página no válida");
+    const limit = query.limit ?? 20;
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 21) throw new ValidationError("Límite no válido");
     const requestedStatus = query.status ?? "";
-    const all = await this.estimates.findPage({ ...(actor.rol === "cliente" ? { clientId: actor.id } : {}), page, limit: 20, search: (query.search ?? "").trim().slice(0,200), status: requestedStatus });
+    const all = await this.estimates.findPage({ ...(actor.rol === "cliente" ? { clientId: actor.id } : {}), page, limit, search: (query.search ?? "").trim().slice(0,200), status: requestedStatus });
     // A proposal does not belong to the client portal until the business has
     // explicitly moved it beyond the internal draft state. This keeps titles,
     // numbers and workflow state of work-in-progress private as well.

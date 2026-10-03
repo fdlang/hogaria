@@ -6,40 +6,38 @@
  * route actually needs.
  */
 
-import { ProjectsApi }    from "@/features/projects/api/projects.api";
-import { WorkApi } from "@/features/work/work.api";
-import { WorkPage } from "@/features/work/WorkPage";
-import { UsersApi }       from "@/features/users/api/users.api";
-import { FilesApi }       from "@/features/files/api/files.api";
-import { AuditApi }       from "@/features/audit/api/audit.api";
-import { SolicitudesApi } from "@/features/solicitudes/api/solicitudes.api";
-import { AdminSolicitudesApi, AdminSolicitudes } from "@/features/solicitudes/components/AdminSolicitudes";
-
-import { AdminProjects }       from "@/features/projects/components/AdminProjects";
-import { ProfesionalDashboard } from "@/features/projects/components/ProfesionalDashboard";
-import { ProjectDetail }       from "@/features/projects/components/ProjectDetail";
-
-import { SalesApi } from "@/features/sales/api/sales.api";
-import { SalesPipeline } from "@/features/sales/components/SalesPipeline";
-import { ClientEstimates } from "@/features/sales/components/ClientEstimates";
-import { CatalogManager } from "@/features/catalog/CatalogManager";
-
-import { AdminUsers }         from "@/features/users/components/AdminUsers";
-import { AdminProfesionales } from "@/features/users/components/AdminProfesionales";
-import { AdminActivity }      from "@/features/audit/components/AdminActivity";
-
-import { LoginPage }     from "@/features/auth/components/LoginPage";
-import { ActivateAccountPage } from "@/features/auth/components/ActivateAccountPage";
+import type { ProjectsApi } from "@/features/projects/api/projects.api";
+import type { WorkApi } from "@/features/work/work.api";
+import type { UsersApi } from "@/features/users/api/users.api";
+import type { FilesApi } from "@/features/files/api/files.api";
+import type { AuditApi } from "@/features/audit/api/audit.api";
+import type { SolicitudesApi } from "@/features/solicitudes/api/solicitudes.api";
+import type { AdminSolicitudesApi } from "@/features/solicitudes/api/admin-solicitudes.api";
+import type { SalesApi } from "@/features/sales/api/sales.api";
 import { PublicLanding } from "@/features/solicitudes/components/PublicLanding";
-import { PrivacyPolicyPage } from "@/features/legal/components/PrivacyPolicyPage";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth }                     from "@/features/auth/hooks/useAuth";
 import { Router, Route, useNavigation } from "./Router";
 import { NavigationIcon, type NavigationIconName } from "./NavigationIcon";
 import { DesktopNavigation } from "./DesktopNavigation";
 import { adminNavigation, navigationFor, isNavigationActive } from "./navigation";
 import { Button, EmptyState }          from "@/shared/ui";
+
+const WorkPage = lazy(() => import("@/features/work/WorkPage").then(module => ({ default: module.WorkPage })));
+const AdminSolicitudes = lazy(() => import("@/features/solicitudes/components/AdminSolicitudes").then(module => ({ default: module.AdminSolicitudes })));
+const AdminProjects = lazy(() => import("@/features/projects/components/AdminProjects").then(module => ({ default: module.AdminProjects })));
+const ProfesionalDashboard = lazy(() => import("@/features/projects/components/ProfesionalDashboard").then(module => ({ default: module.ProfesionalDashboard })));
+const ProjectDetail = lazy(() => import("@/features/projects/components/ProjectDetail").then(module => ({ default: module.ProjectDetail })));
+const SalesPipeline = lazy(() => import("@/features/sales/components/SalesPipeline").then(module => ({ default: module.SalesPipeline })));
+const ClientEstimates = lazy(() => import("@/features/sales/components/ClientEstimates").then(module => ({ default: module.ClientEstimates })));
+const CatalogManager = lazy(() => import("@/features/catalog/CatalogManager").then(module => ({ default: module.CatalogManager })));
+const AdminUsers = lazy(() => import("@/features/users/components/AdminUsers").then(module => ({ default: module.AdminUsers })));
+const AdminProfesionales = lazy(() => import("@/features/users/components/AdminProfesionales").then(module => ({ default: module.AdminProfesionales })));
+const AdminActivity = lazy(() => import("@/features/audit/components/AdminActivity").then(module => ({ default: module.AdminActivity })));
+const LoginPage = lazy(() => import("@/features/auth/components/LoginPage").then(module => ({ default: module.LoginPage })));
+const ActivateAccountPage = lazy(() => import("@/features/auth/components/ActivateAccountPage").then(module => ({ default: module.ActivateAccountPage })));
+const PrivacyPolicyPage = lazy(() => import("@/features/legal/components/PrivacyPolicyPage").then(module => ({ default: module.PrivacyPolicyPage })));
 
 interface AllApis {
   work: WorkApi;
@@ -54,6 +52,15 @@ interface AllApis {
 
 export function App({ apis }: { apis: AllApis }) {
   const { user, signOut, status } = useAuth();
+
+  useEffect(() => {
+    const privatePath = window.location.hash.startsWith("#/")
+      ? window.location.hash.slice(1)
+      : window.location.pathname;
+    if (status === "unauthenticated" && /^\/(admin|cliente|profesional)(?:\/|$)/.test(privatePath)) {
+      window.location.hash = "#/login";
+    }
+  }, [status]);
 
   const routes: Route[] = [
     // Public
@@ -94,7 +101,9 @@ export function App({ apis }: { apis: AllApis }) {
       <Router routes={routes} fallback={fallback} layout={(content) => <>
         {user && <TopBar user={user} onSignOut={signOut} />}
         <main className={user ? `private-main private-main--${user.rol}` : undefined} style={user ? { maxWidth: 1200, margin: "0 auto", padding: 32 } : undefined}>
-          {content}
+          <Suspense fallback={<p role="status" aria-live="polite">Cargando sección…</p>}>
+            {content}
+          </Suspense>
         </main>
       </>} />
     </div>
@@ -157,8 +166,8 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
   return (
     <header className={`private-topbar private-topbar--${user?.rol ?? "guest"}`} style={{ display: "flex", justifyContent: "space-between", minHeight: 70, padding: "14px 32px", borderBottom: "1px solid var(--line)", background: "rgba(247,239,229,.92)", alignItems: "center", position: "sticky", top: 0, zIndex: 20, backdropFilter: "blur(12px)" }}>
       <a className="private-brand" href={user ? `#/${user.rol}` : "#/"} style={{ color: "var(--graphite)", fontWeight: 700, fontSize: 22, textDecoration: "none" }}>
-        <img className="private-brand-symbol" src="/brand/hogaria-isotipo.png" alt="" />
-        <img className="private-brand-wordmark" src="/brand/hogaria-wordmark.png" alt="Hogaria Reformas Integrales" />
+        <img className="private-brand-symbol" src="/brand/hogaria-isotipo-192.png" alt="" width="192" height="180" />
+        <img className="private-brand-wordmark" src="/brand/hogaria-wordmark-480.png" alt="Hogaria Reformas Integrales" width="480" height="104" />
       </a>
 
       {user ? (
@@ -180,7 +189,7 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
         </div>}
         </>
       ) : (
-        <a href="#/login" style={{ color: "#c17248", fontSize: 13, textDecoration: "none" }}>Iniciar sesión →</a>
+        <a href="#/login" style={{ color: "var(--copper-dark)", fontSize: 13, textDecoration: "none" }}>Iniciar sesión →</a>
       )}
     </header>
   );
@@ -224,7 +233,7 @@ function AdminHomeGroup({ label, hint, children }: { label: string; hint: string
 function Tile({ href, title, subtitle, icon }: { href: string; title: string; subtitle: string; icon?: NavigationIconName }) {
   return (
     <a href={href} className="admin-home-tile">
-      <h3 style={{ color: "#c17248", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}><NavigationIcon name={icon} />{title}</h3>
+      <h3 style={{ color: "var(--copper-dark)", fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}><NavigationIcon name={icon} />{title}</h3>
       <p style={{ fontSize: 12, color: "#71685e" }}>{subtitle}</p>
     </a>
   );

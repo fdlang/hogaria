@@ -32,10 +32,13 @@ export function ClientEstimates({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const filtered = filterEstimates(items, query, status);
   const [projects, setProjects] = useState<ProjectDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [changeError, setChangeError] = useState("");
   const [selected, setSelected] = useState<EstimateDTO | null>(null);
   const [receipt, setReceipt] = useState<{ hash: string; date: string } | null>(
     null,
@@ -47,6 +50,7 @@ export function ClientEstimates({
   const [password, setPassword] = useState("");
   const [accepted, setAccepted] = useState(false);
   const canvas = useRef<SignatureCanvasHandle>(null);
+  const actionErrorRef = useRef<HTMLDivElement>(null);
   const requestId = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -55,9 +59,10 @@ export function ClientEstimates({
     setError("");
     try {
       if (view === "budgets") {
-        const estimates = await api.estimates(page, query, status);
+        const estimates = await api.estimatesPage(page, query, status);
         if (request !== requestId.current) return;
-        setItems(estimates);
+        setItems(estimates.items);
+        setHasNextPage(estimates.hasNext);
       } else {
         const assignedProjects = await projectsApi.list();
         if (request !== requestId.current) return;
@@ -86,17 +91,23 @@ export function ClientEstimates({
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [refresh]);
+  useEffect(() => {
+    if (actionError || changeError) actionErrorRef.current?.focus();
+  }, [actionError, changeError]);
   const closeProposal = () => {
     setSelected(null);
     setSignature("");
     setPassword("");
     setAccepted(false);
+    setActionError("");
     canvas.current?.clear();
   };
   const closeChanges = () => {
     if (saving) return;
     setChangeOpen(false);
     setChangeText("");
+    setActionError("");
+    setChangeError("");
   };
   const replace = (next: EstimateDTO) =>
     setItems((current) =>
@@ -106,7 +117,7 @@ export function ClientEstimates({
     if (!selected || !signature || !password || !accepted) return;
     try {
       setSaving(true);
-      setError("");
+      setActionError("");
       const result = await api.signEstimate(selected.id, {
         password,
         canvasSignature: signature,
@@ -117,7 +128,7 @@ export function ClientEstimates({
       closeProposal();
       setReceipt({ hash: result.hash, date: result.fechaFirma });
     } catch (cause) {
-      setError(message(cause, "No se pudo registrar la firma."));
+      setActionError(message(cause, "No se pudo registrar la firma."));
     } finally {
       setSaving(false);
     }
@@ -126,14 +137,14 @@ export function ClientEstimates({
     if (!selected || changeText.trim().length < 10) return;
     try {
       setSaving(true);
-      setError("");
+      setChangeError("");
       const updated = await api.rejectEstimate(selected.id, changeText);
       replace(updated);
       setChangeOpen(false);
       setChangeText("");
       closeProposal();
     } catch (cause) {
-      setError(message(cause, "No se pudo enviar la solicitud de cambios."));
+      setChangeError(message(cause, "No se pudo enviar la solicitud de cambios."));
     } finally {
       setSaving(false);
     }
@@ -148,10 +159,10 @@ export function ClientEstimates({
             Tu proyecto con
             <img
               className="client-estimates__brand-logo"
-              src="/brand/hogaria-wordmark.png"
+              src="/brand/hogaria-wordmark-480.png"
               alt="Hogaria"
-              width="2362"
-              height="511"
+              width="480"
+              height="104"
               decoding="async"
             />
           </h1>
@@ -233,7 +244,7 @@ export function ClientEstimates({
           </p>
         )}
       </section>
-      <nav className="client-estimates__pagination" aria-label="Páginas de presupuestos"><Button small variant="ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button><span>Página {page + 1}</span><Button small variant="ghost" disabled={items.length < 20 || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>
+      <nav className="client-estimates__pagination" aria-label="Páginas de presupuestos"><Button small variant="ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button><span>Página {page + 1}</span><Button small variant="ghost" disabled={!hasNextPage || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>
       </>}
       {view === "projects" && <section className="client-estimates__section client-estimates__section--projects" aria-labelledby="client-projects">
         <div className="client-estimates__section-heading">
@@ -283,6 +294,7 @@ export function ClientEstimates({
         width={900}
         className="estimate-modal"
       >
+        {actionError && !changeOpen && <div ref={actionErrorRef} className="client-estimates__alert" role="alert" tabIndex={-1}>{actionError}</div>}
         {selected && (
           <EstimateDocuments
             key={`${selected.id}-${selected.versionActual}`}
@@ -302,7 +314,7 @@ export function ClientEstimates({
           onSignature={setSignature}
           onPassword={setPassword}
           onAccepted={setAccepted}
-          onRequestChanges={() => { setChangeText(""); setChangeOpen(true); }}
+          onRequestChanges={() => { setChangeText(""); setChangeError(""); setChangeOpen(true); }}
           onSign={() => void sign()}
           onClose={closeProposal}
         />
@@ -314,6 +326,7 @@ export function ClientEstimates({
         width={600}
         className="client-area-modal"
       >
+        {changeError && <div ref={actionErrorRef} className="client-estimates__alert" role="alert" tabIndex={-1}>{changeError}</div>}
         <p>
           Describe qué quieres revisar. El equipo recibirá el mensaje junto a
           esta propuesta.

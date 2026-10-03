@@ -1,4 +1,5 @@
 import { ApiClient } from "@/shared/lib/api-client";
+import { ApiContractError, isRecord } from "@/shared/lib/contracts";
 
 export type OpportunityDTO = { id: number; clienteId: number | null; nombre: string; email: string | null; telefono: string | null; direccion: string; tipo: string; descripcion: string; estado: string; fechaVisita: string | null; notasInternas: string; createdAt: string; updatedAt: string };
 export type EstimateLineDTO = { id: string; categoria: string; descripcion: string; cantidad: number; unidad: string; precioVentaUnitario: number; costeUnitario: number | null; descuento: number; iva: number; notaCliente?: string; notaInterna?: string };
@@ -9,6 +10,18 @@ export type EstimateDTO = { id: number; numero: string; clienteNombre: string; t
 export type CatalogItemDTO = { id: number; reference: string; category: string; description: string; unit: string; salePrice: number; vatRate: number; active: boolean; updatedAt: string };
 export type AdminEstimateDTO = { id: number; oportunidadId: number; estado: string; borrador: EstimateDraftDTO };
 export type ChangeOrderDTO = { id: number; numero: string; estado: string; payload?: EstimateDraftDTO; propuesta?: Pick<PublicProposalDTO, "titulo" | "partidas" | "condicionesPago"> };
+
+export const parseEstimateList = (value: unknown): EstimateDTO[] => {
+  if (!Array.isArray(value) || value.some(item =>
+    !isRecord(item) || !Number.isSafeInteger(item.id) || typeof item.numero !== "string" ||
+    typeof item.clienteNombre !== "string" || typeof item.titulo !== "string" ||
+    typeof item.estado !== "string" || !Number.isSafeInteger(item.versionActual) ||
+    !(item.motivoRechazo === null || typeof item.motivoRechazo === "string") ||
+    !(item.propuesta === null || isRecord(item.propuesta)) ||
+    typeof item.createdAt !== "string" || typeof item.updatedAt !== "string"
+  )) throw new ApiContractError("los presupuestos");
+  return value as EstimateDTO[];
+};
 
 export class SalesApi {
   private readonly pdfCache = new Map<string, Blob>();
@@ -23,8 +36,12 @@ export class SalesApi {
   updateCatalogItem(id: number, input: Partial<Omit<CatalogItemDTO, "id" | "updatedAt">>) { return this.http.patch<CatalogItemDTO>(`/catalog/${id}`, input); }
   archiveCatalogItem(id: number) { return this.http.delete<CatalogItemDTO>(`/catalog/${id}`); }
   createOpportunity(input: Omit<OpportunityDTO, "id" | "createdAt" | "updatedAt">) { return this.http.post<OpportunityDTO>("/opportunities", input); }
-  estimates(page = 0, search = "", status = "") { return this.http.get<EstimateDTO[]>(`/estimates?page=${page}&search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`); }
-  history(id: number) { return this.http.get<EstimateDTO[]>(`/estimates/${id}/history`); }
+  async estimates(page = 0, search = "", status = "") { return parseEstimateList(await this.http.get<unknown>(`/estimates?page=${page}&search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`)); }
+  async estimatesPage(page = 0, search = "", status = "") {
+    const result = parseEstimateList(await this.http.get<unknown>(`/estimates?page=${page}&limit=21&search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`));
+    return { items: result.slice(0, 20), hasNext: result.length > 20 };
+  }
+  async history(id: number) { return parseEstimateList(await this.http.get<unknown>(`/estimates/${id}/history`)); }
   draft(id: number) { return this.http.get<AdminEstimateDTO>(`/estimates/${id}/draft`); }
   updateEstimate(id: number, borrador: EstimateDraftDTO) { return this.http.patch<EstimateDTO>(`/estimates/${id}`, { borrador }); }
   reviseEstimate(id: number) { return this.http.post<AdminEstimateDTO>(`/estimates/${id}/revise`); }
