@@ -1,15 +1,14 @@
-- Estado: correcciones prioritarias completadas; falta ejecutar el preflight de solo lectura con el entorno de produccion.
-- Alcance auditado: 251 ficheros; frontend, backend y seguridad revisados en paralelo y contrastados.
-- Hecho: runner versionado con ledger, checksum, lock exclusivo, rollback seguro y todas las migraciones legacy.
-- Hecho: firmas v3 separadas de sesion, key-id, rotacion, comparacion constante y verificacion v2 solo con clave legacy dedicada.
-- Hecho: eventos post-commit no generan falsos 500; login y solicitud de recuperacion fallan cerrados si no pueden auditarse.
-- Hecho: cron y reintentos separados, secretos distintos de 32+ caracteres y mantenimiento reservado al cron.
-- Hecho: cuatro ojos persistente y cierre seguro ante autoria historica desconocida, incluso con un solo admin.
-- Hecho: recuperacion de cuenta activa con enlace de un solo uso, auditoria y revocacion de sesiones.
-- Hecho: acuse de solicitudes inmediato con outbox; politica IVA aplicada en API y selectores; redondeo UI en centimos.
-- Hecho: limites de formularios alineados con API, planificacion de hitos corregida y login limitado por IP y cuenta.
-- Validacion: typecheck y build correctos; 287 tests y 108 flujos Chromium/WebKit correctos; npm audit 0.
-- Hecho: preflight bloqueante para secretos, ledger/checksums y firmas historicas v1/v2/v3, sin mostrar valores ni modificar datos.
-- Bloqueo produccion: el preflight debe confirmar cero v1/desconocidas y claves disponibles para toda firma v2/v3.
-- Pendiente gestor/DPD: validar IVA/defensa fiscal SQL y aprobar retencion de IP, user-agent y auditoria.
-- Deuda media: concurrencia optimista de oportunidades, guardas SQL adicionales, paginacion global y reintento durable de auditoria semantica no critica.
+- Estado: `main` desplegada en producción; Vercel confirmó estado Ready el 03/10/2026.
+- Último despliegue verificado: `f883e64` (`fix(web): restore portfolio media orientation and autoplay`).
+- Validación: typecheck y build correctos; 299 tests unitarios y 122 flujos Playwright en Chromium/WebKit.
+- Hecho: errores de acciones visibles dentro de sus modales, con foco y mensajes recuperables.
+- Hecho: expiración local según el plazo del servidor, redirección al acceso y limpieza de credenciales.
+- Hecho: timeout HTTP diferenciado para API y descargas; errores de red tipados.
+- Hecho: presupuestos paginados sin páginas vacías y contratos runtime para autenticación/listados.
+- Hecho: code splitting por rutas; bundle inicial aproximado de 203 kB (65 kB gzip).
+- Hecho: imágenes responsivas orientadas y comprimidas; vídeo con autoplay silencioso solo al entrar en pantalla.
+- Hecho: mejoras de accesibilidad en errores, campos, contraste, foco y estados del formulario público.
+- Operación: la barrera del build de Production valida secretos críticos sin imprimirlos.
+- Compatibilidad temporal: retirar `SIGNATURE_HMAC_LEGACY_V2_USE_SESSION_KEY` cuando no queden firmas v2.
+- Pendiente gestor/DPD: validar política fiscal y retención de IP, user-agent y auditoría.
+- Deuda media: concurrencia optimista de oportunidades y paginación de módulos administrativos de alto volumen.

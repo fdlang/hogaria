@@ -29,6 +29,8 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
    - `HMAC_SECRET`: secreto aleatorio de al menos 32 caracteres, exclusivo para sesiones.
    - `SIGNATURE_HMAC_SECRET`: secreto distinto para firmas, de al menos 32 caracteres.
    - `SIGNATURE_HMAC_KEY_ID`: identificador de la clave de firma activa (por ejemplo, `sig-2026-09`).
+   - `SIGNATURE_HMAC_PREVIOUS_KEYS`: objeto JSON con claves v3 anteriores que
+     todavía deban verificar firmas históricas.
    - `SIGNATURE_HMAC_LEGACY_V2_SECRET`: si existen sellos v2, copia aquí el antiguo `HMAC_SECRET` y rota simultáneamente `HMAC_SECRET`; la rotación cierra las sesiones actuales y deja ambas claves separadas.
    - `SIGNATURE_HMAC_LEGACY_V2_USE_SESSION_KEY`: alternativa temporal con valor `true` si el secreto anterior está oculto y no puede copiarse. Solo verifica sellos v2 existentes; las firmas nuevas usan la clave v3 independiente.
    - `ALLOWED_ORIGINS`: dominios adicionales autorizados, separados por comas.
@@ -58,6 +60,14 @@ el secreto del cron; después establece `CLIENT_NOTIFICATIONS_ENABLED=true`.
 Los presupuestos solo se descargan: los avisos no adjuntan PDF. El cron diario
 reintenta los avisos pendientes.
 
+## Publicación y verificación
+
+La integración Git de Vercel publica `main` en Production. Antes del push deben
+pasar `npm run typecheck`, `npm run test`, `npm run build` y las pruebas de
+navegador del frontend. Tras el push, comprueba que el despliegue esté `Ready`,
+que los alias `hogaria.design` y `www.hogaria.design` apunten a esa versión y
+realiza una comprobación funcional de landing, acceso y una ruta `/api`.
+
 ## Garantías incluidas
 
 - Las rutas `/api/*` se envían a la función serverless.
@@ -66,5 +76,5 @@ reintenta los avisos pendientes.
 - No se inicia un proceso HTTP persistente dentro de Vercel.
 - Cabeceras básicas de protección se aplican al despliegue.
 
-Los archivos binarios requieren un proveedor de objetos (por ejemplo Vercel Blob
-o S3) antes de habilitar cargas reales en producción.
+Los archivos binarios usan Vercel Blob privado. Sin `BLOB_READ_WRITE_TOKEN`, las
+cargas y descargas privadas deben considerarse no disponibles.

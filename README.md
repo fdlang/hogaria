@@ -10,7 +10,8 @@ API con arquitectura por capas y persistencia PostgreSQL.
 - Node.js, TypeScript y API HTTP.
 - PostgreSQL mediante `pg`.
 - Bcrypt para contraseñas.
-- Vercel: SPA estática y funciones serverless bajo `/api`.
+- Vercel: SPA estática, Blob privado y funciones serverless bajo `/api`.
+- Vitest para pruebas unitarias y Playwright para flujos en Chromium/WebKit.
 
 ## Estructura
 
@@ -80,11 +81,13 @@ No uses las credenciales de ejemplo fuera de tu entorno local.
 npm run typecheck
 npm run test
 npm run build
+npm run test:browser --workspace @reformapro/web
 
 npm run typecheck --workspace @reformapro/web
 npm run build --workspace @reformapro/web
 npm run typecheck --workspace @reformapro/api
 npm run db:migrate --workspace @reformapro/api
+npm run preflight:database
 ```
 
 ## Variables de entorno
@@ -115,9 +118,10 @@ npm run db:migrate --workspace @reformapro/api
 
 El repositorio incluye `vercel.json`, reescrituras para las rutas de la SPA y
 funciones serverless en `api/`. Importa el repositorio en Vercel usando la raíz
-del proyecto. El build de Vercel genera primero el bundle CommonJS de la API y
-después la SPA de Vite. Configura las variables de producción y aplica la
-migración contra una base PostgreSQL gestionada antes de publicar.
+del proyecto. El build genera primero el bundle CommonJS de la API, valida la
+configuración crítica cuando `VERCEL_ENV=production` y después construye la SPA
+de Vite. La integración del repositorio publica `main` en Production. Configura
+las variables y aplica las migraciones antes de publicar cambios de esquema.
 
 Consulta [VERCEL_DEPLOY.md](VERCEL_DEPLOY.md) para la guía de despliegue.
 
@@ -131,6 +135,9 @@ El contenido comercial no está repartido por el proyecto:
   encuentran en `apps/web/src/features/solicitudes/components/PublicLanding.tsx`.
 - Las imágenes públicas se sirven desde `apps/web/public/images/portfolio/` y
   los recursos de marca desde `apps/web/public/brand/`.
+- El caso destacado usa derivados responsivos y orientados. Su vídeo permanece
+  silenciado, se reproduce al entrar suficientemente en pantalla y se pausa al
+  salir para equilibrar visibilidad y consumo de datos.
 
 Al añadir una obra con caso de estudio, su tarjeta debe enlazar a una sección o
 ruta concreta; no debe reutilizarse el destino de otra obra.
@@ -162,13 +169,24 @@ costes internos.
 
 ## Presupuestos: búsqueda y PDF
 
-El listado permite buscar y filtrar por estado. Las propuestas publicadas se pueden
-descargar en PDF. No se envían documentos por correo.
+El listado permite buscar, filtrar por estado y recorrer páginas de 20
+resultados sin exponer una página siguiente vacía. Las propuestas publicadas
+se pueden descargar en PDF. No se envían documentos por correo.
 Los importes admiten como máximo dos decimales; cada línea y su IVA se redondean
 a céntimos antes de acumular el total. Los avisos automáticos informan de
 novedades sin adjuntar documentos y solo se envían cuando
 `CLIENT_NOTIFICATIONS_ENABLED=true`; los fallidos quedan en cola para el cron
 diario configurado en `vercel.json`.
+
+## Fiabilidad del frontend
+
+- Las rutas privadas se cargan bajo demanda para reducir el bundle inicial.
+- La sesión local respeta la expiración indicada por la API y elimina las
+  credenciales antes de devolver al usuario a la pantalla de acceso.
+- Las peticiones HTTP tienen timeout y distinguen timeout, cancelación y fallo
+  de red; las descargas disponen de un margen mayor.
+- Las respuestas críticas de autenticación y presupuestos se validan en tiempo
+  de ejecución antes de llegar a la interfaz.
 
 ## Licencia
 
