@@ -24,18 +24,24 @@ test('public footer actions form a readable column on mobile', async ({ page }) 
   const links = footer.locator('.footer-links');
   await footer.scrollIntoViewIfNeeded();
   await expect(footer.getByText('Instagram', { exact: true })).toBeVisible();
+  await expect(footer.getByText('TikTok', { exact: true })).toBeVisible();
   await expect(footer).toHaveCSS('flex-direction', 'column');
   await expect(links).toHaveCSS('flex-direction', 'column');
   const footerOrder = await footer.locator(':scope > *').evaluateAll(elements => elements.map(element => element.className || element.tagName.toLowerCase()));
   expect(footerOrder).toEqual(['footer-brand', 'footer-contact', 'footer-links', 'footer-signature']);
   const instagramLink = links.getByRole('link', { name: 'Instagram de Hogaria' });
   await expect(instagramLink).toHaveAttribute('href', 'https://www.instagram.com/hogaria.desing?stkn=MTlvYzRnbHVsY2FmYg==');
+  const tiktokLink = links.getByRole('link', { name: 'TikTok de Hogaria' });
+  await expect(tiktokLink).toHaveAttribute('href', 'https://www.tiktok.com/@hogaria.design?_r=1&_t=ZN-9ALEm6kucju');
+  await expect(tiktokLink).toHaveAttribute('target', '_blank');
   const instagram = await instagramLink.boundingBox();
+  const tiktok = await tiktokLink.boundingBox();
   const privacy = await links.getByRole('link', { name: 'Privacidad' }).boundingBox();
   const client = await links.getByRole('button', { name: 'Área cliente' }).boundingBox();
   await expect(links.getByRole('button', { name: 'Área cliente' })).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(links.getByRole('button', { name: 'Área cliente' })).toHaveCSS('border-top-width', '0px');
-  expect(privacy!.y).toBeGreaterThanOrEqual(instagram!.y + instagram!.height);
+  expect(tiktok!.y).toBeGreaterThanOrEqual(instagram!.y + instagram!.height);
+  expect(privacy!.y).toBeGreaterThanOrEqual(tiktok!.y + tiktok!.height);
   expect(client!.y).toBeGreaterThanOrEqual(privacy!.y + privacy!.height);
 });
 
