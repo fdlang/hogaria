@@ -91,6 +91,18 @@ describe("SalesApi", () => {
     expect(http.get).toHaveBeenCalledWith("/estimates?page=2&limit=21&search=cocina&status=enviado");
   });
 
+  it("paginates opportunities and sends their expected revision when updating", async () => {
+    const http = createHttp();
+    vi.mocked(http.get).mockResolvedValue({ items: [], total: 0, page: 2, limit: 20, pages: 1 });
+    const api = new SalesApi(http);
+
+    await api.opportunityPage({ page: 2, search: "cocina", status: "nueva" });
+    api.updateOpportunity(7, { nombre: "Cocina" }, "2026-10-07T10:00:00.000Z");
+
+    expect(http.get).toHaveBeenCalledWith("/opportunities?page=2&limit=20&search=cocina&status=nueva");
+    expect(http.patch).toHaveBeenCalledWith("/opportunities/7", { nombre: "Cocina", expectedUpdatedAt: "2026-10-07T10:00:00.000Z" });
+  });
+
   it("rejects malformed estimate responses instead of trusting a TypeScript cast", async () => {
     const http = createHttp();
     vi.mocked(http.get).mockResolvedValue([{ id: "not-a-number" }]);

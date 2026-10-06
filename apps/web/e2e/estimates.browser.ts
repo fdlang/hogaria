@@ -76,6 +76,8 @@ async function fixture(page: Page, role: string) {
           }
         : path === "/estimates"
           ? [proposal]
+          : path === "/opportunities"
+            ? { items: [], total: 0, page: 1, limit: 20, pages: 1 }
           : [];
     return route.fulfill({ json });
   });
@@ -136,7 +138,7 @@ for (const state of ["borrador", "en_revision", "rechazado"]) {
     await fixture(page, "admin");
     let saved = false, revised = false;
     const draft = { ...proposal.propuesta, notasInternas: "Nota interna", partidas: proposal.propuesta.partidas.map(line => ({ ...line, costeUnitario: 30 })) };
-    await page.route("**/api/opportunities", route => route.fulfill({ json: [{ id: 4, clienteId: 2, nombre: "Obra", direccion: "Madrid" }] }));
+    await page.route("**/api/opportunities*", route => route.fulfill({ json: { items: [{ id: 4, clienteId: 2, nombre: "Obra", direccion: "Madrid", updatedAt: "2026-10-07T10:00:00.000Z" }], total: 1, page: 1, limit: 20, pages: 1 } }));
     await page.route("**/api/estimates?*", route => {
       expect(route.request().method()).toBe("GET");
       return route.fulfill({ json: [{ ...proposal, estado: state }] });

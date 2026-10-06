@@ -184,6 +184,16 @@ export class OpportunityUseCases {
     assertAdmin(await this.users.findById(actorId));
     return this.opportunities.findAll(estado);
   }
+  async get(actorId: number, id: number) {
+    assertAdmin(await this.users.findById(actorId));
+    const opportunity = await this.opportunities.findById(id);
+    if (!opportunity) throw new NotFoundError("Oportunidad");
+    return opportunity;
+  }
+  async listPage(actorId: number, query: import("@reformapro/domain/repositories").OpportunityPageQuery) {
+    assertAdmin(await this.users.findById(actorId));
+    return this.opportunities.findPage(query);
+  }
   async create(actorId: number, input: OpportunityInput, ctx: ClientContext) {
     const actor = await this.users.findById(actorId);
     assertAdmin(actor);
@@ -224,8 +234,9 @@ export class OpportunityUseCases {
     });
     return saved;
   }
-  async update(actorId: number, id: number, input: Partial<OpportunityInput>) {
+  async update(actorId: number, id: number, input: Partial<OpportunityInput>, expectedUpdatedAt: Date) {
     assertAdmin(await this.users.findById(actorId));
+    if (!(expectedUpdatedAt instanceof Date) || !Number.isFinite(expectedUpdatedAt.getTime())) throw new ValidationError("Versión de oportunidad no válida", "expectedUpdatedAt");
     const current = await this.opportunities.findById(id);
     if (!current) throw new NotFoundError("Oportunidad");
     const allowed = new Set(["nombre", "clienteId", "email", "telefono", "direccion", "tipo", "descripcion", "estado", "fechaVisita", "notasInternas"]);
@@ -258,7 +269,7 @@ export class OpportunityUseCases {
       if (!canTransitionOpportunity(current.estado, changes.estado)) throw new ConflictError("Transición comercial no permitida");
     }
     if (changes.fechaVisita !== undefined && changes.fechaVisita !== null && (!(changes.fechaVisita instanceof Date) || !Number.isFinite(changes.fechaVisita.getTime()))) throw new ValidationError("Fecha no válida", "fechaVisita");
-    return this.opportunities.update(id, changes);
+    return this.opportunities.update(id, changes, expectedUpdatedAt);
   }
 }
 

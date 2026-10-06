@@ -177,6 +177,12 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/sales.use-cases.ts"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts"],
   },
   {
+    id: "HOG-COM-004", description: "La edición de una oportunidad exige la versión vigente y rechaza sobrescrituras concurrentes.", origin: "technical", owner: "comercial",
+    assumption: "Más de un administrador puede gestionar simultáneamente la misma oportunidad.", validScale: "Una empresa con múltiples gestores comerciales y miles de oportunidades.", validFrom: "2026-10-07", validUntil: null, nextReview: "2027-01-07",
+    metrics: [metric("opportunity_edit_conflict_rate", "Ediciones comerciales rechazadas por concurrencia", "not_instrumented"), metric("opportunity_overwrite_incidents", "Sobrescrituras concurrentes confirmadas")],
+    implementation: ["apps/api/src/application/use-cases/sales.use-cases.ts", "apps/api/src/infrastructure/database/postgresRepositories.ts"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/api/src/infrastructure/database/repository-patches.test.ts"],
+  },
+  {
     id: "HOG-AUD-001", description: "El registro de auditoría es append-only y excluye secretos y texto libre innecesario.", origin: "security", owner: "seguridad",
     assumption: "La trazabilidad técnica debe resistir modificaciones desde la aplicación.", validScale: "Millones de eventos; requiere archivado cuando se apruebe la política de retención.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("audit_mutation_attempts", "Intentos de modificar el histórico", "audit_log"), metric("audit_persist_failure_rate", "Fallos al persistir eventos")],
@@ -193,7 +199,7 @@ export const BUSINESS_RULES = [
     id: "HOG-OPS-001", description: "Los listados operativos se paginan y agregan en servidor antes de superar su escala validada.", origin: "technical", owner: "operaciones",
     assumption: "Las colecciones completas solo son aceptables durante la fase de bajo volumen.", validScale: "Hasta 500 registros por colección; a partir de ahí la paginación es obligatoria.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("list_response_size", "Elementos devueltos por listado"), metric("list_p95_latency", "Latencia p95 de listados")],
-    implementation: ["apps/api/src/infrastructure/database/postgresRepositories.ts"], tests: ["apps/api/src/infrastructure/database/audit-transactions.test.ts"],
+    implementation: ["apps/api/src/infrastructure/database/postgresRepositories.ts", "apps/web/src/features/sales/components/SalesPipeline.tsx"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/web/src/features/sales/api/sales.api.test.ts"],
   },
   {
     id: "HOG-SLA-001", description: "No se comunica un plazo de respuesta comercial que no esté medido y alertado.", origin: "business", owner: "comercial",

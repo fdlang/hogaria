@@ -104,15 +104,34 @@ export class PostgresOpportunityRepository implements IOpportunityRepository {
   private map(r: Row): Opportunity { return { id: Number(r.id), clienteId: r.cliente_id == null ? null : Number(r.cliente_id), nombre: r.nombre, email: r.email, telefono: r.telefono, direccion: r.direccion, tipo: r.tipo, descripcion: r.descripcion, estado: r.estado as OpportunityStatus, fechaVisita: r.fecha_visita ? date(r.fecha_visita) : null, notasInternas: r.notas_internas, createdAt: date(r.created_at), updatedAt: date(r.updated_at) }; }
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM opportunities WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async findAll(status?: OpportunityStatus) { const r = await this.pool.query(status ? "SELECT * FROM opportunities WHERE estado=$1 ORDER BY updated_at DESC" : "SELECT * FROM opportunities ORDER BY updated_at DESC", status ? [status] : []); return r.rows.map(row => this.map(row)); }
+  async findPage(query: import("@reformapro/domain/repositories").OpportunityPageQuery) {
+    const values: unknown[] = [];
+    const where: string[] = [];
+    const add = (value: unknown) => { values.push(value); return `$${values.length}`; };
+    if (query.status && query.status !== "all") where.push(`estado=${add(query.status)}`);
+    if (query.search.trim()) {
+      const term = add(`%${query.search.trim()}%`);
+      where.push(`(nombre ILIKE ${term} OR direccion ILIKE ${term} OR COALESCE(email,'') ILIKE ${term} OR COALESCE(telefono,'') ILIKE ${term})`);
+    }
+    const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const count = await this.pool.query(`SELECT COUNT(*)::int AS total FROM opportunities ${clause}`, values);
+    const offset = add((query.page - 1) * query.limit);
+    const limit = add(query.limit);
+    const rows = await this.pool.query(`SELECT * FROM opportunities ${clause} ORDER BY updated_at DESC,id DESC OFFSET ${offset} LIMIT ${limit}`, values);
+    const total = Number(count.rows[0]?.total ?? 0);
+    return { items: rows.rows.map(row => this.map(row)), total, page: query.page, limit: query.limit, pages: Math.max(1, Math.ceil(total / query.limit)) };
+  }
   async save(o: Omit<Opportunity, "id" | "createdAt" | "updatedAt">) { const r = await this.pool.query("INSERT INTO opportunities(cliente_id,nombre,email,telefono,direccion,tipo,descripcion,estado,fecha_visita,notas_internas) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *", [o.clienteId,o.nombre,o.email,o.telefono,o.direccion,o.tipo,o.descripcion,o.estado,o.fechaVisita,o.notasInternas]); return this.map(r.rows[0]); }
-  async update(id: number, changes: Partial<Omit<Opportunity, "id" | "createdAt" | "updatedAt">>) {
+  async update(id: number, changes: Partial<Omit<Opportunity, "id" | "createdAt" | "updatedAt">>, expectedUpdatedAt?: Date) {
     const columns: Record<string, string> = { clienteId: "cliente_id", nombre: "nombre", email: "email", telefono: "telefono", direccion: "direccion", tipo: "tipo", descripcion: "descripcion", estado: "estado", fechaVisita: "fecha_visita", notasInternas: "notas_internas" };
     const entries = Object.entries(changes).filter(([, value]) => value !== undefined);
-    if (!entries.length) { const current = await this.findById(id); if (!current) throw new NotFoundError("Oportunidad"); return current; }
+    if (!entries.length) { const current = await this.findById(id); if (!current) throw new NotFoundError("Oportunidad"); if (expectedUpdatedAt && current.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw new ConflictError("La oportunidad ha cambiado. Actualiza los datos antes de guardar."); return current; }
     const values: unknown[] = [id];
     const assignments = entries.map(([key, value]) => { values.push(value); return `${columns[key]}=$${values.length}`; });
-    const r = await this.pool.query(`UPDATE opportunities SET ${assignments.join(",")},updated_at=NOW() WHERE id=$1 RETURNING *`, values);
-    if (!r.rows[0]) throw new NotFoundError("Oportunidad");
+    if (expectedUpdatedAt) values.push(expectedUpdatedAt);
+    const expectedClause = expectedUpdatedAt ? ` AND date_trunc('milliseconds',updated_at)=$${values.length}` : "";
+    const r = await this.pool.query(`UPDATE opportunities SET ${assignments.join(",")},updated_at=GREATEST(clock_timestamp(),updated_at + INTERVAL '1 millisecond') WHERE id=$1${expectedClause} RETURNING *`, values);
+    if (!r.rows[0]) throw expectedUpdatedAt ? new ConflictError("La oportunidad ha cambiado. Actualiza los datos antes de guardar.") : new NotFoundError("Oportunidad");
     return this.map(r.rows[0]);
   }
 }

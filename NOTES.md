@@ -1,6 +1,5 @@
-- Estado: `main` desplegada en producción; Vercel confirmó estado Ready el 03/10/2026.
-- Último despliegue verificado: `f883e64` (`fix(web): restore portfolio media orientation and autoplay`).
-- Validación: typecheck y build correctos; 299 tests unitarios y 122 flujos Playwright en Chromium/WebKit.
+- Estado: bloque técnico completado en la rama actual; pendiente de commit y despliegue.
+- Validación: typecheck y build correctos; 305 tests unitarios y 124 flujos Playwright en Chromium/WebKit.
 - Hecho: errores de acciones visibles dentro de sus modales, con foco y mensajes recuperables.
 - Hecho: expiración local según el plazo del servidor, redirección al acceso y limpieza de credenciales.
 - Hecho: timeout HTTP diferenciado para API y descargas; errores de red tipados.
@@ -8,7 +7,9 @@
 - Hecho: code splitting por rutas; bundle inicial aproximado de 203 kB (65 kB gzip).
 - Hecho: imágenes responsivas orientadas y comprimidas; vídeo con autoplay silencioso solo al entrar en pantalla.
 - Hecho: mejoras de accesibilidad en errores, campos, contraste, foco y estados del formulario público.
+- Hecho: oportunidades paginadas y filtradas en servidor, con selección responsive y acceso directo seguro.
+- Hecho: concurrencia optimista en oportunidades; una edición obsoleta devuelve conflicto sin sobrescribir datos.
+- Hecho: paginación administrativa de presupuestos con anticipación fiable y sin páginas vacías.
 - Operación: la barrera del build de Production valida secretos críticos sin imprimirlos.
 - Compatibilidad temporal: retirar `SIGNATURE_HMAC_LEGACY_V2_USE_SESSION_KEY` cuando no queden firmas v2.
 - Pendiente gestor/DPD: validar política fiscal y retención de IP, user-agent y auditoría.
-- Deuda media: concurrencia optimista de oportunidades y paginación de módulos administrativos de alto volumen.

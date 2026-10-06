@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Modal } from "@/shared/ui";
 import { EstimateDocuments, EstimateSearch } from "./EstimateContent";
 import { filterEstimates } from "../estimate-search";
@@ -66,6 +66,14 @@ export function SalesPipeline({
   users: UsersApi;
 }) {
   const [opportunities, setOpportunities] = useState<OpportunityDTO[]>([]);
+  const [opportunityPage, setOpportunityPage] = useState(1);
+  const [opportunityPages, setOpportunityPages] = useState(1);
+  const [opportunityTotal, setOpportunityTotal] = useState(0);
+  const [opportunitySearch, setOpportunitySearch] = useState("");
+  const [opportunityStatus, setOpportunityStatus] = useState("");
+  const [opportunitiesLoading, setOpportunitiesLoading] = useState(false);
+  const deferredOpportunitySearch = useDeferredValue(opportunitySearch);
+  const opportunityRequest = useRef(0);
   const [estimates, setEstimates] = useState<EstimateDTO[]>([]);
   const [clients, setClients] = useState<Array<{ id: number; nombre: string }>>(
     [],
@@ -121,24 +129,50 @@ export function SalesPipeline({
     finally { setOpeningId(null); }
   };
 
-  const refresh = () =>
-    Promise.all([
-      api.opportunities(),
-      api.estimates(),
-      users.list("cliente"),
-    ]).then(([opportunityItems, estimateItems, clientItems]) => {
-      setOpportunities(opportunityItems);
+  const refreshOpportunities = async () => {
+    const request = ++opportunityRequest.current;
+    setOpportunitiesLoading(true);
+    try {
+      const result = await api.opportunityPage({ page: opportunityPage, search: deferredOpportunitySearch.trim(), status: opportunityStatus });
+      let items = result.items;
+      const explicitId = Number(existingOpportunity);
+      if (Number.isSafeInteger(explicitId) && explicitId > 0 && !items.some(item => item.id === explicitId)) {
+        const explicit = await api.opportunity(explicitId);
+        items = [explicit, ...items];
+      }
+      if (request === opportunityRequest.current) {
+        setOpportunities(items);
+        setOpportunityPages(result.pages);
+        setOpportunityTotal(result.total);
+      }
+    } finally {
+      if (request === opportunityRequest.current) setOpportunitiesLoading(false);
+    }
+  };
+
+  const refreshCommercial = () =>
+    Promise.all([api.estimates(), users.list("cliente")]).then(([estimateItems, clientItems]) => {
       setEstimates(estimateItems);
       setClients(
         clientItems.map((client) => ({ id: client.id, nombre: client.nombre })),
       );
     });
 
+  const refresh = () => Promise.all([refreshOpportunities(), refreshCommercial()]).then(() => undefined);
+
   useEffect(() => {
-    void refresh().catch(() =>
+    void refreshCommercial().catch(() =>
       setError("No se pudieron cargar los presupuestos. Inténtalo de nuevo."),
     );
   }, []);
+
+  useEffect(() => {
+    let current = true;
+    void refreshOpportunities().catch(() => {
+      if (current) setError("No se pudieron cargar las oportunidades. Inténtalo de nuevo.");
+    });
+    return () => { current = false; };
+  }, [api, deferredOpportunitySearch, opportunityPage, opportunityStatus]);
 
 
   const active = useMemo(
@@ -219,10 +253,15 @@ export function SalesPipeline({
         fechaVisita: null,
         notasInternas: "",
       };
-      const saved = existingOpportunity ? await api.updateOpportunity(Number(existingOpportunity), { clienteId: input.clienteId, nombre: input.nombre, direccion: input.direccion, tipo: input.tipo, descripcion: input.descripcion }) : await api.createOpportunity(input);
+      const current = existingOpportunity ? opportunities.find(item => item.id === Number(existingOpportunity)) : null;
+      if (existingOpportunity && !current) throw new Error("La oportunidad ya no está disponible. Actualiza el listado.");
+      const saved = current
+        ? await api.updateOpportunity(Number(existingOpportunity), { clienteId: input.clienteId, nombre: input.nombre, direccion: input.direccion, tipo: input.tipo, descripcion: input.descripcion }, current.updatedAt)
+        : await api.createOpportunity(input);
+      setOpportunities(items => [saved, ...items.filter(item => item.id !== saved.id)]);
       setSelected(saved.id);
       setStep(1);
-      await refresh();
+      await refreshCommercial();
     } catch (cause) {
       setError(
         (cause as { message?: string }).message ??
@@ -422,12 +461,38 @@ export function SalesPipeline({
       {step === 0 && (
         <div className="sales-card">
           <h2>Nueva oportunidad</h2>
+          <div className="sales-opportunity-filters">
+            <label>Buscar oportunidad
+              <input
+                type="search"
+                value={opportunitySearch}
+                placeholder="Nombre, dirección, email o teléfono"
+                onChange={event => { setOpportunityPage(1); setOpportunitySearch(event.target.value); }}
+              />
+            </label>
+            <label>Estado
+              <select value={opportunityStatus} onChange={event => { setOpportunityPage(1); setOpportunityStatus(event.target.value); }}>
+                <option value="">Todos los estados</option>
+                <option value="nueva">Nueva</option>
+                <option value="contactada">Contactada</option>
+                <option value="visita_agendada">Visita agendada</option>
+                <option value="en_estudio">En estudio</option>
+                <option value="ganada">Ganada</option>
+                <option value="descartada">Descartada</option>
+              </select>
+            </label>
+          </div>
+          <p role="status">{opportunitiesLoading ? "Cargando oportunidades…" : `${opportunityTotal} oportunidades · página ${opportunityPage} de ${opportunityPages}`}</p>
           <label>Continuar una oportunidad existente
-            <select value={existingOpportunity} onChange={event => setExistingOpportunity(event.target.value)}>
+            <select disabled={opportunitiesLoading} value={existingOpportunity} onChange={event => setExistingOpportunity(event.target.value)}>
               <option value="">Crear nueva</option>
               {opportunities.map(item => <option key={item.id} value={item.id}>{item.nombre} · {item.direccion}</option>)}
             </select>
           </label>
+          <nav aria-label="Páginas de oportunidades">
+            <Button small variant="ghost" disabled={opportunitiesLoading || opportunityPage <= 1} onClick={() => setOpportunityPage(value => value - 1)}>Anterior</Button>
+            <Button small variant="ghost" disabled={opportunitiesLoading || opportunityPage >= opportunityPages} onClick={() => setOpportunityPage(value => value + 1)}>Siguiente</Button>
+          </nav>
           <p>Los campos con * son obligatorios.</p>
           <label>
             Cliente existente *
@@ -737,13 +802,14 @@ function RecentEstimates({
   const [expanded, setExpanded] = useState(false);
   const [page, setPage] = useState(0);
   const [rows, setRows] = useState(estimates);
+  const [hasNext, setHasNext] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     let current = true;
     setLoading(true);
-    const timer = setTimeout(() => { void api.estimates(page, query, status).then(items => {
-      if (current) { setRows(items); setLoadError(""); }
+    const timer = setTimeout(() => { void api.estimatesPage(page, query, status).then(result => {
+      if (current) { setRows(result.items); setHasNext(result.hasNext); setLoadError(""); }
     }).catch(() => { if (current) setLoadError("No se pudieron cargar los presupuestos."); }).finally(() => { if (current) setLoading(false); }); }, 200);
     return () => { current = false; clearTimeout(timer); };
   }, [api, estimates, page, query, status]);
@@ -836,7 +902,7 @@ function RecentEstimates({
         </p>
       )}
       </div>
-      {(expanded || hasFilters) && <nav aria-label="Páginas de presupuestos"><Button small variant="ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button><Button small variant="ghost" disabled={rows.length < 20 || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>}
+      {(expanded || hasFilters) && <nav aria-label="Páginas de presupuestos"><Button small variant="ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button><Button small variant="ghost" disabled={!hasNext || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>}
     </section>
   );
 }

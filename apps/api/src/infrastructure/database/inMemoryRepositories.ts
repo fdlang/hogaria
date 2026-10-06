@@ -171,8 +171,17 @@ export class InMemoryOpportunityRepository implements IOpportunityRepository {
   private readonly items: Opportunity[] = []; private nextId = 1;
   async findById(id: number) { return this.items.find(item => item.id === id) ?? null; }
   async findAll(status?: OpportunityStatus) { return this.items.filter(item => !status || item.estado === status).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); }
+  async findPage(query: import("@reformapro/domain/repositories").OpportunityPageQuery) {
+    const search = query.search.trim().toLocaleLowerCase("es");
+    const filtered = this.items.filter(item =>
+      (!query.status || query.status === "all" || item.estado === query.status) &&
+      (!search || [item.nombre, item.direccion, item.email ?? "", item.telefono ?? ""].some(value => value.toLocaleLowerCase("es").includes(search)))
+    ).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime() || b.id - a.id);
+    const total = filtered.length;
+    return { items: filtered.slice((query.page - 1) * query.limit, query.page * query.limit), total, page: query.page, limit: query.limit, pages: Math.max(1, Math.ceil(total / query.limit)) };
+  }
   async save(item: Omit<Opportunity, "id" | "createdAt" | "updatedAt">) { const now = new Date(); const saved: Opportunity = { ...item, id: this.nextId++, createdAt: now, updatedAt: now }; this.items.push(saved); return saved; }
-  async update(id: number, changes: Partial<Omit<Opportunity, "id" | "createdAt" | "updatedAt">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Oportunidad"); const next = { ...old, ...changes, updatedAt: new Date() }; this.items[this.items.indexOf(old)] = next; return next; }
+  async update(id: number, changes: Partial<Omit<Opportunity, "id" | "createdAt" | "updatedAt">>, expectedUpdatedAt?: Date) { const old = await this.findById(id); if (!old) throw new NotFoundError("Oportunidad"); if (expectedUpdatedAt && old.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw new ConflictError("La oportunidad ha cambiado. Actualiza los datos antes de guardar."); const next = { ...old, ...changes, updatedAt: new Date(Math.max(Date.now(), old.updatedAt.getTime() + 1)) }; this.items[this.items.indexOf(old)] = next; return next; }
 }
 
 export class InMemoryCatalogRepository implements ICatalogRepository {

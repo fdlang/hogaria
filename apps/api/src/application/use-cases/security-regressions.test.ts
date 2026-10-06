@@ -106,10 +106,10 @@ describe("Security and integrity regressions", () => {
     const service = new OpportunityUseCases(users, repository, events);
     const fechaVisita = new Date("2026-10-01");
     const item = await service.create(admin.id, { clienteId: client.id, nombre: "Obra", direccion: "Madrid", tipo: "Reforma", fechaVisita }, ctx);
-    const updated = await service.update(admin.id, item.id, { nombre: "Updated", clienteId: undefined, fechaVisita: undefined } as never);
+    const updated = await service.update(admin.id, item.id, { nombre: "Updated", clienteId: undefined, fechaVisita: undefined } as never, item.updatedAt);
     expect(updated.clienteId).toBe(client.id);
     expect(updated.fechaVisita).toEqual(fechaVisita);
-    await expect(service.update(admin.id, item.id, { clienteId: admin.id })).rejects.toThrow();
+    await expect(service.update(admin.id, item.id, { clienteId: admin.id }, updated.updatedAt)).rejects.toThrow();
   });
   it("checks project access before deleting an owned upload", async () => {
     const { users, client } = await setup();

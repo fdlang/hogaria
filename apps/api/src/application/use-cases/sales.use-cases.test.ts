@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Email } from "@reformapro/domain/value-objects";
-import { ForbiddenError, NotFoundError } from "@reformapro/domain/errors";
+import { ConflictError, ForbiddenError, NotFoundError } from "@reformapro/domain/errors";
 import { InMemoryUserRepository, InMemoryProjectRepository, InMemoryOpportunityRepository, InMemoryEstimateRepository, InMemoryChangeOrderRepository } from "../../infrastructure/database/inMemoryRepositories.js";
 import { InMemoryEventEmitter } from "../../infrastructure/events/inMemoryEventEmitter.js";
 import { ChangeOrderUseCases, EstimateUseCases, OpportunityUseCases } from "./sales.use-cases.js";
@@ -314,9 +314,9 @@ describe("OpportunityUseCases — governed pipeline", () => {
     const service = new OpportunityUseCases(users, opportunities, new InMemoryEventEmitter());
     const opportunity = await service.create(admin.id, { clienteId: null, nombre: "Obra", direccion: "Madrid", tipo: "Integral" }, { ip: "test", userAgent: "test" });
 
-    await expect(service.update(admin.id, opportunity.id, { email: "invalid" })).rejects.toThrow();
-    await expect(service.update(admin.id, opportunity.id, { telefono: "123" })).rejects.toThrow("Teléfono");
-    await service.update(admin.id, opportunity.id, { email: "  cliente@hogaria.test ", telefono: " +34 614 786 341 " });
+    await expect(service.update(admin.id, opportunity.id, { email: "invalid" }, opportunity.updatedAt)).rejects.toThrow();
+    await expect(service.update(admin.id, opportunity.id, { telefono: "123" }, opportunity.updatedAt)).rejects.toThrow("Teléfono");
+    await service.update(admin.id, opportunity.id, { email: "  cliente@hogaria.test ", telefono: " +34 614 786 341 " }, opportunity.updatedAt);
     expect(await opportunities.findById(opportunity.id)).toMatchObject({ email: "cliente@hogaria.test", telefono: "+34 614 786 341" });
   });
   it("accepts only forward commercial transitions and keeps terminal states closed", async () => {
@@ -326,10 +326,39 @@ describe("OpportunityUseCases — governed pipeline", () => {
     const service = new OpportunityUseCases(users, opportunities, new InMemoryEventEmitter());
     const opportunity = await service.create(admin.id, { clienteId: null, nombre: "Reforma", email: null, telefono: null, direccion: "Madrid", tipo: "Integral", descripcion: "", estado: "nueva", fechaVisita: null, notasInternas: "" }, { ip: "test", userAgent: "test" });
 
-    await expect(service.update(admin.id, opportunity.id, { estado: "ganada" })).rejects.toThrow("Transición");
-    await service.update(admin.id, opportunity.id, { estado: "contactada" });
-    await service.update(admin.id, opportunity.id, { estado: "en_estudio" });
-    await expect(service.update(admin.id, opportunity.id, { estado: "ganada" })).rejects.toThrow("conversión");
+    await expect(service.update(admin.id, opportunity.id, { estado: "ganada" }, opportunity.updatedAt)).rejects.toThrow("Transición");
+    const contacted = await service.update(admin.id, opportunity.id, { estado: "contactada" }, opportunity.updatedAt);
+    const inStudy = await service.update(admin.id, opportunity.id, { estado: "en_estudio" }, contacted.updatedAt);
+    await expect(service.update(admin.id, opportunity.id, { estado: "ganada" }, inStudy.updatedAt)).rejects.toThrow("conversión");
+  });
+
+  it("rejects a stale edit instead of overwriting a concurrent change", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("concurrency@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const opportunities = new InMemoryOpportunityRepository();
+    const service = new OpportunityUseCases(users, opportunities, new InMemoryEventEmitter());
+    const original = await service.create(admin.id, { clienteId: null, nombre: "Obra", direccion: "Madrid", tipo: "Integral" }, { ip: "test", userAgent: "test" });
+
+    await opportunities.update(original.id, { nombre: "Edición concurrente" }, original.updatedAt);
+
+    await expect(service.update(admin.id, original.id, { direccion: "Barcelona" }, original.updatedAt)).rejects.toBeInstanceOf(ConflictError);
+    expect(await opportunities.findById(original.id)).toMatchObject({ nombre: "Edición concurrente", direccion: "Madrid" });
+  });
+
+  it("paginates and filters opportunities on the server", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const admin = await users.save({ id: 0, email: Email.of("pagination@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const opportunities = new InMemoryOpportunityRepository();
+    const service = new OpportunityUseCases(users, opportunities, new InMemoryEventEmitter());
+    for (let index = 0; index < 25; index += 1) {
+      await opportunities.save({ clienteId: null, nombre: `Obra ${index}`, email: null, telefono: null, direccion: index % 2 ? "Madrid" : "Toledo", tipo: "Integral", descripcion: "", estado: index < 15 ? "nueva" : "contactada", fechaVisita: null, notasInternas: "" });
+    }
+
+    const result = await service.listPage(admin.id, { page: 2, limit: 5, search: "madrid", status: "nueva" });
+
+    expect(result).toMatchObject({ total: 7, page: 2, limit: 5, pages: 2 });
+    expect(result.items).toHaveLength(2);
+    expect(result.items.every(item => item.estado === "nueva" && item.direccion === "Madrid")).toBe(true);
   });
 
   it("does not create proposals for a terminal opportunity", async () => {

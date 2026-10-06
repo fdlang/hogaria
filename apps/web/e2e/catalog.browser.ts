@@ -13,7 +13,7 @@ async function setup(page: Page, state: { fail: boolean; items: typeof item[]; g
       ? { id: 1, nombre: "Admin", rol: "admin", activo: true, email: "admin@test.invalid" }
       : path === "/api/users" ? [{ id: 2, nombre: "Cliente", rol: "cliente", activo: true }]
       : path === "/api/opportunities" && route.request().method() === "POST" ? { id: 1 }
-      : path === "/api/opportunities" ? [{ id: 1, nombre: "Reforma prueba", direccion: "Dirección de prueba" }]
+      : path === "/api/opportunities" ? { items: [{ id: 1, nombre: "Reforma prueba", direccion: "Dirección de prueba", updatedAt: "2026-10-07T10:00:00.000Z" }], total: 1, page: 1, limit: 20, pages: 1 }
       : [] });
   });
 }

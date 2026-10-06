@@ -5,11 +5,16 @@ for (const width of [390, 768, 1024, 1440, 1920]) {
   test("navigation and dashboard share groups at " + width, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 });
     await page.addInitScript(() => sessionStorage.setItem("rp_token", "test-token"));
-    await page.route("**/api/**", route => route.fulfill({
-      json: new URL(route.request().url()).pathname === "/api/auth/me"
-        ? { id: 1, nombre: "Prueba", email: "admin@test.invalid", rol: "admin", activo: true }
-        : [],
-    }));
+    await page.route("**/api/**", route => {
+      const path = new URL(route.request().url()).pathname;
+      return route.fulfill({
+        json: path === "/api/auth/me"
+          ? { id: 1, nombre: "Prueba", email: "admin@test.invalid", rol: "admin", activo: true }
+          : path === "/api/opportunities"
+            ? { items: [], total: 0, page: 1, limit: 20, pages: 1 }
+            : [],
+      });
+    });
     await page.goto("/admin");
     await expect(page.getByRole("heading", { name: "Panel de administración" })).toBeVisible();
     await expect(page.locator(".admin-home__hero")).toBeVisible();

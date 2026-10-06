@@ -2,6 +2,7 @@ import { ApiClient } from "@/shared/lib/api-client";
 import { ApiContractError, isRecord } from "@/shared/lib/contracts";
 
 export type OpportunityDTO = { id: number; clienteId: number | null; nombre: string; email: string | null; telefono: string | null; direccion: string; tipo: string; descripcion: string; estado: string; fechaVisita: string | null; notasInternas: string; createdAt: string; updatedAt: string };
+export type OpportunityPageDTO = { items: OpportunityDTO[]; total: number; page: number; limit: number; pages: number };
 export type EstimateLineDTO = { id: string; categoria: string; descripcion: string; cantidad: number; unidad: string; precioVentaUnitario: number; costeUnitario: number | null; descuento: number; iva: number; notaCliente?: string; notaInterna?: string };
 export type EstimateDraftDTO = { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; notasInternas: string; partidas: EstimateLineDTO[] };
 export type PublicEstimateLineDTO = Pick<EstimateLineDTO, "id" | "categoria" | "descripcion" | "cantidad" | "unidad" | "precioVentaUnitario" | "descuento" | "iva" | "notaCliente">;
@@ -29,7 +30,12 @@ export class SalesApi {
 
   constructor(private readonly http: ApiClient) {}
   opportunities() { return this.http.get<OpportunityDTO[]>("/opportunities"); }
-  updateOpportunity(id: number, input: Partial<OpportunityDTO>) { return this.http.patch<OpportunityDTO>(`/opportunities/${id}`, input); }
+  opportunity(id: number) { return this.http.get<OpportunityDTO>(`/opportunities/${id}`); }
+  opportunityPage(query: { page: number; limit?: number; search?: string; status?: string }) {
+    const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit ?? 20), search: query.search ?? "", status: query.status ?? "" });
+    return this.http.get<OpportunityPageDTO>(`/opportunities?${params.toString()}`);
+  }
+  updateOpportunity(id: number, input: Partial<OpportunityDTO>, expectedUpdatedAt: string) { return this.http.patch<OpportunityDTO>(`/opportunities/${id}`, { ...input, expectedUpdatedAt }); }
   catalog() { return this.http.get<CatalogItemDTO[]>("/catalog"); }
   adminCatalog() { return this.http.get<CatalogItemDTO[]>("/catalog?includeInactive=true"); }
   createCatalogItem(input: Omit<CatalogItemDTO, "id" | "active" | "updatedAt">) { return this.http.post<CatalogItemDTO>("/catalog", input); }

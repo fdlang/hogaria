@@ -116,6 +116,7 @@ function getRuntime(): Promise<Runtime> {
   route("PATCH", "/catalog/:id",         req => catalog.update(req as never), { protected: true }),
   route("DELETE","/catalog/:id",         req => catalog.archive(req as never), { protected: true }),
   route("GET",   "/opportunities",       req => sales.listOpportunities(req as never), { protected: true }),
+  route("GET",   "/opportunities/:id",   req => sales.getOpportunity(req as never), { protected: true }),
   route("POST", "/projects/:projectId/change-orders/:id/transition", req => sales.transitionChange(req as never), { protected: true }),
   route("PATCH", "/projects/:projectId/change-orders/:id", req => sales.editChange(req as never), { protected: true }),
   route("POST", "/solicitudes/:id/opportunity", req => sales.convertSolicitud(req as never), { protected: true }),

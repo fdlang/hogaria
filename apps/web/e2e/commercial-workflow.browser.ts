@@ -15,7 +15,7 @@ test("request conversion opens an existing opportunity without creating a duplic
   await page.route("**/api/solicitudes?*", route => route.fulfill({json:{items:[{id:3,nombre:"Solicitud prueba",email:"cliente@test.es",telefono:"614786341",tipo:"Baño",descripcion:"Reforma del baño completo",estado:"pendiente",fecha:"2026-09-01",ip:"127.0.0.1"}],total:1,page:1,limit:20,pages:1}}));
   let converted = false;
   await page.route("**/api/solicitudes/3/opportunity", route => { converted = true; expect(route.request().postDataJSON()).toEqual({direccion:"Calle Madrid 1"}); return route.fulfill({json:{id:9}}); });
-  await page.route("**/api/opportunities", route => route.fulfill({json:[{id:9,clienteId:null,nombre:"Solicitud prueba",direccion:"Calle Madrid 1",tipo:"Baño",descripcion:"Reforma del baño completo"}]}));
+  await page.route("**/api/opportunities*", route => route.fulfill({json:{items:[{id:9,clienteId:null,nombre:"Solicitud prueba",direccion:"Calle Madrid 1",tipo:"Baño",descripcion:"Reforma del baño completo",updatedAt:"2026-10-07T10:00:00.000Z"}],total:1,page:1,limit:20,pages:1}}));
   await page.goto("/admin/solicitudes");
   await page.getByRole("button",{name:"Ver",exact:true}).click();
   await page.getByLabel("Dirección de la obra").fill("Calle Madrid 1");
@@ -23,6 +23,34 @@ test("request conversion opens an existing opportunity without creating a duplic
   await expect(page.getByRole("textbox",{name:"Nombre de la oportunidad *",exact:true})).toHaveValue("Solicitud prueba");
   await expect(page.getByRole("textbox",{name:"Dirección *",exact:true})).toHaveValue("Calle Madrid 1");
   expect(converted).toBe(true);
+});
+test("admin searches paginated opportunities and preserves the edited version", async ({page}) => {
+  await authenticated(page,"admin");
+  const revision = "2026-10-07T10:00:00.000Z";
+  const item = {id:22,clienteId:2,nombre:"Cocina",email:null,telefono:null,direccion:"Calle Mayor 2",tipo:"Integral",descripcion:"Reforma",estado:"nueva",fechaVisita:null,notasInternas:"",createdAt:revision,updatedAt:revision};
+  await page.route("**/api/users**", route => route.fulfill({json:[{id:2,nombre:"Cliente",email:"cliente@test.es",rol:"cliente",activo:true,createdAt:revision}]}));
+  await page.route("**/api/estimates**", route => route.fulfill({json:[]}));
+  await page.route("**/api/catalog", route => route.fulfill({json:[]}));
+  await page.route("**/api/opportunities**", route => {
+    const url = new URL(route.request().url());
+    const matches = url.searchParams.get("search") === "cocina";
+    return route.fulfill({json:{items:matches?[item]:[],total:matches?1:0,page:1,limit:20,pages:1}});
+  });
+  let updateBody: Record<string, unknown> | null = null;
+  await page.route("**/api/opportunities/22", route => {
+    updateBody = route.request().postDataJSON() as Record<string, unknown>;
+    return route.fulfill({json:{...item,nombre:String(updateBody.nombre)}});
+  });
+
+  await page.goto("/admin/budgets");
+  await page.getByRole("button",{name:"Nuevo presupuesto"}).click();
+  await page.getByLabel("Buscar oportunidad").fill("cocina");
+  await expect(page.getByText("1 oportunidades · página 1 de 1")).toBeVisible();
+  await page.getByLabel("Continuar una oportunidad existente").selectOption("22");
+  await page.getByLabel("Nombre de la oportunidad *",{exact:true}).fill("Cocina actualizada");
+  await page.getByRole("button",{name:"Continuar",exact:true}).click();
+
+  expect(updateBody).toMatchObject({nombre:"Cocina actualizada",expectedUpdatedAt:revision});
 });
 test("client can inspect and download a published historical version", async ({page}) => {
   await authenticated(page,"cliente");
