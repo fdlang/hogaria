@@ -99,7 +99,7 @@ npm run preflight:database
 | `EMAIL_FROM` | Remitente verificado en Resend, p. ej. `Hogaria <info@hogaria.design>`. |
 | `APP_URL` | URL pública, p. ej. `https://www.hogaria.design`. |
 | `BLOB_READ_WRITE_TOKEN` | Acceso al almacén privado de documentos. |
-| `CLIENT_NOTIFICATIONS_ENABLED` | Activa los avisos transaccionales al cliente (`true`/`false`). |
+| `CLIENT_NOTIFICATIONS_ENABLED` | Activa el correo de los avisos transaccionales por rol (`true`/`false`); la campana permanece disponible. |
 | `CRON_SECRET` | Secreto de al menos 32 caracteres usado por el cron de Vercel. |
 | `NOTIFICATION_RETRY_SECRET` | Secreto alternativo de al menos 32 caracteres, distinto del cron. |
 | `HMAC_SECRET` | Secreto de al menos 32 caracteres exclusivo para sesiones. Obligatorio en producción. |
@@ -173,10 +173,10 @@ El listado permite buscar, filtrar por estado y recorrer páginas de 20
 resultados sin exponer una página siguiente vacía. Las propuestas publicadas
 se pueden descargar en PDF. No se envían documentos por correo.
 Los importes admiten como máximo dos decimales; cada línea y su IVA se redondean
-a céntimos antes de acumular el total. Los avisos automáticos informan de
-novedades sin adjuntar documentos y solo se envían cuando
-`CLIENT_NOTIFICATIONS_ENABLED=true`; los fallidos quedan en cola para el cron
-diario configurado en `vercel.json`.
+a céntimos antes de acumular el total. Los avisos automáticos se conservan en la
+campana del destinatario y, con `CLIENT_NOTIFICATIONS_ENABLED=true`, también se
+envían por correo sin adjuntar documentos; cada canal mantiene su propio estado
+y los fallidos quedan en cola para el cron configurado.
 
 ## Fiabilidad del frontend
 

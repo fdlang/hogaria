@@ -8,6 +8,7 @@ describe("versioned migration runner", () => {
       "migrate-sales-signature.sql",
       "migrate-account-activation.sql",
       "migrate-catalog.sql",
+      "app-notifications.sql",
     ]));
   });
 

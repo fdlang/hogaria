@@ -153,10 +153,10 @@ export const BUSINESS_RULES = [
     implementation: ["packages/domain/src/value-objects/index.ts", "apps/api/src/application/use-cases/estimate-validation.ts", "apps/api/src/application/use-cases/project-validation.ts"], tests: ["apps/api/src/application/use-cases/audit-regressions.test.ts", "apps/api/src/application/use-cases/work-tracking.use-cases.test.ts"],
   },
   {
-    id: "HOG-NTF-001", description: "Los cambios relevantes para el cliente generan notificación, salvo contenido reservado o acciones del propio cliente.", origin: "business", owner: "operaciones",
-    assumption: "El correo es el canal suficiente para avisos no urgentes y el área privada conserva la fuente de verdad.", validScale: "Volumen moderado con reintentos por lotes; requiere preferencias y digestos al aumentar frecuencia.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
-    metrics: [metric("notification_delivery_rate", "Notificaciones entregadas frente a encoladas", "database"), metric("notification_retry_rate", "Reintentos por notificación", "database")],
-    implementation: ["apps/api/src/application/notifications/client-notifications.ts", "apps/api/database/notification-outbox.sql"], tests: ["apps/api/src/application/notifications/client-notifications.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
+    id: "HOG-NTF-001", description: "Los cambios relevantes generan un aviso persistente y un correo al rol afectado, salvo contenido reservado o acciones del propio usuario.", origin: "business", owner: "operaciones",
+    assumption: "La campana y el correo son canales independientes derivados de un evento duradero; solo se avisa cuando existe una acción o información útil para el destinatario.", validScale: "Miles de usuarios y eventos con entrega por lotes; requiere preferencias y resúmenes antes de elevar sustancialmente la frecuencia.", validFrom: "2026-10-07", validUntil: null, nextReview: "2027-01-07",
+    metrics: [metric("notification_channel_delivery_rate", "Entregas aceptadas por canal frente a encoladas", "database"), metric("notification_read_rate", "Avisos leídos frente a visibles", "database"), metric("notification_deduplication_rate", "Eventos duplicados descartados", "database")],
+    implementation: ["packages/domain/src/notifications.ts", "apps/api/src/application/notifications/user-notifications.ts", "apps/api/database/app-notifications.sql"], tests: ["packages/domain/src/notifications.test.ts", "apps/api/src/application/notifications/user-notifications.test.ts"],
   },
   {
     id: "HOG-SEC-004", description: "Cerrar sesión o cambiar contraseña, rol o activación revoca todas las sesiones emitidas anteriormente.", origin: "security", owner: "seguridad",

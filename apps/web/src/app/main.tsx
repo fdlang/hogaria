@@ -22,6 +22,7 @@ import { WorkApi } from "@/features/work/work.api";
 import { NotificationsProvider } from "@/shared/ui/notifications";
 import { ConfirmProvider } from "@/shared/ui/confirm";
 import { ErrorBoundary } from "@/shared/ui/error-boundary";
+import { UserNotificationsApi } from "@/features/notifications/api/notifications.api";
 
 // 1) Transport layer — single instance, shared across features
 //    Forward-declare authStore so onUnauthorized can reference it
@@ -47,6 +48,7 @@ const apis = {
   solicitudes:      new SolicitudesApi(api),
   adminSolicitudes: new AdminSolicitudesApi(api),
   sales:            new SalesApi(api),
+  notifications:    new UserNotificationsApi(api),
 };
 
 // 4) Restore session on boot (best-effort; failures silently sign out)

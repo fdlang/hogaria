@@ -23,6 +23,8 @@ import { NavigationIcon, type NavigationIconName } from "./NavigationIcon";
 import { DesktopNavigation } from "./DesktopNavigation";
 import { adminNavigation, navigationFor, isNavigationActive } from "./navigation";
 import { Button, EmptyState }          from "@/shared/ui";
+import type { UserNotificationsApi } from "@/features/notifications/api/notifications.api";
+import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 
 const WorkPage = lazy(() => import("@/features/work/WorkPage").then(module => ({ default: module.WorkPage })));
 const AdminSolicitudes = lazy(() => import("@/features/solicitudes/components/AdminSolicitudes").then(module => ({ default: module.AdminSolicitudes })));
@@ -48,6 +50,7 @@ interface AllApis {
   solicitudes:      SolicitudesApi;
   adminSolicitudes: AdminSolicitudesApi;
   sales:            SalesApi;
+  notifications:    UserNotificationsApi;
 }
 
 export function App({ apis }: { apis: AllApis }) {
@@ -99,7 +102,7 @@ export function App({ apis }: { apis: AllApis }) {
   return (
     <div className={user ? `app-shell app-shell--private app-shell--${user.rol}` : "app-shell"} style={{ minHeight: "100vh", background: "var(--marble-light)", color: "var(--ink)" }}>
       <Router routes={routes} fallback={fallback} layout={(content) => <>
-        {user && <TopBar user={user} onSignOut={signOut} />}
+        {user && <TopBar user={user} onSignOut={signOut} notifications={apis.notifications} />}
         <main className={user ? `private-main private-main--${user.rol}` : undefined} style={user ? { maxWidth: 1200, margin: "0 auto", padding: 32 } : undefined}>
           <Suspense fallback={<p role="status" aria-live="polite">Cargando sección…</p>}>
             {content}
@@ -114,7 +117,7 @@ export function App({ apis }: { apis: AllApis }) {
 // TopBar — role-aware navigation
 // ─────────────────────────────────────────────────────────────
 
-function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "cliente" | "profesional" } | null; onSignOut: () => void | Promise<void> }) {
+function TopBar({ user, onSignOut, notifications }: { user: { nombre: string; rol: "admin" | "cliente" | "profesional" } | null; onSignOut: () => void | Promise<void>; notifications: UserNotificationsApi }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLElement>(null);
@@ -176,6 +179,7 @@ function TopBar({ user, onSignOut }: { user: { nombre: string; rol: "admin" | "c
           <span className="private-mobile-menu-icon" aria-hidden="true"><span /><span /><span /></span>
         </button>
         <DesktopNavigation groups={groups} currentPath={currentPath} grouped={user.rol === "admin"} />
+        <NotificationBell api={notifications} role={user.rol} navigate={navigate}/>
         <div className="private-account" aria-label="Cuenta">
           <span title={user.nombre}>{user.nombre}</span>
           <Button small variant="ghost" onClick={() => void handleSignOut()}>Salir</Button>

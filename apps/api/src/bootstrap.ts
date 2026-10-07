@@ -45,6 +45,9 @@ import { PdfEstimateRenderer } from "./infrastructure/documents/estimatePdf.js";
 import { ClientNotifications } from "./application/notifications/client-notifications.js";
 import { PostgresNoticeStore, MemoryNoticeStore } from "./infrastructure/database/clientNoticeStore.js";
 import { ResendClientNotifications } from "./infrastructure/email/resendClientNotifications.js";
+import { UserNotifications } from "./application/notifications/user-notifications.js";
+import { MemoryUserNotificationStore, PostgresUserNotificationStore } from "./infrastructure/database/userNotificationStore.js";
+import { ResendUserNotifications } from "./infrastructure/email/resendUserNotifications.js";
 import { MemoryWorkStore } from "./infrastructure/database/memoryWorkStore.js";
 import { PostgresWorkStore } from "./infrastructure/database/postgresWorkStore.js";
 import { AccountActivationUseCases, configureActivationPasswordHasher, IActivationTokenRepository } from "./application/use-cases/account-activation.use-cases.js";
@@ -156,6 +159,7 @@ interface AppDependencies {
     work:                      WorkTrackingUseCases;
     estimateDocuments:         EstimateDocumentUseCases;
     notifications:             ClientNotifications;
+    userNotifications:         UserNotifications;
     professionalDocuments:     ProfessionalDocumentUseCases;
     retryPendingDeletions:     RetryPendingDeletionsUseCase;
   };
@@ -244,6 +248,11 @@ export async function buildApp(): Promise<AppDependencies> {
     pool ? new PostgresNoticeStore(pool) : new MemoryNoticeStore(),
     new ResendClientNotifications(process.env.RESEND_API_KEY, process.env.EMAIL_FROM, process.env.APP_URL));
   if (process.env.CLIENT_NOTIFICATIONS_ENABLED === "true") notifications.start(events, !!pool);
+  const userNotifications = new UserNotifications(
+    users, projects, estimates, files,
+    pool ? new PostgresUserNotificationStore(pool) : new MemoryUserNotificationStore(),
+    new ResendUserNotifications(process.env.CLIENT_NOTIFICATIONS_ENABLED === "true" ? process.env.RESEND_API_KEY : undefined, process.env.EMAIL_FROM, process.env.APP_URL),
+  );
 
   // ── Use cases ──────────────────────────────────────────────────
   const workStore = pool ? new PostgresWorkStore(pool) : new MemoryWorkStore();
@@ -251,6 +260,7 @@ export async function buildApp(): Promise<AppDependencies> {
   const useCases = {
     login:                      new LoginUseCase(users, tokens, events, cooldown),
     notifications,
+    userNotifications,
     createUser:                 new CreateUserUseCase(users, hasher, generateTempPassword, events, activation),
     updateUser:                 new UpdateUserUseCase(users, events),
     deleteUser:                 new DeleteUserUseCase(users, events),

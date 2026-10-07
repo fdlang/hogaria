@@ -1,15 +1,12 @@
-- Estado: bloque técnico completado en la rama actual; pendiente de commit y despliegue.
-- Validación: typecheck y build correctos; 305 tests unitarios y 124 flujos Playwright en Chromium/WebKit.
-- Hecho: errores de acciones visibles dentro de sus modales, con foco y mensajes recuperables.
-- Hecho: expiración local según el plazo del servidor, redirección al acceso y limpieza de credenciales.
-- Hecho: timeout HTTP diferenciado para API y descargas; errores de red tipados.
-- Hecho: presupuestos paginados sin páginas vacías y contratos runtime para autenticación/listados.
-- Hecho: code splitting por rutas; bundle inicial aproximado de 203 kB (65 kB gzip).
-- Hecho: imágenes responsivas orientadas y comprimidas; vídeo con autoplay silencioso solo al entrar en pantalla.
-- Hecho: mejoras de accesibilidad en errores, campos, contraste, foco y estados del formulario público.
-- Hecho: oportunidades paginadas y filtradas en servidor, con selección responsive y acceso directo seguro.
-- Hecho: concurrencia optimista en oportunidades; una edición obsoleta devuelve conflicto sin sobrescribir datos.
-- Hecho: paginación administrativa de presupuestos con anticipación fiable y sin páginas vacías.
-- Operación: la barrera del build de Production valida secretos críticos sin imprimirlos.
+- Estado: centro de notificaciones multicanal terminado en la rama actual; pendiente de commit, migración y despliegue.
+- Hecho: campana persistente por usuario con contador, histórico paginado, lectura individual/global y actualización periódica.
+- Hecho: una política de dominio decide destinatarios por rol y excluye al actor, datos reservados y áreas ajenas.
+- Hecho: outbox transaccional; la campana y el correo tienen estados, reintentos e idempotencia independientes.
+- Hecho: eventos cubiertos para solicitudes, presupuestos, obras, documentos, órdenes de cambio y jornadas.
+- Hecho: enlaces construidos en cliente desde rutas cerradas por rol; la API no entrega URL ni texto arbitrario.
+- Hecho: la cola antigua queda solo para confirmaciones externas ya existentes, sin duplicar nuevos avisos de cuenta.
+- Validación: typecheck, 312 tests, build y 10 pruebas responsive de navegación en Chromium/WebKit correctos.
+- Operación: ejecutar la migración versionada `app-notifications.sql` antes de desplegar esta versión.
+- Operación: `CLIENT_NOTIFICATIONS_ENABLED=true` activa correo; la campana funciona aunque el correo esté desactivado.
 - Compatibilidad temporal: retirar `SIGNATURE_HMAC_LEGACY_V2_USE_SESSION_KEY` cuando no queden firmas v2.
-- Pendiente gestor/DPD: validar política fiscal y retención de IP, user-agent y auditoría.
+- Pendiente gestor/DPD: identidad fiscal, política fiscal y retención de IP, user-agent y auditoría.

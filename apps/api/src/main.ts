@@ -27,6 +27,7 @@ import { estimateDocumentController } from "./interfaces/http/estimateDocumentCo
 import { toHttpError } from "./interfaces/http/errorMiddleware.js";
 import { ValidationError } from "@reformapro/domain/errors";
 import { notificationRetryController } from "./interfaces/http/notificationRetryController.js";
+import { userNotificationController } from "./interfaces/http/userNotificationController.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
@@ -54,6 +55,7 @@ function route(method: string, path: string, handler: Handler, opts: { protected
 interface Runtime {
   routes: Route[];
   authMiddleware: ReturnType<typeof requireAuth>;
+  flushNotifications: () => Promise<void>;
 }
 
 let runtimePromise: Promise<Runtime> | null = null;
@@ -87,8 +89,9 @@ function getRuntime(): Promise<Runtime> {
     const catalog = catalogController({ catalog: app.useCases.catalog });
     const work = workController(app.useCases.work);
     const documents = estimateDocumentController(app.useCases.estimateDocuments);
+    const userNotifications = userNotificationController(app.useCases.userNotifications);
 
-    return { authMiddleware: requireAuth(app.tokens, app.users), routes: [
+    return { authMiddleware: requireAuth(app.tokens, app.users), flushNotifications: async()=>{await app.useCases.userNotifications.retry(1);}, routes: [
   route("GET", "/work/current", work.current, { protected: true }),
   route("GET", "/work/audit", work.audit, { protected: true }),
   route("GET", "/work/entries", work.list, { protected: true }),
@@ -108,9 +111,17 @@ function getRuntime(): Promise<Runtime> {
 
   // Commercial pipeline: opportunity -> versioned estimate -> project.
   route("GET", "/estimates/:id/pdf", documents.pdf, { protected:true }),
-  route("GET", "/internal/notifications/retry", notificationRetryController(app.useCases.notifications,
+  route("GET", "/internal/notifications/retry", notificationRetryController({retry:async()=>{
+      const legacy=await app.useCases.notifications.retry();
+      const current=await app.useCases.userNotifications.retry();
+      return {processed:legacy.processed+current.events+current.emails,configured:legacy.configured||current.configured};
+    }},
     () => ({secret:process.env.CRON_SECRET,retrySecret:process.env.NOTIFICATION_RETRY_SECRET,enabled:process.env.CLIENT_NOTIFICATIONS_ENABLED==="true"}),
     app.useCases.retryPendingDeletions)),
+  route("GET", "/notifications", req => userNotifications.list(req as never), { protected:true }),
+  route("GET", "/notifications/unread-count", req => userNotifications.unread(req as never), { protected:true }),
+  route("POST", "/notifications/read-all", req => userNotifications.readAll(req as never), { protected:true }),
+  route("POST", "/notifications/:id/read", req => userNotifications.read(req as never), { protected:true }),
   route("GET",   "/catalog",             req => catalog.list(req as never), { protected: true }),
   route("POST",  "/catalog",             req => catalog.create(req as never), { protected: true }),
   route("PATCH", "/catalog/:id",         req => catalog.update(req as never), { protected: true }),
@@ -200,7 +211,7 @@ export async function apiHandler(req: IncomingMessage, res: ServerResponse): Pro
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
     if (req.method === "OPTIONS") { res.writeHead(204).end(); return; }
 
-    const { routes, authMiddleware } = await getRuntime();
+    const { routes, authMiddleware, flushNotifications } = await getRuntime();
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
     // Vercel forwards requests through /api/:path*. Local development may call
     // the API directly, so normalize both forms before route matching.
@@ -238,6 +249,9 @@ export async function apiHandler(req: IncomingMessage, res: ServerResponse): Pro
     if (match.protected || pathname.startsWith("/auth/")) res.setHeader("Cache-Control", "private, no-store");
 
     const result = await requestAudit.run({ actorId: httpReq.actorId ?? 0, ip: httpReq.ip, userAgent: String(httpReq.headers["user-agent"] ?? "unknown") }, () => match.handler(httpReq));
+    if (req.method !== "GET" && result.status < 400 && !pathname.startsWith("/notifications/")) {
+      await flushNotifications().catch(() => console.error("APP_NOTIFICATION_FAST_PATH_FAILED"));
+    }
     const headers = result.headers ?? {};
     if (result.body instanceof Uint8Array) {
       res.writeHead(result.status, headers).end(result.body as unknown as string);

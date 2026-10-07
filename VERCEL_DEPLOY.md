@@ -39,7 +39,7 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
      sólo para crear el primer administrador.
    - `VITE_API_URL`: opcional. Déjalo vacío para usar `/api` en el mismo dominio.
    - `BLOB_READ_WRITE_TOKEN`: obligatorio para documentos privados.
-   - `CLIENT_NOTIFICATIONS_ENABLED`: `true` para activar avisos de cuenta.
+   - `CLIENT_NOTIFICATIONS_ENABLED`: `true` para activar el correo de los avisos por rol; la campana no depende de este interruptor.
    - `CRON_SECRET`: secreto aleatorio de al menos 32 caracteres usado por el cron de Vercel.
    - `NOTIFICATION_RETRY_SECRET`: secreto alternativo de al menos 32 caracteres, distinto del cron, si se usa el workflow de GitHub.
    - `VITE_EMAILJS_SERVICE_ID`, `VITE_EMAILJS_AUTOREPLY_TEMPLATE_ID` y
@@ -55,10 +55,10 @@ las tarifas históricas por profesional y comprueba entrada, pausa, salida,
 aprobación y costes con cuentas de prueba. No borres datos históricos para
 repetir la migración.
 
-Antes de activar los avisos de cuenta, configura Resend, `APP_URL` con HTTPS y
+Antes de activar el correo de los avisos, configura Resend, `APP_URL` con HTTPS y
 el secreto del cron; después establece `CLIENT_NOTIFICATIONS_ENABLED=true`.
-Los presupuestos solo se descargan: los avisos no adjuntan PDF. El cron diario
-reintenta los avisos pendientes.
+Los presupuestos solo se descargan: los avisos no adjuntan PDF. El cron
+reintenta de forma independiente los eventos y correos pendientes.
 
 ## Publicación y verificación
 
