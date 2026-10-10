@@ -101,6 +101,12 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/sales.use-cases.ts"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
   },
   {
+    id: "HOG-EST-005", description: "Cada presupuesto nuevo recibe una referencia compacta, legible y técnicamente única sin alterar referencias históricas.", origin: "technical", owner: "comercial",
+    assumption: "Una referencia de 22 caracteres con año y 64 bits aleatorios equilibra legibilidad y unicidad sin exponer el volumen comercial.", validScale: "Hasta un millón de presupuestos con restricción única en base de datos; revisar si se exige numeración secuencial externa.", validFrom: "2026-10-10", validUntil: null, nextReview: "2027-01-10",
+    metrics: [metric("estimate_reference_collision_count", "Colisiones de referencia rechazadas por la base de datos", "database"), metric("estimate_reference_manual_correction_rate", "Referencias corregidas manualmente")],
+    implementation: ["packages/domain/src/estimate-reference.ts", "apps/api/src/application/use-cases/sales.use-cases.ts"], tests: ["packages/domain/src/estimate-reference.test.ts", "apps/api/src/application/use-cases/sales.use-cases.test.ts"],
+  },
+  {
     id: "HOG-PRJ-001", description: "Los proyectos avanzan por transiciones de estado permitidas y solo finalizan al 100 %.", origin: "business", owner: "operaciones",
     assumption: "Planificación, curso, pausa y finalización describen todo el ciclo de obra.", validScale: "Obras sin fases contractuales independientes ni reapertura posterior al cierre.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("project_transition_denial_rate", "Transiciones de estado rechazadas", "audit_log"), metric("project_reopen_requests", "Solicitudes manuales de reapertura")],

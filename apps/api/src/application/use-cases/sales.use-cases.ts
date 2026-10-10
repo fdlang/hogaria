@@ -27,7 +27,7 @@ import {
 import { validateDraft } from "./estimate-validation.js";
 import type { ClientContext } from "./auth.use-cases.js";
 import type { ISolicitudRepository, ICooldownGate } from "./solicitud.use-cases.js";
-import { ABUSE_LIMITS, canTransitionOpportunity, isOpenOpportunity } from "@reformapro/domain";
+import { ABUSE_LIMITS, canTransitionOpportunity, createEstimateReference, isOpenOpportunity } from "@reformapro/domain";
 import type { ISignatureCrypto } from "../../infrastructure/crypto/crypto.service.js";
 import { calculateEstimateTotals, createFiscalSnapshot, isValidSpanishPhone } from "@reformapro/domain";
 
@@ -415,7 +415,7 @@ export class EstimateUseCases {
     assertAdmin(actor);
     validateDraft(draft);
     const now = new Date();
-    const number = `HOG-${now.getFullYear()}-${crypto.randomUUID()}`;
+    const number = createEstimateReference(now.getFullYear(), crypto.randomUUID());
     const saved = await this.transaction.execute(async ({ opportunities, estimates }) => {
       const opportunity = await opportunities.findById(opportunityId);
       if (!opportunity) throw new NotFoundError("Oportunidad");

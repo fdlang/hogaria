@@ -379,8 +379,10 @@ describe("OpportunityUseCases — governed pipeline", () => {
     const opportunity = await opportunities.save({ clienteId: client.id, nombre: "Nueva", email: null, telefono: null, direccion: "Madrid", tipo: "Integral", descripcion: "", estado: "nueva", fechaVisita: null, notasInternas: "" });
     const service = new EstimateUseCases(users, opportunities, new InMemoryEstimateRepository(), new InMemoryProjectRepository(), new InMemoryEventEmitter(), cryptoPort);
 
-    await service.create(admin.id, opportunity.id, draft, { ip: "test", userAgent: "test" });
+    const estimate = await service.create(admin.id, opportunity.id, draft, { ip: "test", userAgent: "test" });
 
     expect((await opportunities.findById(opportunity.id))?.estado).toBe("en_estudio");
+    expect(estimate.numero).toMatch(/^HOG-\d{4}-[0-9A-Z]{13}$/);
+    expect(estimate.numero).toHaveLength(22);
   });
 });
