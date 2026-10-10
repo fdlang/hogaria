@@ -17,7 +17,7 @@ export function estimateDocumentController(useCases: EstimateDocumentUseCases) {
         status: 200,
         headers: {
           "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="${result.filename}"`,
+          "Content-Disposition": `inline; filename="${result.filename}"`,
           "Cache-Control": "no-store",
         },
         body: result.bytes,

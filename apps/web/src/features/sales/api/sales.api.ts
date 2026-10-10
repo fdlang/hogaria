@@ -24,6 +24,13 @@ export const parseEstimateList = (value: unknown): EstimateDTO[] => {
   return value as EstimateDTO[];
 };
 
+const ensurePdf = (blob: Blob): Blob => {
+  if (blob.size === 0 || !blob.type.toLowerCase().startsWith("application/pdf")) {
+    throw new ApiContractError("el PDF del presupuesto");
+  }
+  return blob;
+};
+
 export class SalesApi {
   private readonly pdfCache = new Map<string, Blob>();
   private readonly pendingPdfs = new Map<string, Promise<Blob>>();
@@ -62,6 +69,7 @@ export class SalesApi {
       const pending = this.pendingPdfs.get(`fresh:${key}`);
       if (pending) return pending;
       const request = this.http.download(`/estimates/${id}/pdf?version=${version}`)
+        .then(ensurePdf)
         .finally(() => this.pendingPdfs.delete(`fresh:${key}`));
       this.pendingPdfs.set(`fresh:${key}`, request);
       return request;
@@ -76,6 +84,7 @@ export class SalesApi {
     if (pending) return pending;
 
     const request = this.http.download(`/estimates/${id}/pdf?version=${version}`)
+      .then(ensurePdf)
       .then(blob => {
         this.pdfCache.set(key, blob);
         while (this.pdfCache.size > 8) {

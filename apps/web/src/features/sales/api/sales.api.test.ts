@@ -66,9 +66,18 @@ describe("SalesApi", () => {
     expect(http.download).toHaveBeenCalledTimes(2);
   });
 
+  it("rejects an empty or non-PDF response instead of opening a blank preview", async () => {
+    const http = createHttp();
+    const api = new SalesApi(http);
+    vi.mocked(http.download).mockResolvedValueOnce(new Blob(["error"], { type: "application/json" }));
+    await expect(api.downloadPdf(7, 1, "invalid")).rejects.toThrow("PDF del presupuesto");
+    vi.mocked(http.download).mockResolvedValueOnce(new Blob([], { type: "application/pdf" }));
+    await expect(api.downloadPdf(7, 1, "empty")).rejects.toThrow("PDF del presupuesto");
+  });
+
   it("revalidates client PDF access after an in-flight request finishes", async () => {
     const http = createHttp();
-    vi.mocked(http.download).mockResolvedValue(new Blob(["pdf"]));
+    vi.mocked(http.download).mockResolvedValue(new Blob(["pdf"], { type: "application/pdf" }));
     const api = new SalesApi(http);
 
     const first = api.downloadPdf(7, 2, "revision", { reuse: false });
