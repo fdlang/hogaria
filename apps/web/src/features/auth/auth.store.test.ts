@@ -10,10 +10,11 @@ const user: AuthUser = {
   activo: true,
 };
 
-function createStorage(initialToken: string | null = null, initialExpiry: number | null = null) {
+function createStorage(initialToken: string | null = null, initialExpiry: number | null = null, salesDraft = false) {
   const values = new Map<string, string>();
   if (initialToken) values.set("rp_token", initialToken);
   if (initialExpiry !== null) values.set("rp_expires_at", String(initialExpiry));
+  if (salesDraft) values.set("hogaria_sales_draft", "sensitive-draft");
   return {
     getItem: vi.fn((key: string) => values.get(key) ?? null),
     setItem: vi.fn((key: string, value: string) => { values.set(key, value); }),
@@ -107,6 +108,19 @@ describe("AuthStore", () => {
     expect(api.setToken).toHaveBeenCalledWith(null);
     expect(storage.removeItem).toHaveBeenCalledWith("rp_token");
     expect(store.getState()).toMatchObject({ status: "unauthenticated", user: null });
+  });
+
+  it("removes the recoverable sales draft when the session ends", async () => {
+    const api = createApi();
+    const storage = createStorage("token", null, true);
+    const store = new AuthStore(api, storage);
+    vi.mocked(api.get).mockResolvedValue(user);
+    await store.restore();
+    vi.mocked(api.post).mockResolvedValue(undefined);
+
+    await store.signOut();
+
+    expect(storage.removeItem).toHaveBeenCalledWith("hogaria_sales_draft");
   });
 
   it("explains an expired session instead of failing silently", () => {

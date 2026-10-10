@@ -139,21 +139,24 @@ for (const state of ["borrador", "en_revision", "rechazado"]) {
     await fixture(page, "admin");
     let saved = false, revised = false;
     const draft = { ...proposal.propuesta, notasInternas: "Nota interna", partidas: proposal.propuesta.partidas.map(line => ({ ...line, costeUnitario: 30 })) };
-    await page.route("**/api/opportunities*", route => route.fulfill({ json: { items: [{ id: 4, clienteId: 2, nombre: "Obra", direccion: "Madrid", updatedAt: "2026-10-07T10:00:00.000Z" }], total: 1, page: 1, limit: 20, pages: 1 } }));
+    await page.route("**/api/opportunities*", route => {
+      const opportunity = { id: 4, clienteId: 2, nombre: "Obra", email: null, telefono: null, direccion: "Madrid", tipo: "Reforma", descripcion: "", estado: "en_estudio", fechaVisita: null, notasInternas: "", createdAt: "2026-10-07T09:00:00.000Z", updatedAt: "2026-10-07T10:00:00.000Z" };
+      return route.fulfill({ json: new URL(route.request().url()).pathname.endsWith("/4") ? opportunity : { items: [opportunity], total: 1, page: 1, limit: 20, pages: 1 } });
+    });
     await page.route("**/api/estimates?*", route => {
       expect(route.request().method()).toBe("GET");
       return route.fulfill({ json: [{ ...proposal, estado: state }] });
     });
-    await page.route("**/api/estimates/1/draft", route => route.fulfill({ json: { id: 1, oportunidadId: 4, estado: "borrador", borrador: draft } }));
+    await page.route("**/api/estimates/1/draft", route => route.fulfill({ json: { id: 1, oportunidadId: 4, estado: "borrador", borrador: draft, updatedAt: "2026-10-11T10:00:00.000Z" } }));
     await page.route("**/api/estimates/1/revise", route => {
       revised = true;
-      return route.fulfill({ json: { id: 1, oportunidadId: 4, estado: "en_revision", borrador: draft } });
+      return route.fulfill({ json: { id: 1, oportunidadId: 4, estado: "en_revision", borrador: draft, updatedAt: "2026-10-11T10:00:00.000Z" } });
     });
     await page.route("**/api/estimates/1", route => {
       expect(route.request().method()).toBe("PATCH");
       expect(route.request().postDataJSON().borrador.titulo).toBe("Título corregido");
       saved = true;
-      return route.fulfill({ json: { ...proposal, titulo: "Título corregido", estado: "borrador" } });
+      return route.fulfill({ json: { ...proposal, titulo: "Título corregido", estado: "borrador", updatedAt: "2026-10-11T10:00:00.001Z" } });
     });
     await page.reload();
     await page.getByRole("button", { name: "Mostrar propuestas" }).click();

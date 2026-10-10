@@ -124,6 +124,7 @@ export class AuthStore {
     this.expiryTimer = null;
     this.storage.removeItem("rp_token");
     this.storage.removeItem("rp_expires_at");
+    this.storage.removeItem("hogaria_sales_draft");
     this.api.setToken(null);
   }
 }

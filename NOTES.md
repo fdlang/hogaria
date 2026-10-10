@@ -1,15 +1,14 @@
-- Estado: migración de catálogo aplicada; corrección multiplataforma de checksums validada y pendiente de commit/push.
-- Hecho: gobernanza del catálogo pendiente/verificado/archivado e histórico inmutable.
-- Hecho: preflight de build comprueba esquema, firmas y catálogo operativo.
-- Hecho: instantáneas fiscales legacy, rate limit de login y límite Bcrypt corregidos.
-- Hecho: operaciones ya no esperan envío externo de correo.
-- Hecho: borrador comercial recuperable tras expirar sesión y PDF progresivo.
-- Hecho: Jornadas solo en obra en curso; cronología de hitos validada.
-- Pendiente: identidad legal, domicilio, proveedores/regiones y matriz de retención aprobada.
-- Hecho: 60 precios aportados por administración quedan verificados hasta 2027-01-10; 7 candidatos sin precio siguen pendientes.
-- Hecho: catálogo descompuesto por mano de obra, materiales y auxiliares con cálculo automático.
-- Hecho: unidades cerradas, zona Madrid, versión e histórico de precios incorporados.
-- Hecho: registros anteriores conservados como importes heredados, sin inventar componentes.
-- Validado: typecheck, build y 340 tests correctos; migración completa probada en PostgreSQL efímero.
-- Hecho: checksums de migración canónicos entre Windows y Linux con compatibilidad histórica limitada.
-- Pendiente: publicar la corrección y verificar el preflight del despliegue de producción.
+- Estado: flujo rápido de creación de presupuestos implementado y validado.
+- Hecho: selector search-first; el catálogo no descarga ni muestra todas las partidas al abrir.
+- Hecho: búsqueda compacta, normalizada y paginada en API; máximo 12 resultados visibles.
+- Hecho: plantillas rápidas, partidas manuales y combinación automática de duplicados.
+- Hecho: editor compacto con detalles avanzados plegados y revisión clara de base, IVA y total.
+- Hecho: cada partida de catálogo conserva ID, referencia, versión y precio base.
+- Hecho: cualquier cambio del precio de catálogo exige indicar el motivo.
+- Hecho: cada presupuesto inicia como borrador persistente antes de editar alcance y partidas.
+- Hecho: autoguardado con estado visible y protección frente a sobrescrituras concurrentes.
+- Hecho: oportunidad existente continúa sin reescribir datos salvo acción explícita.
+- Hecho: borradores locales sensibles se eliminan al cerrar o caducar la sesión.
+- Validado: typecheck y build completos; 348 tests unitarios y 54 recorridos Playwright afectados.
+- Decisión: no se requiere migración; se reutilizan borrador JSONB y updated_at existentes.
+- Pendiente opcional: favoritos, partidas recientes y duplicación de presupuestos.

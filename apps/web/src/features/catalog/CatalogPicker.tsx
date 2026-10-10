@@ -1,13 +1,14 @@
 /**
  * CatalogPicker — quick-add partidas from the price catalog.
- * Expands the 16 categories × 59 items into searchable rows.
+ * Search-first selector for verified catalog items.
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogCategory, CatalogItem } from "./catalog";
 import { Input, Button, Badge } from "@/shared/ui";
 import { formatMoney } from "@/shared/lib/formatters";
 import { ESTIMATE_TEMPLATES, type EstimateTemplate } from "@reformapro/domain";
+import { CatalogLoadState } from "./CatalogLoadState";
 
 export type TemplateMeasurements = { floorArea: number; wallArea: number; linearMetres: number };
 export type TemplateCatalogItem = { categoria: string; item: CatalogItem; cantidad: number };
@@ -23,14 +24,20 @@ export function resolveCatalogTemplate(template: EstimateTemplate, catalog: Cata
 }
 
 interface Props {
-  onPickItem:     (ref: string) => void;
-  onImportCategory: (categoria: string, items: CatalogItem[]) => void;
+  onPickItem: (item: CatalogItem, category: string) => void;
   onImportTemplate: (items: TemplateCatalogItem[]) => void;
-  catalog: CatalogCategory[];
+  loadItems: (search: string, references?: string[]) => Promise<CatalogCategory[]>;
 }
 
-export function CatalogPicker({ onPickItem, onImportCategory, onImportTemplate, catalog }: Props) {
+const templateReferences = [...new Set(ESTIMATE_TEMPLATES.flatMap(template => template.items.map(item => item.reference)))];
+
+export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props) {
   const [search, setSearch] = useState("");
+  const [results, setResults] = useState<CatalogCategory[]>([]);
+  const [templateCatalog, setTemplateCatalog] = useState<CatalogCategory[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const request = useRef(0);
   const [measurements, setMeasurements] = useState({ floorArea: "", wallArea: "", linearMetres: "" });
   const numericMeasurements = useMemo<TemplateMeasurements>(() => ({
     floorArea: Number(measurements.floorArea) || 0,
@@ -38,22 +45,40 @@ export function CatalogPicker({ onPickItem, onImportCategory, onImportTemplate, 
     linearMetres: Number(measurements.linearMetres) || 0,
   }), [measurements]);
 
-  const filtered = useMemo(() => {
-    const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es-ES");
-    const q = normalize(search.trim());
-    if (!q) return catalog;
-    return catalog
-      .map(c => ({ ...c, items: c.items.filter(i =>
-        normalize(i.descripcion).includes(q) ||
-        i.searchTerms?.some(term => normalize(term).includes(q)) ||
-        normalize(i.ref).includes(q) ||
-        normalize(c.categoria).includes(q)
-      )}))
-      .filter(c => c.items.length > 0);
-  }, [catalog, search]);
+  const resultCount = results.reduce((total, category) => total + category.items.length, 0);
+
+  const loadTemplates = useCallback(() => loadItems("", templateReferences).then(setTemplateCatalog).catch(() => setError("No se pudieron cargar las plantillas del catálogo.")), [loadItems]);
+  useEffect(() => { void loadTemplates(); }, [loadItems]);
+  useEffect(() => {
+    const query = search.trim();
+    if (!query) { setResults([]); setLoading(false); return; }
+    const current = ++request.current;
+    const timer = window.setTimeout(() => {
+      setLoading(true); setError("");
+      void loadItems(query).then(items => { if (request.current === current) setResults(items); })
+        .catch(() => { if (request.current === current) setError("No se pudo buscar en el catálogo."); })
+        .finally(() => { if (request.current === current) setLoading(false); });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [loadItems, search]);
 
   return (
     <div>
+      <Input
+        label="Buscar partida"
+        type="search"
+        autoFocus
+        placeholder="Ej. alicatado baño, FON-010…"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        aria-describedby="catalog-search-help"
+      />
+      <p id="catalog-search-help" className="catalog-search-help">
+        Busca por referencia, trabajo, material o categoría. Mostramos los 12 resultados más relevantes.
+      </p>
+      <p className="catalog-search-status" role="status">
+        {search.trim() ? `${resultCount} ${resultCount === 1 ? "resultado" : "resultados"}` : "Escribe para buscar o utiliza una plantilla rápida."}
+      </p>
       <section className="catalog-templates" aria-labelledby="catalog-templates-title">
         <div>
           <strong id="catalog-templates-title">Plantillas rápidas</strong>
@@ -66,7 +91,7 @@ export function CatalogPicker({ onPickItem, onImportCategory, onImportTemplate, 
         </div>
         <div className="catalog-template-actions">
           {ESTIMATE_TEMPLATES.map(template => {
-            const resolved = resolveCatalogTemplate(template, catalog, numericMeasurements);
+            const resolved = resolveCatalogTemplate(template, templateCatalog, numericMeasurements);
             const needsFloor = template.items.some(item => item.measurement === "floorArea") && numericMeasurements.floorArea <= 0;
             const needsWall = template.items.some(item => item.measurement === "wallArea") && numericMeasurements.wallArea <= 0;
             const needsLinear = template.items.some(item => item.measurement === "linearMetres") && numericMeasurements.linearMetres <= 0;
@@ -76,20 +101,12 @@ export function CatalogPicker({ onPickItem, onImportCategory, onImportTemplate, 
           })}
         </div>
       </section>
-      <Input
-        label="Buscar en catálogo"
-        placeholder="REF, descripción o categoría…"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-      />
 
-      {filtered.map(cat => (
+      <CatalogLoadState loading={loading} error={error} reload={async () => { if (search.trim()) setSearch(value => `${value} `); else await loadTemplates(); }} />
+      {results.map(cat => (
         <section key={cat.categoria} style={{ marginBottom: 20 }}>
           <header className="catalog-category-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
             <h4 style={{ fontSize: 13, fontWeight: 700, color: "var(--copper-dark)" }}>{cat.categoria}</h4>
-            <Button small variant="ghost" onClick={() => onImportCategory(cat.categoria, cat.items)}>
-              + Importar categoría ({cat.items.length})
-            </Button>
           </header>
 
           <ul style={{ display: "flex", flexDirection: "column", gap: 6, listStyle: "none", padding: 0 }}>
@@ -105,7 +122,7 @@ export function CatalogPicker({ onPickItem, onImportCategory, onImportTemplate, 
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#302d29" }}>
                     {formatMoney(item.precio)} <span style={{ color: "#71685e", fontSize: 12 }}>/ {item.unidad}</span>
                   </span>
-                  <Button small aria-label={`Añadir ${item.ref}: ${item.descripcion}`} onClick={() => onPickItem(item.ref)}>+ Añadir</Button>
+                  <Button small aria-label={`Añadir ${item.ref}: ${item.descripcion}`} onClick={() => onPickItem(item, cat.categoria)}>+ Añadir</Button>
                 </div>
               </li>
             ))}
@@ -113,7 +130,7 @@ export function CatalogPicker({ onPickItem, onImportCategory, onImportTemplate, 
         </section>
       ))}
 
-      {filtered.length === 0 && (
+      {search.trim() && !loading && !error && results.length === 0 && (
         <p style={{ color: "#71685e", fontSize: 13, textAlign: "center", padding: 20 }}>
           Ningún ítem coincide con "{search}".
         </p>

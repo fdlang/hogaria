@@ -1,7 +1,7 @@
 import { ValidationError } from "@reformapro/domain/errors";
 import type { EstimateDraft } from "@reformapro/domain/entities";
 import { fiscalPolicyAt, hasAtMostTwoDecimals } from "@reformapro/domain";
-export function validateDraft(value: unknown): asserts value is EstimateDraft {
+export function validateDraft(value: unknown, options: { allowEmpty?: boolean } = {}): asserts value is EstimateDraft {
   const fail = (field?: string): never => {
     throw new ValidationError(
       field ? `Propuesta inválida: revisa ${field}` : "Propuesta inválida: revisa textos, importes y partidas",
@@ -30,7 +30,7 @@ export function validateDraft(value: unknown): asserts value is EstimateDraft {
   if (!Number.isInteger(draft.validezDias)) fail("validezDias");
   if (
     !Array.isArray(draft.partidas) ||
-    draft.partidas.length === 0 ||
+    (!options.allowEmpty && draft.partidas.length === 0) ||
     draft.partidas.length > 1000
   )
     return fail("partidas");
@@ -58,6 +58,17 @@ export function validateDraft(value: unknown): asserts value is EstimateDraft {
         (line.costeUnitario != null && !hasAtMostTwoDecimals(line.costeUnitario as number))) fail(prefix);
     for (const key of ["notaCliente", "notaInterna"])
       if (line[key] !== undefined) text(line[key], 10000, false, `${prefix}.${key}`);
+    const catalogFields = [line.catalogItemId, line.catalogReference, line.catalogPriceVersion, line.catalogBasePrice];
+    const hasCatalogOrigin = catalogFields.some(value => value !== undefined);
+    if (hasCatalogOrigin) {
+      if (!Number.isSafeInteger(line.catalogItemId) || (line.catalogItemId as number) < 1) fail(`${prefix}.catalogItemId`);
+      text(line.catalogReference, 40, true, `${prefix}.catalogReference`);
+      if (!Number.isSafeInteger(line.catalogPriceVersion) || (line.catalogPriceVersion as number) < 1) fail(`${prefix}.catalogPriceVersion`);
+      number(line.catalogBasePrice, 0, 100_000_000, `${prefix}.catalogBasePrice`);
+      if (!hasAtMostTwoDecimals(line.catalogBasePrice as number)) fail(`${prefix}.catalogBasePrice`);
+      if (Math.abs((line.precioVentaUnitario as number) - (line.catalogBasePrice as number)) >= 0.005) text(line.priceOverrideReason, 500, true, `${prefix}.priceOverrideReason`);
+      else if (line.priceOverrideReason !== undefined) text(line.priceOverrideReason, 500, false, `${prefix}.priceOverrideReason`);
+    } else if (line.priceOverrideReason !== undefined) fail(`${prefix}.priceOverrideReason`);
     total += (line.cantidad as number) * (line.precioVentaUnitario as number);
     if (total > 1_000_000_000) fail("partidas.total");
   }

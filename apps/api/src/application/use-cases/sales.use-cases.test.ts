@@ -33,6 +33,18 @@ async function setup() {
 }
 
 describe("EstimateUseCases — client privacy and authorization", () => {
+  it("persists an empty working draft and prevents stale autosaves", async () => {
+    const { users, opportunityA, estimateUseCases } = await setup();
+    const admin = await users.save({ id: 0, email: Email.of("autosave-admin@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const shell = await estimateUseCases.createShell(admin.id, opportunityA.id, { ...draft, partidas: [] }, { ip: "test", userAgent: "test" });
+
+    expect(shell.estado).toBe("borrador");
+    expect(shell.borrador.partidas).toEqual([]);
+    const saved = await estimateUseCases.update(admin.id, shell.id, { ...draft, titulo: "Primera edición" }, shell.updatedAt);
+    expect(saved.borrador.titulo).toBe("Primera edición");
+    await expect(estimateUseCases.update(admin.id, shell.id, { ...draft, titulo: "Edición obsoleta" }, shell.updatedAt)).rejects.toBeInstanceOf(ConflictError);
+  });
+
   it("lets an administrator preview a draft without exposing internal fields to the client", async () => {
     const { users, clientA, opportunityA, estimates, estimateUseCases } = await setup();
     const admin = await users.save({ id: 0, email: Email.of("preview-admin@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");

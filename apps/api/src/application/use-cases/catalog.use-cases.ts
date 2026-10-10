@@ -84,6 +84,13 @@ function assertActivatable(item: Pick<CatalogItem, "salePrice" | "costBreakdown"
 export class CatalogUseCases {
   constructor(private readonly users: IUserRepository, private readonly catalog: ICatalogRepository) {}
   async list(actorId: number, includeInactive = false) { assertAdmin(await this.users.findById(actorId)); return this.catalog.findAll(includeInactive); }
+  async search(actorId: number, query: import("@reformapro/domain/repositories").CatalogSearchQuery) {
+    assertAdmin(await this.users.findById(actorId));
+    if (!Number.isInteger(query.page) || query.page < 0) throw new ValidationError("Página inválida", "page");
+    if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 50) throw new ValidationError("Límite inválido", "limit");
+    if (query.search.length > 120 || (query.category?.length ?? 0) > 80 || (query.references?.length ?? 0) > 50) throw new ValidationError("Búsqueda inválida", "search");
+    return this.catalog.search(query);
+  }
   async create(actorId: number, input: CatalogInput) {
     assertAdmin(await this.users.findById(actorId)); const item = normalize(input);
     if (await this.catalog.findByReference(item.reference)) throw new ConflictError("Ya existe una partida con esa referencia");

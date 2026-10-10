@@ -37,6 +37,16 @@ describe("SalesApi", () => {
     expect(http.post).toHaveBeenCalledWith("/estimates", { oportunidadId: 34, borrador: draft });
   });
 
+  it("creates a persistent draft and sends its revision on autosave", () => {
+    const http = createHttp();
+    const api = new SalesApi(http);
+    api.createEstimateDraft(34, draft);
+    api.updateEstimate(7, draft, "2026-10-11T10:00:00.000Z");
+
+    expect(http.post).toHaveBeenCalledWith("/estimate-drafts", { oportunidadId: 34, borrador: draft });
+    expect(http.patch).toHaveBeenCalledWith("/estimates/7", { borrador: draft, expectedUpdatedAt: "2026-10-11T10:00:00.000Z" });
+  });
+
   it("keeps signing, rejection and conversion as explicit estimate actions", () => {
     const http = createHttp();
     const api = new SalesApi(http);

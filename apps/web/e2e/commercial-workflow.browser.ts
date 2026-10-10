@@ -21,8 +21,10 @@ test("request conversion opens an existing opportunity without creating a duplic
   await page.getByRole("button",{name:"Ver",exact:true}).click();
   await page.getByLabel("Dirección de la obra").fill("Calle Madrid 1");
   await page.getByRole("button",{name:"Crear o abrir oportunidad"}).click();
-  await expect(page.getByRole("textbox",{name:"Nombre de la oportunidad *",exact:true})).toHaveValue("Solicitud prueba");
-  await expect(page.getByRole("textbox",{name:"Dirección *",exact:true})).toHaveValue("Calle Madrid 1");
+  const selection = page.locator(".sales-opportunity-selection");
+  await expect(selection.getByText("Solicitud prueba", { exact: true })).toBeVisible();
+  await expect(selection.getByText("Calle Madrid 1", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continuar con esta oportunidad" })).toBeVisible();
   expect(converted).toBe(true);
 });
 test("admin searches paginated opportunities and preserves the edited version", async ({page}) => {
@@ -48,8 +50,9 @@ test("admin searches paginated opportunities and preserves the edited version", 
   await page.getByLabel("Buscar oportunidad").fill("cocina");
   await expect(page.getByText("1 oportunidades · página 1 de 1")).toBeVisible();
   await page.getByLabel("Continuar una oportunidad existente").selectOption("22");
+  await page.getByRole("button", { name: "Editar datos" }).click();
   await page.getByLabel("Nombre de la oportunidad *",{exact:true}).fill("Cocina actualizada");
-  await page.getByRole("button",{name:"Continuar",exact:true}).click();
+  await page.getByRole("button",{name:"Guardar cambios y continuar",exact:true}).click();
 
   expect(updateBody).toMatchObject({nombre:"Cocina actualizada",expectedUpdatedAt:revision});
 });

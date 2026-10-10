@@ -16,7 +16,7 @@ export interface Opportunity { id: number; clienteId: number | null; nombre: str
 
 export type EstimateStatus = "borrador" | "en_revision" | "enviado" | "firmado" | "aceptado" | "rechazado" | "caducado" | "sustituido";
 export type ChangeOrderStatus = "borrador" | "enviado" | "aprobado" | "rechazado";
-export interface EstimateLine { id: string; categoria: string; descripcion: string; cantidad: number; unidad: string; precioVentaUnitario: number; costeUnitario: number | null; descuento: number; iva: number; notaCliente?: string; notaInterna?: string; }
+export interface EstimateLine { id: string; categoria: string; descripcion: string; cantidad: number; unidad: string; precioVentaUnitario: number; costeUnitario: number | null; descuento: number; iva: number; notaCliente?: string; notaInterna?: string; catalogItemId?: number; catalogReference?: string; catalogPriceVersion?: number; catalogBasePrice?: number; priceOverrideReason?: string; }
 export interface EstimateDraft { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; notasInternas: string; partidas: EstimateLine[]; }
 export interface Estimate { id: number; oportunidadId: number; clienteId: number; numero: string; titulo: string; estado: EstimateStatus; versionActual: number; borrador: EstimateDraft; motivoRechazo: string | null; createdAt: Date; updatedAt: Date; }
 export interface EstimateVersion { id: number; estimateId: number; version: number; snapshot: EstimateDraft; enviadoAt: Date | null; firmadoAt: Date | null; firma: Record<string, unknown> | null; createdAt: Date; }

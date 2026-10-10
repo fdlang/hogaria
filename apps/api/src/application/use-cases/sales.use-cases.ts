@@ -411,9 +411,26 @@ export class EstimateUseCases {
     draft: EstimateDraft,
     ctx: ClientContext,
   ) {
+    return this.createInternal(actorId, opportunityId, draft, ctx, false);
+  }
+  async createShell(
+    actorId: number,
+    opportunityId: number,
+    draft: EstimateDraft,
+    ctx: ClientContext,
+  ) {
+    return this.createInternal(actorId, opportunityId, draft, ctx, true);
+  }
+  private async createInternal(
+    actorId: number,
+    opportunityId: number,
+    draft: EstimateDraft,
+    ctx: ClientContext,
+    allowEmpty: boolean,
+  ) {
     const actor = await this.users.findById(actorId);
     assertAdmin(actor);
-    validateDraft(draft);
+    validateDraft(draft, { allowEmpty });
     const now = new Date();
     const number = createEstimateReference(now.getFullYear(), crypto.randomUUID());
     const saved = await this.transaction.execute(async ({ opportunities, estimates }) => {
@@ -456,20 +473,21 @@ export class EstimateUseCases {
     actorId: number,
     id: number,
     draft: EstimateDraft,
+    expectedUpdatedAt: Date,
   ): Promise<Estimate> {
     if (!this.locked)
-      return this.mutate(id, (service) => service.update(actorId, id, draft));
+      return this.mutate(id, (service) => service.update(actorId, id, draft, expectedUpdatedAt));
     assertAdmin(await this.users.findById(actorId));
     const estimate = await this.require(id);
     if (estimate.estado !== "borrador" && estimate.estado !== "en_revision")
       throw new ConflictError(
         "Crea una nueva versión para modificar una propuesta enviada",
       );
-    validateDraft(draft);
+    validateDraft(draft, { allowEmpty: true });
     return this.estimates.update(id, {
       titulo: draft.titulo.trim(),
       borrador: draft,
-    });
+    }, expectedUpdatedAt);
   }
   async send(
     actorId: number,

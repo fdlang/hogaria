@@ -14,13 +14,24 @@ async function setup(page: Page, state: { fail: boolean; items: typeof item[]; g
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/catalog") {
       if (state.gate) await state.gate;
-      return route.fulfill({ status: state.fail ? 500 : 200, json: state.fail ? { message: "Error de prueba" } : state.items });
+      const picker = new URL(route.request().url()).searchParams.get("picker") === "true";
+      const body = picker
+        ? { items: state.items.map(entry => ({ ...entry, priceVersion: 1, unitCost: null })), total: state.items.length, page: 0, limit: 12, pages: 1 }
+        : state.items;
+      return route.fulfill({ status: state.fail ? 500 : 200, json: state.fail ? { message: "Error de prueba" } : body });
+    }
+    if (path === "/api/estimate-drafts" && route.request().method() === "POST") {
+      const body = route.request().postDataJSON() as { oportunidadId: number; borrador: unknown };
+      return route.fulfill({ json: { id: 1, oportunidadId: body.oportunidadId, estado: "borrador", borrador: body.borrador, updatedAt: "2026-10-11T10:00:00.000Z" } });
+    }
+    if (path === "/api/estimates/1" && route.request().method() === "PATCH") {
+      return route.fulfill({ json: { id: 1, numero: "HOG-2026-TEST", clienteNombre: "Cliente", titulo: "Propuesta de prueba", estado: "borrador", versionActual: 1, motivoRechazo: null, propuesta: null, createdAt: "2026-10-11T10:00:00.000Z", updatedAt: "2026-10-11T10:00:00.001Z" } });
     }
     return route.fulfill({ json: path === "/api/auth/me"
       ? { id: 1, nombre: "Admin", rol: "admin", activo: true, email: "admin@test.invalid" }
       : path === "/api/users" ? [{ id: 2, nombre: "Cliente", rol: "cliente", activo: true }]
-      : path === "/api/opportunities" && route.request().method() === "POST" ? { id: 1 }
-      : path === "/api/opportunities" ? { items: [{ id: 1, nombre: "Reforma prueba", direccion: "Dirección de prueba", updatedAt: "2026-10-07T10:00:00.000Z" }], total: 1, page: 1, limit: 20, pages: 1 }
+      : path === "/api/opportunities" && route.request().method() === "POST" ? { id: 1, clienteId: 2, nombre: "Reforma prueba", direccion: "Dirección de prueba", tipo: "Reforma", descripcion: "", estado: "nueva", email: null, telefono: null, fechaVisita: null, notasInternas: "", createdAt: "2026-10-11T10:00:00.000Z", updatedAt: "2026-10-11T10:00:00.000Z" }
+      : path === "/api/opportunities" ? { items: [{ id: 1, clienteId: 2, nombre: "Reforma prueba", direccion: "Dirección de prueba", tipo: "Reforma", descripcion: "", estado: "nueva", email: null, telefono: null, fechaVisita: null, notasInternas: "", createdAt: "2026-10-07T09:00:00.000Z", updatedAt: "2026-10-07T10:00:00.000Z" }], total: 1, page: 1, limit: 20, pages: 1 }
       : [] });
   });
 }
@@ -70,20 +81,23 @@ for (const fail of [false, true]) test("estimate never falls back to static pric
   await page.getByLabel("Título visible al cliente").fill("Propuesta de prueba");
   await page.getByRole("button", { name: "Continuar", exact: true }).click();
   await page.getByRole("button", { name: "Añadir desde catálogo" }).click();
-  const catalog = page.locator(".estimate-catalog");
+  const catalog = page.locator(".catalog-picker-modal");
   await expect(catalog.getByRole("button", { name: "+ Añadir", exact: true })).toHaveCount(0);
   await expect(catalog.getByText("DEM-001", { exact: false })).toHaveCount(0);
   if (fail) {
-    await expect(catalog.getByRole("alert")).toContainText("No se pudo cargar el catálogo");
+    await expect(catalog.getByRole("alert")).toContainText("No se pudieron cargar las plantillas del catálogo");
     state.fail = false;
     state.items = [item];
     await catalog.getByRole("button", { name: "Reintentar catálogo" }).click();
+    await catalog.getByRole("searchbox", { name: "Buscar partida" }).fill(item.reference);
     await expect(catalog.getByText(item.description, { exact: true })).toBeVisible();
     await expect(catalog.getByRole("alert")).toHaveCount(0);
     await catalog.getByRole("button", { name: `Añadir ${item.reference}: ${item.description}`, exact: true }).click();
     await expect(page.locator(".estimate-line")).toHaveCount(1);
   } else {
-    await expect(catalog.getByRole("status")).toContainText("No hay partidas activas");
+    await catalog.getByRole("searchbox", { name: "Buscar partida" }).fill("partida inexistente");
+    await expect(catalog.getByText(/Ningún ítem coincide/)).toBeVisible();
+    await catalog.getByRole("button", { name: "Cerrar modal" }).click();
     await page.getByRole("button", { name: "+ Partida manual", exact: true }).click();
     await expect(page.locator(".estimate-line")).toHaveCount(1);
   }

@@ -11,4 +11,5 @@ describe("estimate catalog templates", () => {
     const result = resolveCatalogTemplate(ESTIMATE_TEMPLATES[0]!, catalog, { floorArea: 5, wallArea: 22, linearMetres: 0 });
     expect(result.map(item => [item.item.ref, item.cantidad])).toEqual([["REV-001", 22], ["REV-003", 5]]);
   });
+
 });

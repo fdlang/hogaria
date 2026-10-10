@@ -178,6 +178,22 @@ export class PostgresCatalogRepository implements ICatalogRepository {
       : "SELECT * FROM catalog_items WHERE active=true AND review_status='verified' AND (valid_from IS NULL OR valid_from<=CURRENT_DATE) AND (valid_until IS NULL OR valid_until>=CURRENT_DATE) ORDER BY category, reference";
     return (await this.pool.query(query)).rows.map(row => this.map(row));
   }
+  async search(query: import("@reformapro/domain/repositories").CatalogSearchQuery) {
+    const words = query.search.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es-ES").trim().split(/\s+/).filter(Boolean);
+    const references = (query.references ?? []).map(reference => reference.trim().toUpperCase()).filter(Boolean);
+    const values = [words, query.category ?? "", references, query.limit, query.page * query.limit];
+    const where = `active=true AND review_status='verified'
+      AND (valid_from IS NULL OR valid_from<=CURRENT_DATE) AND (valid_until IS NULL OR valid_until>=CURRENT_DATE)
+      AND ($2='' OR category=$2) AND (cardinality($3::text[])=0 OR reference=ANY($3::text[]))
+      AND NOT EXISTS (SELECT 1 FROM unnest($1::text[]) word WHERE strpos(translate(lower(reference||' '||category||' '||description||' '||array_to_string(search_terms,' ')),'áéíóúüñ','aeiouun'),word)=0)`;
+    const [rows, count] = await Promise.all([
+      this.pool.query(`SELECT * FROM catalog_items WHERE ${where}
+        ORDER BY CASE WHEN lower(reference)=lower($6) THEN 0 WHEN lower(reference) LIKE lower($6)||'%' THEN 1 ELSE 2 END,category,reference LIMIT $4 OFFSET $5`, [...values, query.search.trim()]),
+      this.pool.query(`SELECT count(*)::int total FROM catalog_items WHERE ${where}`, values.slice(0, 3)),
+    ]);
+    const total = Number(count.rows[0]?.total ?? 0);
+    return { items: rows.rows.map(row => this.map(row)), total, page: query.page, limit: query.limit, pages: Math.max(1, Math.ceil(total / query.limit)) };
+  }
   async findById(id: number) { const result = await this.pool.query("SELECT * FROM catalog_items WHERE id=$1", [id]); return result.rows[0] ? this.map(result.rows[0]) : null; }
   async findByReference(reference: string) { const result = await this.pool.query("SELECT * FROM catalog_items WHERE reference=$1", [reference]); return result.rows[0] ? this.map(result.rows[0]) : null; }
   async save(item: Omit<CatalogItem, "id" | "createdAt" | "updatedAt">) {
@@ -243,7 +259,7 @@ export class PostgresEstimateRepository implements IEstimateRepository {
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM estimates WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async findAll() { return (await this.pool.query("SELECT * FROM estimates ORDER BY updated_at DESC")).rows.map(row => this.map(row)); }
   async save(e: Omit<Estimate, "id" | "createdAt" | "updatedAt">) { const r = await this.pool.query("INSERT INTO estimates(oportunidad_id,cliente_id,numero,titulo,estado,version_actual,borrador,motivo_rechazo) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *", [e.oportunidadId,e.clienteId,e.numero,e.titulo,e.estado,e.versionActual,e.borrador,e.motivoRechazo]); return this.map(r.rows[0]); }
-  async update(id: number, changes: Partial<Pick<Estimate, "titulo" | "estado" | "versionActual" | "borrador" | "motivoRechazo">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Presupuesto"); const next = { ...old, ...changes }; const r = await this.pool.query("UPDATE estimates SET titulo=$2,estado=$3,version_actual=$4,borrador=$5,motivo_rechazo=$6,updated_at=NOW() WHERE id=$1 RETURNING *", [id,next.titulo,next.estado,next.versionActual,next.borrador,next.motivoRechazo]); return this.map(r.rows[0]); }
+  async update(id: number, changes: Partial<Pick<Estimate, "titulo" | "estado" | "versionActual" | "borrador" | "motivoRechazo">>, expectedUpdatedAt?: Date) { const old = await this.findById(id); if (!old) throw new NotFoundError("Presupuesto"); const next = { ...old, ...changes }; const r = await this.pool.query("UPDATE estimates SET titulo=$2,estado=$3,version_actual=$4,borrador=$5,motivo_rechazo=$6,updated_at=GREATEST(clock_timestamp(),updated_at + interval '1 millisecond') WHERE id=$1 AND ($7::timestamptz IS NULL OR date_trunc('milliseconds',updated_at)=date_trunc('milliseconds',$7::timestamptz)) RETURNING *", [id,next.titulo,next.estado,next.versionActual,next.borrador,next.motivoRechazo,expectedUpdatedAt ?? null]); if (!r.rows[0]) throw new ConflictError("El presupuesto ha cambiado. Actualiza los datos antes de guardar."); return this.map(r.rows[0]); }
   async saveVersion(v: Omit<EstimateVersion, "id" | "createdAt">) { const r = await this.pool.query("INSERT INTO budget_versions(estimate_id,version,snapshot,enviado_at,firmado_at,firma) VALUES($1,$2,$3,$4,$5,$6) RETURNING *", [v.estimateId,v.version,v.snapshot,v.enviadoAt,v.firmadoAt,v.firma]); return this.mapVersion(r.rows[0]); }
   async findVersions(estimateId: number) { return (await this.pool.query("SELECT * FROM budget_versions WHERE estimate_id=$1 ORDER BY version DESC", [estimateId])).rows.map(row => this.mapVersion(row)); }
   async signVersion(estimateId: number, version: number, firma: Record<string, unknown>, firmadoAt: Date) { const r = await this.pool.query("UPDATE budget_versions SET firma=$3,firmado_at=$4 WHERE estimate_id=$1 AND version=$2 AND firmado_at IS NULL RETURNING *", [estimateId,version,firma,firmadoAt]); if (!r.rows[0]) throw new NotFoundError("Versión firmable"); return this.mapVersion(r.rows[0]); }

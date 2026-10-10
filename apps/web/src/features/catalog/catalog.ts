@@ -8,12 +8,14 @@
  * never selectable until an administrator validates their evidence and term.
  */
 export interface CatalogItem {
+  id?: number;
   ref: string;
   descripcion: string;
   unidad: string;
   precio: number;
   iva: number;
   costeUnitario?: number | null;
+  priceVersion?: number;
   searchTerms?: string[];
   active?: boolean;
   itemType?: "simple" | "composite";

@@ -107,6 +107,18 @@ export const BUSINESS_RULES = [
     implementation: ["packages/domain/src/estimate-reference.ts", "apps/api/src/application/use-cases/sales.use-cases.ts"], tests: ["packages/domain/src/estimate-reference.test.ts", "apps/api/src/application/use-cases/sales.use-cases.test.ts"],
   },
   {
+    id: "HOG-EST-006", description: "Cada partida procedente del catálogo conserva referencia, versión y precio base; cualquier ajuste exige un motivo.", origin: "business", owner: "comercial",
+    assumption: "La trazabilidad del precio reduce errores sin impedir ajustes justificados por el alcance real.", validScale: "Una tarifa comercial versionada y miles de presupuestos; revisar al incorporar listas por cliente o zona.", validFrom: "2026-10-11", validUntil: null, nextReview: "2027-01-11",
+    metrics: [metric("catalog_price_override_rate", "Partidas cuyo precio se separa del catálogo", "database"), metric("catalog_stale_version_rate", "Partidas guardadas con una versión anterior del precio")],
+    implementation: ["packages/domain/src/entities/index.ts", "apps/api/src/application/use-cases/estimate-validation.ts"], tests: ["apps/api/src/application/use-cases/audit-regressions.test.ts"],
+  },
+  {
+    id: "HOG-EST-007", description: "La edición crea un borrador persistente, lo guarda automáticamente y rechaza versiones obsoletas antes de sobrescribirlas.", origin: "technical", owner: "comercial",
+    assumption: "Varios administradores o pestañas pueden editar presupuestos y una interrupción no debe hacer perder el trabajo ya válido.", validScale: "Varios gestores comerciales y miles de borradores; revisar si se incorpora edición colaborativa en tiempo real.", validFrom: "2026-10-11", validUntil: null, nextReview: "2027-01-11",
+    metrics: [metric("estimate_autosave_failure_rate", "Guardados automáticos fallidos", "not_instrumented"), metric("estimate_edit_conflict_rate", "Ediciones rechazadas por versión obsoleta", "not_instrumented")],
+    implementation: ["apps/api/src/application/use-cases/sales.use-cases.ts", "apps/api/src/infrastructure/database/postgresRepositories.ts", "apps/web/src/features/sales/components/SalesPipeline.tsx"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/api/src/interfaces/http/salesController.test.ts"],
+  },
+  {
     id: "HOG-PRJ-001", description: "Los proyectos avanzan por transiciones de estado permitidas y solo finalizan al 100 %.", origin: "business", owner: "operaciones",
     assumption: "Planificación, curso, pausa y finalización describen todo el ciclo de obra.", validScale: "Obras sin fases contractuales independientes ni reapertura posterior al cierre.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("project_transition_denial_rate", "Transiciones de estado rechazadas", "audit_log"), metric("project_reopen_requests", "Solicitudes manuales de reapertura")],

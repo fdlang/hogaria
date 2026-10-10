@@ -73,6 +73,11 @@ describe("Audit: strict DTOs", () => {
       }),
     ).not.toThrow();
   });
+  it("requires a reason when an administrator overrides a catalog price", () => {
+    const catalogLine = { ...draft.partidas[0], catalogItemId: 7, catalogReference: "TST-007", catalogPriceVersion: 3, catalogBasePrice: 100 };
+    expect(() => validateDraft({ ...draft, partidas: [{ ...catalogLine, precioVentaUnitario: 90 }] })).toThrow("priceOverrideReason");
+    expect(() => validateDraft({ ...draft, partidas: [{ ...catalogLine, precioVentaUnitario: 90, priceOverrideReason: "Ajuste por alcance real" }] })).not.toThrow();
+  });
   it.each([
     { precioVentaUnitario: 10.005 },
     { costeUnitario: 2.345 },

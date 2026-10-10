@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Modal } from "@/shared/ui";
 import { EstimateDocuments, EstimateSearch } from "./EstimateContent";
 import { filterEstimates } from "../estimate-search";
@@ -17,10 +17,8 @@ import {
   type OpportunityDTO,
 } from "../api/sales.api";
 
-import { useCatalog } from "@/features/catalog/useCatalog";
-import { CatalogLoadState } from "@/features/catalog/CatalogLoadState";
-import { blankOpportunity, opportunityForSelection } from "../sales-pipeline.utils";
-import { calculateCatalogPrice, calculateEstimateTotals, CURRENT_FISCAL_POLICY, hasAtMostTwoDecimals } from "@reformapro/domain";
+import { blankOpportunity, mergeCatalogLines, opportunityForSelection } from "../sales-pipeline.utils";
+import { calculateEstimateTotals, CURRENT_FISCAL_POLICY, hasAtMostTwoDecimals } from "@reformapro/domain";
 
 const steps = ["Oportunidad", "Alcance", "Partidas", "Revisión"];
 
@@ -50,7 +48,7 @@ const blankDraft = (): EstimateDraftDTO => ({
 const SALES_DRAFT_KEY = "hogaria_sales_draft";
 type RecoverableSalesDraft = {
   step: number; opportunity: ReturnType<typeof blankOpportunity>; selected: number | null;
-  draft: EstimateDraftDTO; existingOpportunity: string; editingId: number | null;
+  draft: EstimateDraftDTO; existingOpportunity: string; editingId: number | null; draftUpdatedAt: string | null;
 };
 const recoverSalesDraft = (): RecoverableSalesDraft | null => {
   try {
@@ -63,6 +61,7 @@ const recoverSalesDraft = (): RecoverableSalesDraft | null => {
       draft: parsed.draft,
       existingOpportunity: typeof parsed.existingOpportunity === "string" ? parsed.existingOpportunity : "",
       editingId: Number.isSafeInteger(parsed.editingId) ? Number(parsed.editingId) : null,
+      draftUpdatedAt: typeof parsed.draftUpdatedAt === "string" ? parsed.draftUpdatedAt : null,
     };
   } catch { return null; }
 };
@@ -99,28 +98,29 @@ export function SalesPipeline({
   const [clients, setClients] = useState<Array<{ id: number; nombre: string }>>(
     [],
   );
-  const { items: catalogItems, loading: catalogLoading, error: catalogError, reload: reloadCatalog } = useCatalog(api);
-  const catalog = useMemo<CatalogCategory[]>(() => {
+  const loadCatalogItems = useCallback(async (search: string, references: string[] = []): Promise<CatalogCategory[]> => {
+    const result = await api.catalogSearch(search, references);
     const grouped = new Map<string, CatalogItem[]>();
-    catalogItems.filter(item => item.active && item.reviewStatus === "verified").forEach(item => {
+    result.items.forEach(item => {
       const entries = grouped.get(item.category) ?? [];
-      const pricing = calculateCatalogPrice(item.costBreakdown);
       entries.push({
+        id: item.id,
         ref: item.reference, descripcion: item.description, unidad: item.unit,
         precio: item.salePrice, iva: item.vatRate,
-        costeUnitario: pricing.costWithOverhead ?? (pricing.directCost > 0 ? pricing.directCost : null),
-        searchTerms: item.searchTerms ?? [],
+        costeUnitario: item.unitCost,
+        priceVersion: item.priceVersion,
       });
       grouped.set(item.category, entries);
     });
     return [...grouped].map(([categoria, items]) => ({ categoria, items }));
-  }, [catalogItems]);
+  }, [api]);
   const [step, setStep] = useState(recoveredDraft?.step ?? 0);
   const [saving, setSaving] = useState(false);
   const [openingId, setOpeningId] = useState<number | null>(null);
   const [converting, setConverting] = useState<number | null>(null);
   const [sending, setSending] = useState<number | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
+  const [catalogNotice, setCatalogNotice] = useState("");
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<EstimateDTO | null>(null);
   const [showEditor, setShowEditor] = useState(() => Boolean(recoveredDraft || new URLSearchParams(window.location.hash.split("?")[1] ?? window.location.search).get("opportunity")));
@@ -128,14 +128,45 @@ export function SalesPipeline({
   const [selected, setSelected] = useState<number | null>(recoveredDraft?.selected ?? null);
   const [draft, setDraft] = useState(recoveredDraft?.draft ?? blankDraft);
   const [existingOpportunity, setExistingOpportunity] = useState(() => recoveredDraft?.existingOpportunity ?? new URLSearchParams(window.location.hash.split("?")[1] ?? window.location.search).get("opportunity") ?? "");
+  const [editExistingOpportunity, setEditExistingOpportunity] = useState(false);
   useEffect(() => {
     setOpportunity(opportunityForSelection(existingOpportunity, opportunities));
   }, [existingOpportunity, opportunities]);
+  useEffect(() => { setEditExistingOpportunity(false); }, [existingOpportunity]);
   const [editingId, setEditingId] = useState<number | null>(recoveredDraft?.editingId ?? null);
+  const [draftUpdatedAt, setDraftUpdatedAt] = useState<string | null>(recoveredDraft?.draftUpdatedAt ?? null);
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error" | "conflict">("idle");
+  const lastSavedDraft = useRef("");
+  const failedAutosaveDraft = useRef("");
+  const draftUpdatedAtRef = useRef<string | null>(draftUpdatedAt);
+  const autosaveInFlight = useRef(false);
+  const autosavePending = useRef(false);
+  const [autosaveRetry, setAutosaveRetry] = useState(0);
+  const rememberServerDraft = (value: EstimateDraftDTO, updatedAt: string) => {
+    lastSavedDraft.current = JSON.stringify(value);
+    failedAutosaveDraft.current = "";
+    draftUpdatedAtRef.current = updatedAt;
+    setDraftUpdatedAt(updatedAt);
+    setAutosaveStatus("saved");
+  };
   useEffect(() => {
     if (!showEditor) { sessionStorage.removeItem(SALES_DRAFT_KEY); return; }
-    sessionStorage.setItem(SALES_DRAFT_KEY, JSON.stringify({ step, opportunity, selected, draft, existingOpportunity, editingId } satisfies RecoverableSalesDraft));
-  }, [showEditor, step, opportunity, selected, draft, existingOpportunity, editingId]);
+    sessionStorage.setItem(SALES_DRAFT_KEY, JSON.stringify({ step, opportunity, selected, draft, existingOpportunity, editingId, draftUpdatedAt } satisfies RecoverableSalesDraft));
+  }, [showEditor, step, opportunity, selected, draft, existingOpportunity, editingId, draftUpdatedAt]);
+  useEffect(() => {
+    if (editingId === null || draftUpdatedAt) return;
+    let current = true;
+    void api.draft(editingId).then(serverDraft => {
+      if (!current) return;
+      lastSavedDraft.current = JSON.stringify(serverDraft.borrador);
+      draftUpdatedAtRef.current = serverDraft.updatedAt;
+      setDraftUpdatedAt(serverDraft.updatedAt);
+      setAutosaveStatus("saved");
+    }).catch(() => {
+      if (current) setError("No se pudo comprobar la versión del borrador. Vuelve a abrirlo desde Presupuestos recientes.");
+    });
+    return () => { current = false; };
+  }, [api, draftUpdatedAt, editingId]);
   const editorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (showEditor) editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -151,7 +182,9 @@ export function SalesPipeline({
         ? await api.draft(estimate.id)
         : await api.reviseEstimate(estimate.id);
       setEditingId(existing.id);
+      rememberServerDraft(existing.borrador, existing.updatedAt);
       setSelected(existing.oportunidadId);
+      setExistingOpportunity(String(existing.oportunidadId));
       setDraft(existing.borrador);
       setStep(1);
       setShowEditor(true);
@@ -203,7 +236,7 @@ export function SalesPipeline({
       if (current) setError("No se pudieron cargar las oportunidades. Inténtalo de nuevo.");
     });
     return () => { current = false; };
-  }, [api, deferredOpportunitySearch, opportunityPage, opportunityStatus]);
+  }, [api, deferredOpportunitySearch, existingOpportunity, opportunityPage, opportunityStatus]);
 
 
   const active = useMemo(
@@ -224,8 +257,7 @@ export function SalesPipeline({
     draft.validezDias <= 365 &&
     draft.condicionesPago.trim(),
   );
-  const linesComplete =
-    draft.partidas.length > 0 &&
+  const linesValid =
     draft.partidas.every(
       (line) =>
         line.descripcion.trim() &&
@@ -249,12 +281,15 @@ export function SalesPipeline({
         line.iva >= 0 &&
         line.iva <= 100 &&
         hasAtMostTwoDecimals(line.iva) &&
-        CURRENT_FISCAL_POLICY.selectableVatRates.includes(line.iva),
+        CURRENT_FISCAL_POLICY.selectableVatRates.includes(line.iva) &&
+        (line.catalogBasePrice === undefined || Math.abs(line.precioVentaUnitario - line.catalogBasePrice) < 0.005 || Boolean(line.priceOverrideReason?.trim())),
     ) &&
     draft.partidas.reduce(
       (total, line) => total + line.cantidad * line.precioVentaUnitario,
       0,
     ) <= 1_000_000_000;
+  const linesComplete = draft.partidas.length > 0 && linesValid;
+  const draftSaveable = scopeComplete && linesValid;
   const totals = useMemo(
     () => {
       const sale = calculateEstimateTotals(draft.partidas).totalSinIva;
@@ -266,6 +301,47 @@ export function SalesPipeline({
     },
     [draft.partidas],
   );
+
+  useEffect(() => {
+    if (!showEditor || editingId === null || !draftUpdatedAt || !draftSaveable || saving || autosaveStatus === "conflict") return;
+    const serialized = JSON.stringify(draft);
+    if (serialized === lastSavedDraft.current || serialized === failedAutosaveDraft.current) return;
+    const timer = window.setTimeout(() => {
+      if (autosaveInFlight.current) {
+        autosavePending.current = true;
+        return;
+      }
+      const expectedUpdatedAt = draftUpdatedAtRef.current;
+      if (!expectedUpdatedAt) return;
+      autosaveInFlight.current = true;
+      setAutosaveStatus("saving");
+      void api.updateEstimate(editingId, draft, expectedUpdatedAt)
+        .then(saved => {
+          lastSavedDraft.current = serialized;
+          failedAutosaveDraft.current = "";
+          draftUpdatedAtRef.current = saved.updatedAt;
+          setDraftUpdatedAt(saved.updatedAt);
+          setAutosaveStatus("saved");
+        })
+        .catch((cause: { status?: number; code?: string }) => {
+          if (cause.status === 409 || cause.code === "CONFLICT") {
+            setAutosaveStatus("conflict");
+            setError("Este presupuesto ha cambiado en otra sesión. Cierra la edición y vuelve a abrirlo para no sobrescribir trabajo ajeno.");
+          } else {
+            failedAutosaveDraft.current = serialized;
+            setAutosaveStatus("error");
+          }
+        })
+        .finally(() => {
+          autosaveInFlight.current = false;
+          if (autosavePending.current) {
+            autosavePending.current = false;
+            setAutosaveRetry(value => value + 1);
+          }
+        });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [api, autosaveRetry, autosaveStatus, draft, draftSaveable, draftUpdatedAt, editingId, saving, showEditor]);
 
   const submitOpportunity = async () => {
     if (!opportunityComplete) return;
@@ -289,8 +365,13 @@ export function SalesPipeline({
       const saved = current
         ? await api.updateOpportunity(Number(existingOpportunity), { clienteId: input.clienteId, nombre: input.nombre, direccion: input.direccion, tipo: input.tipo, descripcion: input.descripcion }, current.updatedAt)
         : await api.createOpportunity(input);
+      const initialDraft = { ...draft, titulo: draft.titulo.trim() ? draft.titulo : saved.nombre };
+      const serverDraft = await api.createEstimateDraft(saved.id, initialDraft);
       setOpportunities(items => [saved, ...items.filter(item => item.id !== saved.id)]);
       setSelected(saved.id);
+      setEditingId(serverDraft.id);
+      setDraft(serverDraft.borrador);
+      rememberServerDraft(serverDraft.borrador, serverDraft.updatedAt);
       setStep(1);
       await refreshCommercial();
     } catch (cause) {
@@ -303,15 +384,40 @@ export function SalesPipeline({
     }
   };
 
+  const continueExistingOpportunity = async () => {
+    const current = opportunities.find(item => item.id === Number(existingOpportunity));
+    if (!current) {
+      setError("La oportunidad seleccionada ya no está disponible. Actualiza el listado.");
+      return;
+    }
+    setError("");
+    setSaving(true);
+    try {
+      const initialDraft = { ...draft, titulo: draft.titulo.trim() ? draft.titulo : current.nombre };
+      const serverDraft = await api.createEstimateDraft(current.id, initialDraft);
+      setSelected(current.id);
+      setEditingId(serverDraft.id);
+      setDraft(serverDraft.borrador);
+      rememberServerDraft(serverDraft.borrador, serverDraft.updatedAt);
+      setStep(1);
+      await refreshCommercial();
+    } catch (cause) {
+      setError((cause as { message?: string }).message ?? "No se pudo iniciar el presupuesto");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submitEstimate = async () => {
-    if (!selected || !scopeComplete || !linesComplete) return;
+    if (!selected || editingId === null || !draftUpdatedAtRef.current || !scopeComplete || !linesComplete || autosaveInFlight.current) return;
     setError("");
     try {
       setSaving(true);
-      const saved = editingId !== null
-        ? await api.updateEstimate(editingId, draft)
-        : await api.createEstimate(selected, draft);
+      const saved = await api.updateEstimate(editingId, draft, draftUpdatedAtRef.current);
       setEditingId(null);
+      setDraftUpdatedAt(null);
+      draftUpdatedAtRef.current = null;
+      lastSavedDraft.current = "";
       setStep(0);
       setSelected(null);
       setDraft(blankDraft());
@@ -377,38 +483,31 @@ export function SalesPipeline({
       ...current,
       partidas: current.partidas.filter((_, itemIndex) => itemIndex !== index),
     }));
-  const addCatalogItem = (ref: string) => {
-    const entry = catalog
-      .flatMap((category) =>
-        category.items.map((item) => ({ item, category: category.categoria })),
-      )
-      .find((candidate) => candidate.item.ref === ref);
-    if (!entry) return;
-    setDraft((current) => ({
-      ...current,
-      partidas: [
-        ...current.partidas,
-        lineFromCatalog(entry.item, entry.category),
-      ],
-    }));
-  };
-  const importCatalogCategory = (category: string, items: CatalogItem[]) => {
-    setDraft((current) => ({
-      ...current,
-      partidas: [
-        ...current.partidas,
-        ...items.map((item) => lineFromCatalog(item, category)),
-      ],
-    }));
+  const addCatalogItem = (item: CatalogItem, category: string) => {
+    const addition = lineFromCatalog(item, category);
+    setDraft((current) => {
+      const merged = mergeCatalogLines(current.partidas, [addition]);
+      setCatalogNotice(merged.mergedCount ? "La partida ya estaba incluida: hemos sumado una unidad." : "Partida añadida al presupuesto.");
+      return { ...current, partidas: merged.lines };
+    });
   };
   const importCatalogTemplate = (items: TemplateCatalogItem[]) => {
-    setDraft(current => ({
-      ...current,
-      partidas: [...current.partidas, ...items.map(({ item, categoria, cantidad }) => ({ ...lineFromCatalog(item, categoria), cantidad }))],
-    }));
+    setDraft(current => {
+      const additions = items.map(({ item, categoria, cantidad }) => ({ ...lineFromCatalog(item, categoria), cantidad }));
+      const merged = mergeCatalogLines(current.partidas, additions);
+      setCatalogNotice(merged.mergedCount
+        ? `Plantilla añadida; ${merged.mergedCount} ${merged.mergedCount === 1 ? "partida se ha combinado" : "partidas se han combinado"}.`
+        : "Plantilla añadida al presupuesto.");
+      return { ...current, partidas: merged.lines };
+    });
   };
   const openNewEstimate = () => {
     setEditingId(null);
+    setDraftUpdatedAt(null);
+    draftUpdatedAtRef.current = null;
+    lastSavedDraft.current = "";
+    failedAutosaveDraft.current = "";
+    setAutosaveStatus("idle");
     setSelected(null);
     setExistingOpportunity("");
     setOpportunity(blankOpportunity());
@@ -419,8 +518,13 @@ export function SalesPipeline({
   };
   const closeEditor = () => {
     const hasChanges = editingId !== null || selected !== null || draft.partidas.length > 0 || draft.titulo.trim() !== "";
-    if (hasChanges && !window.confirm("¿Cerrar el editor? Los cambios sin guardar se perderán.")) return;
+    if (hasChanges && !window.confirm("¿Cerrar el editor? El último guardado automático seguirá disponible en Presupuestos recientes.")) return;
     setEditingId(null);
+    setDraftUpdatedAt(null);
+    draftUpdatedAtRef.current = null;
+    lastSavedDraft.current = "";
+    failedAutosaveDraft.current = "";
+    setAutosaveStatus("idle");
     setSelected(null);
     setExistingOpportunity("");
     setOpportunity(blankOpportunity());
@@ -488,12 +592,21 @@ export function SalesPipeline({
             className={
               index === step ? "sales-step sales-step--active" : "sales-step"
             }
+            aria-current={index === step ? "step" : undefined}
           >
             {index + 1}. {label}
           </button>
         ))}
       </div>
       <Button small variant="ghost" disabled={saving} onClick={closeEditor}>Cerrar editor</Button>
+      {editingId !== null && (
+        <p className={`sales-autosave sales-autosave--${autosaveStatus}`} aria-live="polite">
+          {autosaveStatus === "saving" && "Guardando cambios…"}
+          {autosaveStatus === "saved" && "Cambios guardados"}
+          {autosaveStatus === "error" && "No se pudo guardar automáticamente. Modifica un campo para reintentarlo."}
+          {autosaveStatus === "conflict" && "Hay una versión más reciente. Vuelve a abrir el presupuesto."}
+        </p>
+      )}
 
       {step === 0 && (
         <div className="sales-card">
@@ -530,6 +643,16 @@ export function SalesPipeline({
             <Button small variant="ghost" disabled={opportunitiesLoading || opportunityPage <= 1} onClick={() => setOpportunityPage(value => value - 1)}>Anterior</Button>
             <Button small variant="ghost" disabled={opportunitiesLoading || opportunityPage >= opportunityPages} onClick={() => setOpportunityPage(value => value + 1)}>Siguiente</Button>
           </nav>
+          {existingOpportunity && (
+            <div className="sales-opportunity-selection">
+              <div><strong>{opportunity.nombre}</strong><span>{opportunity.direccion}</span></div>
+              <div className="sales-opportunity-selection__actions">
+                <Button variant="ghost" onClick={() => setEditExistingOpportunity(value => !value)}>{editExistingOpportunity ? "Cancelar edición" : "Editar datos"}</Button>
+                <Button disabled={saving} loading={saving} onClick={() => void continueExistingOpportunity()}>Continuar con esta oportunidad</Button>
+              </div>
+            </div>
+          )}
+          {(!existingOpportunity || editExistingOpportunity) && <>
           <p>Los campos con * son obligatorios.</p>
           <label>
             Cliente existente *
@@ -608,8 +731,9 @@ export function SalesPipeline({
             onClick={() => void submitOpportunity()}
             loading={saving}
           >
-            Continuar
+            {existingOpportunity ? "Guardar cambios y continuar" : "Continuar"}
           </Button>
+          </>}
         </div>
       )}
 
@@ -703,28 +827,10 @@ export function SalesPipeline({
               variant="ghost"
               onClick={() => setShowCatalog((current) => !current)}
             >
-              {showCatalog ? "Ocultar catálogo" : "Añadir desde catálogo"}
+              Añadir desde catálogo
             </Button>
           </div>
-          {showCatalog && (
-            <section className="estimate-catalog">
-              <header>
-                <strong>Catálogo de partidas</strong>
-                <span>
-                  Precios guardados en el catálogo · sin IVA
-                </span>
-              </header>
-              <CatalogLoadState loading={catalogLoading} error={catalogError} reload={reloadCatalog} />
-              {!catalogLoading && !catalogError && (catalog.length === 0
-                ? <p role="status">No hay partidas activas en el catálogo. Puedes crear una partida manual.</p>
-                : <CatalogPicker
-                catalog={catalog}
-                onPickItem={addCatalogItem}
-                onImportCategory={importCatalogCategory}
-                onImportTemplate={importCatalogTemplate}
-              />)}
-            </section>
-          )}
+          {catalogNotice && <p className="estimate-catalog-notice" role="status">{catalogNotice}</p>}
           {draft.partidas.length === 0 ? (
             <p className="estimate-lines__empty">
               Empieza con una partida del catálogo o crea una manual.
@@ -736,8 +842,7 @@ export function SalesPipeline({
                   key={line.id}
                   index={index}
                   line={line}
-                  categories={catalog.map((category) => category.categoria)}
-                  canRemove={draft.partidas.length > 1}
+                  categories={[...new Set(draft.partidas.map(item => item.categoria))]}
                   onChange={(changes) => updateLine(index, changes)}
                   onRemove={() => removeLine(index)}
                 />
@@ -764,6 +869,9 @@ export function SalesPipeline({
             </span>
           </div>
           <div className="sales-next-action">
+            {!linesComplete && draft.partidas.length > 0 && (
+              <p className="sales-validation" role="alert">Revisa las partidas marcadas: descripción, cantidad, precio, descuento e IVA deben ser válidos.</p>
+            )}
             <Button disabled={!linesComplete} onClick={() => setStep(3)}>
               Revisar propuesta
             </Button>
@@ -772,18 +880,37 @@ export function SalesPipeline({
       )}
 
       {step === 3 && (
-        <div className="sales-card">
+        <div className="sales-card sales-card--wide">
           <h2>Revisión antes de guardar</h2>
-          <p>
-            <strong>{draft.titulo}</strong> · {draft.partidas.length} partidas ·
-            cliente: {active?.nombre}
-          </p>
+          <div className="estimate-review-heading">
+            <div><span>Cliente</span><strong>{active?.nombre}</strong></div>
+            <div><span>Propuesta</span><strong>{draft.titulo}</strong></div>
+            <div><span>Validez</span><strong>{draft.validezDias} días</strong></div>
+          </div>
+          <div className="estimate-review-lines">
+            {draft.partidas.map((line, index) => (
+              <div key={line.id}>
+                <span>{index + 1}. {line.descripcion}</span>
+                <small>{line.cantidad} {line.unidad} × {formatMoney(line.precioVentaUnitario)}{line.descuento ? ` · -${line.descuento}%` : ""}</small>
+                <strong>{formatMoney(line.cantidad * line.precioVentaUnitario * (1 - line.descuento / 100))}</strong>
+              </div>
+            ))}
+          </div>
+          {(() => {
+            const reviewTotals = calculateEstimateTotals(draft.partidas);
+            return <div className="estimate-review-totals">
+              <span>Base imponible <strong>{formatMoney(reviewTotals.totalSinIva)}</strong></span>
+              <span>IVA <strong>{formatMoney(reviewTotals.totalIva)}</strong></span>
+              <span>Total <strong>{formatMoney(reviewTotals.totalConIva)}</strong></span>
+            </div>;
+          })()}
+          <details className="estimate-review-conditions"><summary>Condiciones de pago</summary><p>{draft.condicionesPago}</p></details>
           <p>
             Las notas y costes internos no forman parte de la versión que verá
             el cliente.
           </p>
           <Button
-            disabled={!scopeComplete || !linesComplete}
+            disabled={!scopeComplete || !linesComplete || autosaveInFlight.current || autosaveStatus === "conflict"}
             onClick={() => void submitEstimate()}
             loading={saving}
           >
@@ -792,6 +919,17 @@ export function SalesPipeline({
         </div>
       )}
       </section>}
+      <Modal
+        open={showCatalog}
+        onClose={() => setShowCatalog(false)}
+        title="Añadir partidas"
+        width={900}
+        className="catalog-picker-modal"
+      >
+        <p className="catalog-picker-modal__intro">Busca una partida y añádela en un clic. Los precios mostrados no incluyen IVA.</p>
+        {catalogNotice && <p className="estimate-catalog-notice" role="status">{catalogNotice}</p>}
+        <CatalogPicker loadItems={loadCatalogItems} onPickItem={addCatalogItem} onImportTemplate={importCatalogTemplate} />
+      </Modal>
       <Modal
         open={preview !== null}
         onClose={() => setPreview(null)}
@@ -949,14 +1087,12 @@ function EstimateLineEditor({
   index,
   line,
   categories,
-  canRemove,
   onChange,
   onRemove,
 }: {
   index: number;
   line: EstimateDraftDTO["partidas"][number];
   categories: string[];
-  canRemove: boolean;
   onChange: (changes: Partial<EstimateDraftDTO["partidas"][number]>) => void;
   onRemove: () => void;
 }) {
@@ -964,47 +1100,29 @@ function EstimateLineEditor({
     line.cantidad * line.precioVentaUnitario * (1 - line.descuento / 100);
   const cost =
     line.costeUnitario == null ? null : line.cantidad * line.costeUnitario;
+  const invalidDescription = !line.descripcion.trim();
+  const invalidQuantity = !Number.isFinite(line.cantidad) || line.cantidad <= 0 || line.cantidad > 1_000_000;
+  const invalidPrice = !Number.isFinite(line.precioVentaUnitario) || line.precioVentaUnitario < 0 || !hasAtMostTwoDecimals(line.precioVentaUnitario);
+  const invalidDiscount = !Number.isFinite(line.descuento) || line.descuento < 0 || line.descuento > 100 || !hasAtMostTwoDecimals(line.descuento);
+  const invalidVat = !CURRENT_FISCAL_POLICY.selectableVatRates.includes(line.iva);
+  const priceOverridden = line.catalogBasePrice !== undefined && Math.abs(line.precioVentaUnitario - line.catalogBasePrice) >= 0.005;
+  const invalidOverride = priceOverridden && !line.priceOverrideReason?.trim();
+  const invalid = invalidDescription || invalidQuantity || invalidPrice || invalidDiscount || invalidVat || invalidOverride;
+  const categoryOptions = [...new Set(["General", "Demoliciones", "Albañilería", "Instalaciones", "Carpintería", "Acabados", ...categories])];
   return (
-    <article className="estimate-line">
+    <article className={invalid ? "estimate-line estimate-line--invalid" : "estimate-line"}>
       <header>
-        <strong>Partida {index + 1}</strong>
-        {canRemove && (
-          <button
-            type="button"
-            className="estimate-line__remove"
-            onClick={onRemove}
-          >
-            Eliminar
-          </button>
-        )}
+        <div><span>Partida {index + 1}</span><strong>{line.descripcion || "Sin descripción"}</strong></div>
+        <button
+          type="button"
+          className="estimate-line__remove"
+          aria-label={`Eliminar partida ${index + 1}: ${line.descripcion || "sin descripción"}`}
+          onClick={onRemove}
+        >
+          Eliminar
+        </button>
       </header>
-      <div className="estimate-line__main">
-        <label>
-          Descripción *
-          <input
-            required
-            value={line.descripcion}
-            placeholder="Ej. Demolición y retirada"
-            onChange={(event) => onChange({ descripcion: event.target.value })}
-          />
-        </label>
-        <label>
-          Categoría
-          <select
-            value={line.categoria}
-            onChange={(event) => onChange({ categoria: event.target.value })}
-          >
-            <option value="General">General</option>
-            <option value="Demoliciones">Demoliciones</option>
-            <option value="Albañilería">Albañilería</option>
-            <option value="Instalaciones">Instalaciones</option>
-            <option value="Carpintería">Carpintería</option>
-            <option value="Acabados">Acabados</option>
-            {categories.filter((category) => !["General", "Demoliciones", "Instalaciones", "Acabados"].includes(category)).map((category) => (
-              <option key={category} value={category}>{category}</option>
-            ))}
-          </select>
-        </label>
+      <div className="estimate-line__quick">
         <label>
           Cantidad *
           <input
@@ -1013,6 +1131,7 @@ function EstimateLineEditor({
             step="0.01"
             type="number"
             value={line.cantidad}
+            aria-invalid={invalidQuantity}
             onChange={(event) =>
               onChange({ cantidad: Number(event.target.value) })
             }
@@ -1029,7 +1148,6 @@ function EstimateLineEditor({
             <option value="ml">ml</option>
             <option value="h">h</option>
             <option value="global">global</option>
-            <option value="mes">mes</option>
           </select>
         </label>
         <label>
@@ -1040,37 +1158,25 @@ function EstimateLineEditor({
             step="0.01"
             type="number"
             value={line.precioVentaUnitario}
+            aria-invalid={invalidPrice}
             onChange={(event) =>
               onChange({ precioVentaUnitario: Number(event.target.value) })
             }
           />
         </label>
-        <label>
-          Descuento (%)
-          <input
-            min="0"
-            max="100"
-            step="0.01"
-            type="number"
-            value={line.descuento}
-            onChange={(event) =>
-              onChange({ descuento: Number(event.target.value) })
-            }
-          />
-        </label>
-        <label>
-          IVA (%)
-          <select
-            value={line.iva}
-            onChange={(event) => onChange({ iva: Number(event.target.value) })}
-          >
-            {CURRENT_FISCAL_POLICY.selectableVatRates.map((rate) => (
-              <option key={rate} value={rate}>{rate}%</option>
-            ))}
-          </select>
-        </label>
+        <span className="estimate-line__quick-total">Importe<strong>{formatMoney(sale)}</strong></span>
       </div>
-      <details className="estimate-line__internal" open>
+      <details className="estimate-line__advanced">
+        <summary>Editar descripción, categoría, descuento e IVA</summary>
+        <div>
+          <label>Descripción *<input required value={line.descripcion} aria-invalid={invalidDescription} placeholder="Ej. Demolición y retirada" onChange={(event) => onChange({ descripcion: event.target.value })} /></label>
+          <label>Categoría<select value={line.categoria} onChange={(event) => onChange({ categoria: event.target.value })}>{categoryOptions.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
+          <label>Descuento (%)<input min="0" max="100" step="0.01" type="number" value={line.descuento} aria-invalid={invalidDiscount} onChange={(event) => onChange({ descuento: Number(event.target.value) })} /></label>
+          <label>IVA (%)<select value={line.iva} aria-invalid={invalidVat} onChange={(event) => onChange({ iva: Number(event.target.value) })}>{CURRENT_FISCAL_POLICY.selectableVatRates.map((rate) => <option key={rate} value={rate}>{rate}%</option>)}</select></label>
+          {priceOverridden && <label className="estimate-line__override">Motivo del ajuste de precio *<textarea required rows={2} value={line.priceOverrideReason ?? ""} aria-invalid={invalidOverride} placeholder={`Precio de catálogo: ${formatMoney(line.catalogBasePrice!)}`} onChange={event => onChange({ priceOverrideReason: event.target.value })} /></label>}
+        </div>
+      </details>
+      <details className="estimate-line__internal">
         <summary>
           Control interno <span>No visible para el cliente</span>
         </summary>
@@ -1131,5 +1237,6 @@ function lineFromCatalog(
     precioVentaUnitario: item.precio,
     costeUnitario: item.costeUnitario ?? null,
     iva: item.iva,
+    ...(item.id && item.priceVersion ? { catalogItemId: item.id, catalogReference: item.ref, catalogPriceVersion: item.priceVersion, catalogBasePrice: item.precio } : {}),
   };
 }

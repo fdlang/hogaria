@@ -45,3 +45,21 @@ describe("salesController opportunities", () => {
     expect(update.mock.calls[0]?.[2]).not.toHaveProperty("expectedUpdatedAt");
   });
 });
+
+describe("salesController estimate drafts", () => {
+  it("requires and forwards the expected estimate version", async () => {
+    const update = vi.fn(async () => ({ id: 9 }));
+    const publicGet = vi.fn(async () => ({ id: 9, updatedAt: "2026-10-11T10:00:00.001Z" }));
+    const controller = salesController({ opportunities: {} as never, estimates: { update, publicGet } as never, changes: {} as never });
+
+    const missing = await controller.updateEstimate({ ...request, params: { id: "9" }, body: { borrador: {} } });
+    expect(missing.status).toBe(422);
+    expect(update).not.toHaveBeenCalled();
+
+    const expected = "2026-10-11T10:00:00.000Z";
+    const response = await controller.updateEstimate({ ...request, params: { id: "9" }, body: { borrador: { titulo: "Cocina" }, expectedUpdatedAt: expected } });
+    expect(response.status).toBe(200);
+    expect(update).toHaveBeenCalledWith(1, 9, { titulo: "Cocina" }, new Date(expected));
+    expect(response.body).toMatchObject({ id: 9, updatedAt: "2026-10-11T10:00:00.001Z" });
+  });
+});
