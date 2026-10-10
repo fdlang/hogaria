@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
+const LEGACY_EOL_CHECKSUMS = Object.freeze({
+  "notification-outbox.sql": ["d125ca904b462c883d2c57498ee4840190767d9be10360d86716a95d83e954bb"],
+});
+
 export const MIGRATIONS = [
   "schema.sql",
   "migrate-account-activation.sql",
@@ -22,7 +26,18 @@ export const MIGRATIONS = [
   "catalog-cost-composition.sql",
 ];
 
-export const migrationChecksum = (sql) => createHash("sha256").update(sql).digest("hex");
+const sha256 = (sql) => createHash("sha256").update(sql).digest("hex");
+export const normalizeMigrationSql = (sql) => sql.replace(/\r\n?/g, "\n");
+export const migrationChecksum = (sql) => sha256(normalizeMigrationSql(sql));
+export function migrationChecksumCandidates(name, sql) {
+  const normalized = normalizeMigrationSql(sql);
+  return new Set([
+    migrationChecksum(normalized),
+    sha256(sql),
+    sha256(normalized.replace(/\n/g, "\r\n")),
+    ...(LEGACY_EOL_CHECKSUMS[name] ?? []),
+  ]);
+}
 
 export async function applyMigrations(pool, load = (name) =>
   readFile(new URL(`../database/${name}`, import.meta.url), "utf8")) {
@@ -42,7 +57,7 @@ export async function applyMigrations(pool, load = (name) =>
       const sql = await load(name);
       const digest = migrationChecksum(sql);
       const previous = applied.get(name);
-      if (previous && previous !== digest) {
+      if (previous && !migrationChecksumCandidates(name, sql).has(previous)) {
         throw new Error(`La migracion aplicada ${name} ha cambiado; crea una migracion incremental nueva`);
       }
       if (previous) continue;

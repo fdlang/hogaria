@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import pg from "pg";
-import { MIGRATIONS, migrationChecksum } from "./migrations.mjs";
+import { MIGRATIONS, migrationChecksum, migrationChecksumCandidates } from "./migrations.mjs";
 
 const REQUIRED_SECRETS = ["HMAC_SECRET", "SIGNATURE_HMAC_SECRET"];
 
@@ -67,7 +67,7 @@ export function assessSignatureInventory(inventory, env) {
 async function expectedMigrationChecksums() {
   const entries = await Promise.all(MIGRATIONS.map(async (name) => {
     const sql = await readFile(new URL(`../database/${name}`, import.meta.url), "utf8");
-    return [name, migrationChecksum(sql)];
+    return [name, { canonical: migrationChecksum(sql), accepted: migrationChecksumCandidates(name, sql) }];
   }));
   return new Map(entries);
 }
@@ -82,12 +82,12 @@ export async function inspectProductionDatabase(pool, env) {
   if (relations?.ledger) {
     const expected = await expectedMigrationChecksums();
     const applied = new Map((await pool.query("SELECT name, checksum FROM schema_migrations")).rows.map((row) => [row.name, row.checksum]));
-    for (const [name, checksum] of expected) {
+    for (const [name, checksums] of expected) {
       if (!applied.has(name)) errors.push(`Migracion pendiente: ${name}`);
-      else if (applied.get(name) !== checksum) errors.push(`Checksum distinto en migracion aplicada: ${name}`);
+      else if (!checksums.accepted.has(applied.get(name))) errors.push(`Checksum distinto en migracion aplicada: ${name}`);
     }
     for (const name of applied.keys()) if (!expected.has(name)) warnings.push(`Migracion registrada pero desconocida por este codigo: ${name}`);
-    if (applied.get("catalog-governance.sql") === expected.get("catalog-governance.sql")) {
+    if (expected.get("catalog-governance.sql")?.accepted.has(applied.get("catalog-governance.sql"))) {
       const usableCatalogItems = Number((await pool.query("SELECT count(*) FROM catalog_items WHERE active=true AND review_status='verified' AND (valid_from IS NULL OR valid_from<=CURRENT_DATE) AND (valid_until IS NULL OR valid_until>=CURRENT_DATE)")).rows[0]?.count ?? 0);
       if (usableCatalogItems === 0) errors.push("El catalogo no contiene ninguna partida verificada y vigente");
     }

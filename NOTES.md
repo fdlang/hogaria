@@ -1,15 +1,15 @@
-- Estado: producción desplegada y verificada el 2026-10-10 (commit 84c2290).
+- Estado: migración de catálogo aplicada; corrección multiplataforma de checksums validada y pendiente de commit/push.
 - Hecho: gobernanza del catálogo pendiente/verificado/archivado e histórico inmutable.
 - Hecho: preflight de build comprueba esquema, firmas y catálogo operativo.
 - Hecho: instantáneas fiscales legacy, rate limit de login y límite Bcrypt corregidos.
 - Hecho: operaciones ya no esperan envío externo de correo.
 - Hecho: borrador comercial recuperable tras expirar sesión y PDF progresivo.
 - Hecho: Jornadas solo en obra en curso; cronología de hitos validada.
-- Hecho: typecheck, build, 335 tests y 124 flujos Chromium/WebKit correctos; npm audit limpio.
 - Pendiente: identidad legal, domicilio, proveedores/regiones y matriz de retención aprobada.
 - Hecho: 60 precios aportados por administración quedan verificados hasta 2027-01-10; 7 candidatos sin precio siguen pendientes.
 - Hecho: catálogo descompuesto por mano de obra, materiales y auxiliares con cálculo automático.
 - Hecho: unidades cerradas, zona Madrid, versión e histórico de precios incorporados.
 - Hecho: registros anteriores conservados como importes heredados, sin inventar componentes.
-- Validado: typecheck y 337 tests correctos; migración completa probada en PostgreSQL efímero.
-- Pendiente: ejecutar catalog-cost-composition.sql en el entorno correspondiente antes de desplegar.
+- Validado: typecheck, build y 340 tests correctos; migración completa probada en PostgreSQL efímero.
+- Hecho: checksums de migración canónicos entre Windows y Linux con compatibilidad histórica limitada.
+- Pendiente: publicar la corrección y verificar el preflight del despliegue de producción.
