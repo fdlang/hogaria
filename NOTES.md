@@ -1,4 +1,4 @@
-- Estado: catálogo de costes y plantillas implementado; base objetivo migrada, código pendiente de despliegue.
+- Estado: catálogo de costes y plantillas desplegado en producción.
 - Hecho: desglose interno de mano de obra, material, auxiliares, gastos y margen objetivo.
 - Hecho: fuente, fecha, vigencia, sinónimos y tipo simple/compuesto con validación API/BD.
 - Hecho: histórico automático e inmutable de cambios de precio mediante migración incremental.
@@ -11,5 +11,5 @@
 - Validación: build de API y web correcto.
 - Validación: 124 pruebas de navegador; un timeout WebKit pasó al repetirlo aisladamente.
 - Producción: `catalog-pricing.sql` aplicada; segunda ejecución 0 migraciones; seed preservó datos existentes.
-- Pendiente operativo: la configuración local no puede verificar firmas v3 con key id `sig-2026-10`.
+- Producción: Vercel `Ready`; aliases activos; landing 200 y catálogo sin sesión 401.
 - Pendiente negocio: fijar gastos, margen y precio de venta antes de activar cada nueva partida.
