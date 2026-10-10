@@ -26,6 +26,8 @@ function dto(item: CatalogItem) {
     unit: item.unit, salePrice: item.salePrice, vatRate: item.vatRate, active: item.active,
     reviewStatus: item.reviewStatus, replacementReference: item.replacementReference, reviewNote: item.reviewNote,
     itemType: item.itemType, costBreakdown: item.costBreakdown, evidence: item.evidence,
+    costComposition: item.costComposition, pricingMode: item.pricingMode,
+    tariffZone: item.tariffZone, priceVersion: item.priceVersion,
     searchTerms: item.searchTerms, updatedAt: item.updatedAt.toISOString(),
   };
 }

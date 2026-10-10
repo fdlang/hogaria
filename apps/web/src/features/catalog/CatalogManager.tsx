@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { calculateCatalogPrice, catalogActivationIssues, CURRENT_FISCAL_POLICY, type CatalogCostBreakdown } from "@reformapro/domain";
+import { CATALOG_MEASUREMENT_UNITS, calculateCatalogComposition, calculateCatalogPrice, catalogActivationIssues, CURRENT_FISCAL_POLICY, type CatalogCostBreakdown, type CatalogCostComposition } from "@reformapro/domain";
 import { Button } from "@/shared/ui";
 import { formatMoney } from "@/shared/lib/formatters";
 import { SalesApi, type CatalogItemDTO, type CatalogWriteDTO } from "@/features/sales/api/sales.api";
@@ -13,6 +13,10 @@ type Form = {
   overheadPercent: string; targetMarginPercent: string; sourceName: string; sourceUrl: string;
   priceDate: string; validFrom: string; validUntil: string; searchTerms: string;
   replacementReference: string; reviewNote: string;
+  pricingMode: "legacy_total" | "decomposed"; tariffZone: "Madrid";
+  labor: { trade: string; performanceHoursPerUnit: string; hourlyCost: string }[];
+  materials: { description: string; unit: string; quantityPerUnit: string; unitCost: string }[];
+  auxiliaries: { description: string; amountPerUnit: string }[];
 };
 
 const blank = (): Form => ({
@@ -21,6 +25,7 @@ const blank = (): Form => ({
   materialCost: "", auxiliaryCost: "", overheadPercent: "", targetMarginPercent: "",
   sourceName: "", sourceUrl: "", priceDate: "", validFrom: "", validUntil: "", searchTerms: "",
   replacementReference: "", reviewNote: "",
+  pricingMode: "decomposed", tariffZone: "Madrid", labor: [], materials: [], auxiliaries: [],
 });
 const optionalNumber = (value: string) => value.trim() === "" ? null : Number(value);
 const optionalText = (value: string) => value.trim() || null;
@@ -29,6 +34,14 @@ const costsFrom = (form: Form): CatalogCostBreakdown => ({
   auxiliaryCost: optionalNumber(form.auxiliaryCost), overheadPercent: optionalNumber(form.overheadPercent),
   targetMarginPercent: optionalNumber(form.targetMarginPercent),
 });
+const compositionFrom = (form: Form): CatalogCostComposition => ({
+  labor: form.labor.map(row => ({ trade: row.trade, performanceHoursPerUnit: Number(row.performanceHoursPerUnit), hourlyCost: Number(row.hourlyCost) })),
+  materials: form.materials.map(row => ({ description: row.description, unit: row.unit, quantityPerUnit: Number(row.quantityPerUnit), unitCost: Number(row.unitCost) })),
+  auxiliaries: form.auxiliaries.map(row => ({ description: row.description, amountPerUnit: Number(row.amountPerUnit) })),
+});
+const effectiveCosts = (form: Form): CatalogCostBreakdown => form.pricingMode === "decomposed"
+  ? { ...costsFrom(form), ...calculateCatalogComposition(compositionFrom(form)) }
+  : costsFrom(form);
 
 export function CatalogManager({ api }: { api: SalesApi }) {
   const { items, loading, error: loadError, reload: load } = useCatalog(api, true);
@@ -42,16 +55,21 @@ export function CatalogManager({ api }: { api: SalesApi }) {
   const categories = useMemo(() => catalogCategories(items), [items]);
   const displayedItems = useMemo(() => filterCatalogItems(items, { search, category, includeArchived }), [items, search, category, includeArchived]);
   const groups = useMemo(() => groupCatalogItems(displayedItems), [displayedItems]);
-  const priceCalculation = useMemo(() => { try { return calculateCatalogPrice(costsFrom(form)); } catch { return null; } }, [form]);
+  const priceCalculation = useMemo(() => { try { return calculateCatalogPrice(effectiveCosts(form)); } catch { return null; } }, [form]);
   const set = (field: keyof Form, value: string) => setForm(current => ({ ...current, [field]: value }));
 
   const submit = async () => {
-    const validation = validateCatalogForm(form);
+    if (form.pricingMode === "decomposed" && (!priceCalculation || form.labor.length + form.materials.length + form.auxiliaries.length === 0)) {
+      setError("Completa al menos un recurso con descripción, rendimiento, cantidad y coste válidos."); return;
+    }
+    const calculatedSalePrice = form.pricingMode === "decomposed" ? priceCalculation?.suggestedSalePrice : Number(form.salePrice);
+    const validation = validateCatalogForm({ ...form, salePrice: calculatedSalePrice == null ? "" : String(calculatedSalePrice) });
     if (Object.keys(validation).length) { setError(Object.values(validation)[0] ?? "Revisa los campos obligatorios"); return; }
     const payload: CatalogWriteDTO = {
-      reference: form.reference, category: form.category, description: form.description, unit: form.unit,
-      salePrice: Number(form.salePrice), vatRate: Number(form.vatRate), itemType: form.itemType,
-      costBreakdown: costsFrom(form),
+      reference: form.reference, category: form.category, description: form.description, unit: form.unit as CatalogWriteDTO["unit"],
+      salePrice: calculatedSalePrice ?? 0, vatRate: Number(form.vatRate), itemType: form.itemType,
+      pricingMode: form.pricingMode, tariffZone: form.tariffZone, costComposition: compositionFrom(form),
+      costBreakdown: effectiveCosts(form),
       evidence: {
         sourceName: optionalText(form.sourceName), sourceUrl: optionalText(form.sourceUrl),
         priceDate: optionalText(form.priceDate), validFrom: optionalText(form.validFrom), validUntil: optionalText(form.validUntil),
@@ -78,6 +96,10 @@ export function CatalogManager({ api }: { api: SalesApi }) {
       sourceUrl: item.evidence.sourceUrl ?? "", priceDate: item.evidence.priceDate ?? "", validFrom: item.evidence.validFrom ?? "",
       validUntil: item.evidence.validUntil ?? "", searchTerms: item.searchTerms.join(", "),
       replacementReference: item.replacementReference ?? "", reviewNote: item.reviewNote ?? "",
+      pricingMode: item.pricingMode, tariffZone: item.tariffZone,
+      labor: item.costComposition.labor.map(row => ({ ...row, performanceHoursPerUnit: String(row.performanceHoursPerUnit), hourlyCost: String(row.hourlyCost) })),
+      materials: item.costComposition.materials.map(row => ({ ...row, quantityPerUnit: String(row.quantityPerUnit), unitCost: String(row.unitCost) })),
+      auxiliaries: item.costComposition.auxiliaries.map(row => ({ ...row, amountPerUnit: String(row.amountPerUnit) })),
     });
     requestAnimationFrame(() => {
       const input = document.querySelector<HTMLInputElement>(".catalog-manager .sales-card input");
@@ -115,25 +137,53 @@ export function CatalogManager({ api }: { api: SalesApi }) {
         <label>Referencia *<input value={form.reference} onChange={event => set("reference", event.target.value)} placeholder="DEM-007" /></label>
         <label>Categoría *<input list="catalog-categories" value={form.category} onChange={event => set("category", event.target.value)} placeholder="Demoliciones" /><datalist id="catalog-categories">{categories.map(value => <option key={value} value={value} />)}</datalist></label>
         <label>Descripción *<input value={form.description} onChange={event => set("description", event.target.value)} /></label>
-        <label>Unidad *<input value={form.unit} onChange={event => set("unit", event.target.value)} /></label>
-        <label>Precio sin IVA *<input type="number" min="0" step="0.01" value={form.salePrice} onChange={event => set("salePrice", event.target.value)} /></label>
+        <label>Unidad *<select value={form.unit} onChange={event => set("unit", event.target.value)}>{CATALOG_MEASUREMENT_UNITS.map(unit => <option key={unit}>{unit}</option>)}</select></label>
+        <label>Precio sin IVA *<input type="number" min="0" step="0.01" readOnly={form.pricingMode === "decomposed"} value={form.pricingMode === "decomposed" ? priceCalculation?.suggestedSalePrice ?? "" : form.salePrice} onChange={event => set("salePrice", event.target.value)} /></label>
         <label>IVA (%) *<select value={form.vatRate} onChange={event => set("vatRate", event.target.value)}>{CURRENT_FISCAL_POLICY.selectableVatRates.map(rate => <option key={rate} value={rate}>{rate}%</option>)}</select></label>
       </div>
       <details className="catalog-manager__pricing">
         <summary>Coste y trazabilidad <small>Información interna; el cliente no la ve</small></summary>
         <div className="estimate-line__main">
           <label>Tipo<select value={form.itemType} onChange={event => set("itemType", event.target.value)}><option value="simple">Simple</option><option value="composite">Compuesta</option></select></label>
-          <label>Mano de obra<input type="number" min="0" step="0.01" value={form.laborCost} onChange={event => set("laborCost", event.target.value)} /></label>
+          <label>Modelo de cálculo<select value={form.pricingMode} onChange={event => set("pricingMode", event.target.value)} disabled={editing == null}><option value="decomposed">Descompuesto</option><option value="legacy_total">Importes heredados</option></select></label>
+          <label>Zona tarifaria<input value={form.tariffZone} readOnly /></label>
+          {form.pricingMode === "legacy_total" && <><label>Mano de obra<input type="number" min="0" step="0.01" value={form.laborCost} onChange={event => set("laborCost", event.target.value)} /></label>
           <label>Material<input type="number" min="0" step="0.01" value={form.materialCost} onChange={event => set("materialCost", event.target.value)} /></label>
-          <label>Auxiliares<input type="number" min="0" step="0.01" value={form.auxiliaryCost} onChange={event => set("auxiliaryCost", event.target.value)} /></label>
+          <label>Auxiliares<input type="number" min="0" step="0.01" value={form.auxiliaryCost} onChange={event => set("auxiliaryCost", event.target.value)} /></label></>}
           <label>Gastos generales (%)<input type="number" min="0" max="100" step="0.01" value={form.overheadPercent} onChange={event => set("overheadPercent", event.target.value)} /></label>
           <label>Margen bruto objetivo (%)<input type="number" min="0" max="99.99" step="0.01" value={form.targetMarginPercent} onChange={event => set("targetMarginPercent", event.target.value)} /></label>
         </div>
+        {form.pricingMode === "decomposed" && <div className="catalog-manager__resources">
+          <h3>Mano de obra</h3>
+          {form.labor.map((row, index) => <div className="estimate-line__main" key={`labor-${index}`}>
+            <label>Oficio<input value={row.trade} onChange={event => setForm(current => ({ ...current, labor: current.labor.map((item, position) => position === index ? { ...item, trade: event.target.value } : item) }))} /></label>
+            <label>Horas por {form.unit}<input type="number" min="0" step="0.0001" value={row.performanceHoursPerUnit} onChange={event => setForm(current => ({ ...current, labor: current.labor.map((item, position) => position === index ? { ...item, performanceHoursPerUnit: event.target.value } : item) }))} /></label>
+            <label>Coste/hora<input type="number" min="0" step="0.01" value={row.hourlyCost} onChange={event => setForm(current => ({ ...current, labor: current.labor.map((item, position) => position === index ? { ...item, hourlyCost: event.target.value } : item) }))} /></label>
+            <Button small variant="ghost" onClick={() => setForm(current => ({ ...current, labor: current.labor.filter((_, position) => position !== index) }))}>Quitar</Button>
+          </div>)}
+          <Button small variant="ghost" onClick={() => setForm(current => ({ ...current, labor: [...current.labor, { trade: "", performanceHoursPerUnit: "", hourlyCost: "" }] }))}>+ Mano de obra</Button>
+          <h3>Materiales</h3>
+          {form.materials.map((row, index) => <div className="estimate-line__main" key={`material-${index}`}>
+            <label>Material<input value={row.description} onChange={event => setForm(current => ({ ...current, materials: current.materials.map((item, position) => position === index ? { ...item, description: event.target.value } : item) }))} /></label>
+            <label>Unidad<input value={row.unit} onChange={event => setForm(current => ({ ...current, materials: current.materials.map((item, position) => position === index ? { ...item, unit: event.target.value } : item) }))} /></label>
+            <label>Cantidad por {form.unit}<input type="number" min="0" step="0.0001" value={row.quantityPerUnit} onChange={event => setForm(current => ({ ...current, materials: current.materials.map((item, position) => position === index ? { ...item, quantityPerUnit: event.target.value } : item) }))} /></label>
+            <label>Coste unitario<input type="number" min="0" step="0.01" value={row.unitCost} onChange={event => setForm(current => ({ ...current, materials: current.materials.map((item, position) => position === index ? { ...item, unitCost: event.target.value } : item) }))} /></label>
+            <Button small variant="ghost" onClick={() => setForm(current => ({ ...current, materials: current.materials.filter((_, position) => position !== index) }))}>Quitar</Button>
+          </div>)}
+          <Button small variant="ghost" onClick={() => setForm(current => ({ ...current, materials: [...current.materials, { description: "", unit: "ud", quantityPerUnit: "", unitCost: "" }] }))}>+ Material</Button>
+          <h3>Medios auxiliares</h3>
+          {form.auxiliaries.map((row, index) => <div className="estimate-line__main" key={`aux-${index}`}>
+            <label>Concepto<input value={row.description} onChange={event => setForm(current => ({ ...current, auxiliaries: current.auxiliaries.map((item, position) => position === index ? { ...item, description: event.target.value } : item) }))} /></label>
+            <label>Importe por {form.unit}<input type="number" min="0" step="0.01" value={row.amountPerUnit} onChange={event => setForm(current => ({ ...current, auxiliaries: current.auxiliaries.map((item, position) => position === index ? { ...item, amountPerUnit: event.target.value } : item) }))} /></label>
+            <Button small variant="ghost" onClick={() => setForm(current => ({ ...current, auxiliaries: current.auxiliaries.filter((_, position) => position !== index) }))}>Quitar</Button>
+          </div>)}
+          <Button small variant="ghost" onClick={() => setForm(current => ({ ...current, auxiliaries: [...current.auxiliaries, { description: "", amountPerUnit: "" }] }))}>+ Medio auxiliar</Button>
+        </div>}
         {priceCalculation && <div className="catalog-manager__calculation" aria-live="polite">
           <span>Coste directo <strong>{formatMoney(priceCalculation.directCost)}</strong></span>
           <span>Con gastos <strong>{priceCalculation.costWithOverhead == null ? "—" : formatMoney(priceCalculation.costWithOverhead)}</strong></span>
           <span>Venta sugerida <strong>{priceCalculation.suggestedSalePrice == null ? "—" : formatMoney(priceCalculation.suggestedSalePrice)}</strong></span>
-          {priceCalculation.suggestedSalePrice != null && <Button small variant="ghost" onClick={() => set("salePrice", String(priceCalculation.suggestedSalePrice))}>Usar precio sugerido</Button>}
+          {form.pricingMode === "legacy_total" && priceCalculation.suggestedSalePrice != null && <Button small variant="ghost" onClick={() => set("salePrice", String(priceCalculation.suggestedSalePrice))}>Usar precio sugerido</Button>}
         </div>}
         <p className="form-hint">Si informas un coste, la fuente y la fecha del precio son obligatorias.</p>
         <div className="estimate-line__main">
@@ -171,7 +221,7 @@ export function CatalogManager({ api }: { api: SalesApi }) {
               const status = item.reviewStatus === "verified" ? "Verificada" : item.reviewStatus === "archived" ? "Archivada" : "Pendiente de revisión";
               return <tr key={item.id} style={{ opacity: item.reviewStatus === "archived" ? .55 : 1 }}>
                 <td data-label="Referencia"><code>{item.reference}</code></td>
-                <td data-label="Partida"><strong>{item.description}</strong><br /><small>{item.unit} · IVA {item.vatRate}%{directCost > 0 ? ` · coste ${formatMoney(directCost)}` : ""}</small>{item.evidence.sourceName && <><br /><small>Fuente: {item.evidence.sourceName}{item.evidence.priceDate ? ` · ${item.evidence.priceDate}` : ""}</small></>}</td>
+                <td data-label="Partida"><strong>{item.description}</strong><br /><small>{item.unit} · {item.tariffZone} · versión {item.priceVersion} · IVA {item.vatRate}%{directCost > 0 ? ` · coste ${formatMoney(directCost)}` : ""}</small>{item.evidence.sourceName && <><br /><small>Fuente: {item.evidence.sourceName}{item.evidence.priceDate ? ` · ${item.evidence.priceDate}` : ""}</small></>}</td>
                 <td data-label="Precio">{formatMoney(item.salePrice)}</td>
                 <td data-label="Estado">{status}{item.replacementReference ? <><br /><small>Sustituida por {item.replacementReference}</small></> : null}</td>
                 <td><div className="catalog-manager__row-actions"><Button small variant="ghost" onClick={() => edit(item)}>Editar</Button>{item.reviewStatus === "pending_review" && <Button small onClick={() => void activate(item)}>Validar y activar</Button>}{item.reviewStatus === "archived" && <Button small variant="ghost" onClick={() => void reopen(item)}>Reabrir revisión</Button>}{item.reviewStatus !== "archived" && <Button small variant="ghost" onClick={() => void archive(item)}>Archivar</Button>}</div></td>

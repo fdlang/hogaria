@@ -6,7 +6,7 @@ import { CatalogUseCases } from "./catalog.use-cases.js";
 import type { ICatalogRepository } from "@reformapro/domain/repositories";
 
 const hasher = { hash: async () => "hash", verify: async () => true };
-const input = { reference: "DEM-900", category: "Demoliciones", description: "Partida de prueba", unit: "ud", salePrice: 125, vatRate: 21 };
+const input = { reference: "DEM-900", category: "Demoliciones", description: "Partida de prueba", unit: "ud" as const, salePrice: 125, vatRate: 21 };
 const traceable = {
   ...input,
   evidence: { sourceName: "Tarifa proveedor", sourceUrl: null, priceDate: "2026-10-10", validFrom: "2026-10-10", validUntil: "2027-01-10" },
@@ -68,6 +68,27 @@ describe("CatalogUseCases — administración exclusiva", () => {
     });
     expect(item.evidence.sourceName).toBe("CYPE");
     expect(item.searchTerms).toEqual(["plato de ducha"]);
+  });
+
+  it("calcula el precio de una partida descompuesta sin confiar en totales del cliente", async () => {
+    const { admin, catalog } = await setup();
+    const item = await catalog.create(admin.id, {
+      ...traceable, salePrice: 1, pricingMode: "decomposed", tariffZone: "Madrid",
+      costComposition: {
+        labor: [{ trade: "Oficial", performanceHoursPerUnit: 2, hourlyCost: 25 }],
+        materials: [{ description: "Material", unit: "kg", quantityPerUnit: 3, unitCost: 10 }],
+        auxiliaries: [{ description: "Herramienta", amountPerUnit: 5 }],
+      },
+      costBreakdown: { laborCost: 999, materialCost: 999, auxiliaryCost: 999, overheadPercent: 10, targetMarginPercent: 20 },
+    });
+    expect(item.costBreakdown).toEqual({ laborCost: 50, materialCost: 30, auxiliaryCost: 5, overheadPercent: 10, targetMarginPercent: 20 });
+    expect(item.salePrice).toBe(116.88);
+    expect(item.priceVersion).toBe(1);
+    const revised = await catalog.update(admin.id, item.id, {
+      costBreakdown: { ...item.costBreakdown, overheadPercent: 12 },
+    });
+    expect(revised.priceVersion).toBe(2);
+    expect(revised.salePrice).toBe(119);
   });
 
   it("updates only explicitly supplied fields after normalization", async () => {

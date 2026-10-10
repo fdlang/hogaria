@@ -33,10 +33,10 @@ describe("catalog pricing migration", () => {
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'catalog_items'
-        AND column_name IN ('labor_cost', 'source_name', 'search_terms', 'review_status', 'replacement_reference')
+        AND column_name IN ('labor_cost', 'source_name', 'search_terms', 'review_status', 'replacement_reference', 'labor_breakdown', 'tariff_zone', 'price_version')
       ORDER BY column_name
     `);
-    expect(columns.rows.map(row => row.column_name)).toEqual(["labor_cost", "replacement_reference", "review_status", "search_terms", "source_name"]);
+    expect(columns.rows.map(row => row.column_name)).toEqual(["labor_breakdown", "labor_cost", "price_version", "replacement_reference", "review_status", "search_terms", "source_name", "tariff_zone"]);
 
     await database.query(`
       INSERT INTO catalog_items(
@@ -59,12 +59,17 @@ describe("catalog pricing migration", () => {
       WHERE item.reference='TST-LOCAL' ORDER BY history.id DESC LIMIT 1
     `);
     expect(latest.rows[0]?.snapshot).toMatchObject({ reference: "TST-LOCAL", description: "Validación local", reviewStatus: "pending_review", salePrice: 120 });
+    expect(latest.rows[0]?.snapshot).toMatchObject({ tariffZone: "Madrid", priceVersion: 2, pricingMode: "legacy_total" });
     await expect(database.query("DELETE FROM catalog_price_history")).rejects.toThrow("append-only");
 
     await expect(database.query(`
       INSERT INTO catalog_items(
         reference, category, description, unit, sale_price, vat_rate, active, labor_cost
       ) VALUES('TST-BAD', 'Prueba', 'Sin fuente', 'ud', 0, 21, false, 10)
+    `)).rejects.toThrow();
+    await expect(database.query(`
+      INSERT INTO catalog_items(reference, category, description, unit, sale_price, vat_rate, active)
+      VALUES('TST-UNIT', 'Prueba', 'Unidad inválida', 'mes', 10, 21, false)
     `)).rejects.toThrow();
 
     await database.query(`

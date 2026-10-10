@@ -19,6 +19,7 @@ export const MIGRATIONS = [
   "catalog-governance.sql",
   "catalog-approved-prices.sql",
   "work-tracking-hardening.sql",
+  "catalog-cost-composition.sql",
 ];
 
 export const migrationChecksum = (sql) => createHash("sha256").update(sql).digest("hex");

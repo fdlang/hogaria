@@ -1,5 +1,32 @@
 export type CatalogItemType = "simple" | "composite";
 export type CatalogReviewStatus = "pending_review" | "verified" | "archived";
+export type CatalogMeasurementUnit = "m²" | "ml" | "ud" | "h" | "global";
+export type CatalogPricingMode = "legacy_total" | "decomposed";
+export type CatalogTariffZone = "Madrid";
+
+export interface CatalogLaborComponent {
+  trade: string;
+  performanceHoursPerUnit: number;
+  hourlyCost: number;
+}
+
+export interface CatalogMaterialComponent {
+  description: string;
+  unit: string;
+  quantityPerUnit: number;
+  unitCost: number;
+}
+
+export interface CatalogAuxiliaryComponent {
+  description: string;
+  amountPerUnit: number;
+}
+
+export interface CatalogCostComposition {
+  labor: CatalogLaborComponent[];
+  materials: CatalogMaterialComponent[];
+  auxiliaries: CatalogAuxiliaryComponent[];
+}
 
 export interface CatalogCostBreakdown {
   laborCost: number | null;
@@ -38,6 +65,33 @@ const validPercent = (value: number | null, upperExclusive = false) =>
 export function isValidCatalogCostBreakdown(value: CatalogCostBreakdown): boolean {
   return validMoney(value.laborCost) && validMoney(value.materialCost) && validMoney(value.auxiliaryCost) &&
     validPercent(value.overheadPercent) && validPercent(value.targetMarginPercent, true);
+}
+
+export const CATALOG_MEASUREMENT_UNITS = ["m²", "ml", "ud", "h", "global"] as const;
+export const DEFAULT_CATALOG_TARIFF_ZONE: CatalogTariffZone = "Madrid";
+
+const validLabel = (value: string) => value.trim().length > 0 && value.trim().length <= 120;
+const validQuantity = (value: number) => Number.isFinite(value) && value >= 0 && value <= 999_999_999.9999;
+
+export function isValidCatalogCostComposition(value: CatalogCostComposition): boolean {
+  if (value.labor.length > 100 || value.materials.length > 100 || value.auxiliaries.length > 100) return false;
+  return value.labor.every(row => validLabel(row.trade) && validQuantity(row.performanceHoursPerUnit) && validMoney(row.hourlyCost)) &&
+    value.materials.every(row => validLabel(row.description) && validLabel(row.unit) && validQuantity(row.quantityPerUnit) && validMoney(row.unitCost)) &&
+    value.auxiliaries.every(row => validLabel(row.description) && validMoney(row.amountPerUnit));
+}
+
+/**
+ * Derives unit costs from auditable resources instead of accepting editable totals.
+ * Origin: business. Assumption: Madrid is the initial tariff zone and resources
+ * are expressed per catalogue unit. Valid from 2026-10-10. Next review 2027-01-10.
+ */
+export function calculateCatalogComposition(value: CatalogCostComposition): Pick<CatalogCostBreakdown, "laborCost" | "materialCost" | "auxiliaryCost"> {
+  if (!isValidCatalogCostComposition(value)) throw new RangeError("Composición de costes no válida");
+  return {
+    laborCost: cents(value.labor.reduce((sum, row) => sum + row.performanceHoursPerUnit * row.hourlyCost, 0)),
+    materialCost: cents(value.materials.reduce((sum, row) => sum + row.quantityPerUnit * row.unitCost, 0)),
+    auxiliaryCost: cents(value.auxiliaries.reduce((sum, row) => sum + row.amountPerUnit, 0)),
+  };
 }
 
 /**

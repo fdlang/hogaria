@@ -9,15 +9,21 @@ export type PublicEstimateLineDTO = Pick<EstimateLineDTO, "id" | "categoria" | "
 export type PublicProposalDTO = { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; partidas: PublicEstimateLineDTO[]; totalSinIva: number; totalIva: number; totalConIva: number; enviadoAt: string | null; expiresAt: string | null; firmadoAt: string | null; hash: string | null };
 export type EstimateDTO = { id: number; numero: string; clienteNombre: string; titulo: string; estado: string; versionActual: number; motivoRechazo: string | null; propuesta: PublicProposalDTO | null; createdAt: string; updatedAt: string };
 export type CatalogItemDTO = {
-  id: number; reference: string; category: string; description: string; unit: string;
+  id: number; reference: string; category: string; description: string; unit: "m²" | "ml" | "ud" | "h" | "global";
   salePrice: number; vatRate: number; active: boolean; itemType: "simple" | "composite";
   reviewStatus: "pending_review" | "verified" | "archived";
   replacementReference: string | null; reviewNote: string | null;
   costBreakdown: { laborCost: number | null; materialCost: number | null; auxiliaryCost: number | null; overheadPercent: number | null; targetMarginPercent: number | null };
+  costComposition: {
+    labor: { trade: string; performanceHoursPerUnit: number; hourlyCost: number }[];
+    materials: { description: string; unit: string; quantityPerUnit: number; unitCost: number }[];
+    auxiliaries: { description: string; amountPerUnit: number }[];
+  };
+  pricingMode: "legacy_total" | "decomposed"; tariffZone: "Madrid"; priceVersion: number;
   evidence: { sourceName: string | null; sourceUrl: string | null; priceDate: string | null; validFrom: string | null; validUntil: string | null };
   searchTerms: string[]; updatedAt: string;
 };
-export type CatalogWriteDTO = Pick<CatalogItemDTO, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate"> & Partial<Pick<CatalogItemDTO, "itemType" | "costBreakdown" | "evidence" | "searchTerms" | "active" | "reviewStatus" | "replacementReference" | "reviewNote">>;
+export type CatalogWriteDTO = Pick<CatalogItemDTO, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate"> & Partial<Pick<CatalogItemDTO, "itemType" | "costBreakdown" | "costComposition" | "pricingMode" | "tariffZone" | "evidence" | "searchTerms" | "active" | "reviewStatus" | "replacementReference" | "reviewNote">>;
 export type AdminEstimateDTO = { id: number; oportunidadId: number; estado: string; borrador: EstimateDraftDTO };
 export type ChangeOrderDTO = { id: number; numero: string; estado: string; payload?: EstimateDraftDTO; propuesta?: Pick<PublicProposalDTO, "titulo" | "partidas" | "condicionesPago"> };
 

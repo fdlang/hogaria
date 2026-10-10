@@ -154,6 +154,14 @@ export class PostgresCatalogRepository implements ICatalogRepository {
         overheadPercent: row.overhead_percent == null ? null : Number(row.overhead_percent),
         targetMarginPercent: row.target_margin_percent == null ? null : Number(row.target_margin_percent),
       },
+      costComposition: {
+        labor: row.labor_breakdown ?? [],
+        materials: row.material_breakdown ?? [],
+        auxiliaries: row.auxiliary_breakdown ?? [],
+      },
+      pricingMode: row.pricing_mode ?? "legacy_total",
+      tariffZone: row.tariff_zone ?? "Madrid",
+      priceVersion: Number(row.price_version ?? 1),
       evidence: {
         sourceName: row.source_name ?? null, sourceUrl: row.source_url ?? null,
         priceDate: row.price_date?.toISOString?.().slice(0, 10) ?? row.price_date ?? null,
@@ -173,29 +181,38 @@ export class PostgresCatalogRepository implements ICatalogRepository {
   async findById(id: number) { const result = await this.pool.query("SELECT * FROM catalog_items WHERE id=$1", [id]); return result.rows[0] ? this.map(result.rows[0]) : null; }
   async findByReference(reference: string) { const result = await this.pool.query("SELECT * FROM catalog_items WHERE reference=$1", [reference]); return result.rows[0] ? this.map(result.rows[0]) : null; }
   async save(item: Omit<CatalogItem, "id" | "createdAt" | "updatedAt">) {
-    const c = item.costBreakdown; const e = item.evidence;
+    const c = item.costBreakdown; const e = item.evidence; const composition = item.costComposition;
     const result = await this.pool.query(`INSERT INTO catalog_items(
       reference,category,description,unit,sale_price,vat_rate,active,item_type,
       labor_cost,material_cost,auxiliary_cost,overhead_percent,target_margin_percent,
       source_name,source_url,price_date,valid_from,valid_until,search_terms,
-      review_status,replacement_reference,review_note
-    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
+      review_status,replacement_reference,review_note,pricing_mode,labor_breakdown,
+      material_breakdown,auxiliary_breakdown,tariff_zone,price_version
+    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28) RETURNING *`,
     [item.reference,item.category,item.description,item.unit,item.salePrice,item.vatRate,item.active,item.itemType,
       c.laborCost,c.materialCost,c.auxiliaryCost,c.overheadPercent,c.targetMarginPercent,
       e.sourceName,e.sourceUrl,e.priceDate,e.validFrom,e.validUntil,item.searchTerms,
-      item.reviewStatus,item.replacementReference,item.reviewNote]);
+      item.reviewStatus,item.replacementReference,item.reviewNote,item.pricingMode,JSON.stringify(composition.labor),
+      JSON.stringify(composition.materials),JSON.stringify(composition.auxiliaries),item.tariffZone,item.priceVersion]);
     return this.map(result.rows[0]);
   }
   async update(id: number, changes: Partial<Omit<CatalogItem, "id" | "createdAt" | "updatedAt">>) {
     const flat: Record<string, unknown> = { ...changes };
-    delete flat.costBreakdown; delete flat.evidence;
+    delete flat.costBreakdown; delete flat.costComposition; delete flat.evidence; delete flat.priceVersion;
     if (changes.costBreakdown) Object.assign(flat, changes.costBreakdown);
+    if (changes.costComposition) Object.assign(flat, {
+      laborBreakdown: JSON.stringify(changes.costComposition.labor),
+      materialBreakdown: JSON.stringify(changes.costComposition.materials),
+      auxiliaryBreakdown: JSON.stringify(changes.costComposition.auxiliaries),
+    });
     if (changes.evidence) Object.assign(flat, changes.evidence);
     const columns: Record<string, string> = {
       reference: "reference", category: "category", description: "description", unit: "unit", salePrice: "sale_price", vatRate: "vat_rate", active: "active", itemType: "item_type",
       laborCost: "labor_cost", materialCost: "material_cost", auxiliaryCost: "auxiliary_cost", overheadPercent: "overhead_percent", targetMarginPercent: "target_margin_percent",
       sourceName: "source_name", sourceUrl: "source_url", priceDate: "price_date", validFrom: "valid_from", validUntil: "valid_until", searchTerms: "search_terms",
       reviewStatus: "review_status", replacementReference: "replacement_reference", reviewNote: "review_note",
+      pricingMode: "pricing_mode", laborBreakdown: "labor_breakdown", materialBreakdown: "material_breakdown",
+      auxiliaryBreakdown: "auxiliary_breakdown", tariffZone: "tariff_zone",
     };
     const entries = Object.entries(flat).filter(([key, value]) => columns[key] && value !== undefined);
     if (!entries.length) { const current = await this.findById(id); if (!current) throw new NotFoundError("Partida de catálogo"); return current; }

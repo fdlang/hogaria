@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateCatalogPrice, catalogActivationIssues, isValidCatalogCostBreakdown } from "./catalog-pricing.js";
+import { calculateCatalogComposition, calculateCatalogPrice, catalogActivationIssues, isValidCatalogCostBreakdown } from "./catalog-pricing.js";
 
 describe("catalog pricing", () => {
   it("keeps evidence costs separate until commercial rates are known", () => {
@@ -10,6 +10,19 @@ describe("catalog pricing", () => {
   it("calculates overhead and target gross margin without binary rounding drift", () => {
     expect(calculateCatalogPrice({ laborCost: 75.76, materialCost: 2.55, auxiliaryCost: 0, overheadPercent: 13, targetMarginPercent: 20 }))
       .toEqual({ directCost: 78.31, costWithOverhead: 88.49, suggestedSalePrice: 110.61 });
+  });
+
+  it("derives unit costs from labor, materials and auxiliary resources", () => {
+    expect(() => calculateCatalogComposition({
+      labor: [{ trade: "Oficial albañil", performanceHoursPerUnit: 1.25, hourlyCost: 24.5 }],
+      materials: [{ description: "Mortero", unit: "", quantityPerUnit: 2, unitCost: 3 }],
+      auxiliaries: [{ description: "Herramienta", amountPerUnit: 1.35 }],
+    })).toThrow("Composición");
+    expect(calculateCatalogComposition({
+      labor: [{ trade: "Oficial albañil", performanceHoursPerUnit: 1.25, hourlyCost: 24.5 }],
+      materials: [{ description: "Mortero", unit: "ud", quantityPerUnit: 2, unitCost: 3 }],
+      auxiliaries: [{ description: "Herramienta", amountPerUnit: 1.35 }],
+    })).toEqual({ laborCost: 30.63, materialCost: 6, auxiliaryCost: 1.35 });
   });
 
   it("rejects impossible costs and a one hundred percent target margin", () => {

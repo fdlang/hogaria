@@ -26,7 +26,7 @@ export interface CatalogItem {
   reference: string;
   category: string;
   description: string;
-  unit: string;
+  unit: import("../catalog-pricing.js").CatalogMeasurementUnit;
   salePrice: number;
   vatRate: number;
   active: boolean;
@@ -35,6 +35,10 @@ export interface CatalogItem {
   reviewNote: string | null;
   itemType: import("../catalog-pricing.js").CatalogItemType;
   costBreakdown: import("../catalog-pricing.js").CatalogCostBreakdown;
+  costComposition: import("../catalog-pricing.js").CatalogCostComposition;
+  pricingMode: import("../catalog-pricing.js").CatalogPricingMode;
+  tariffZone: import("../catalog-pricing.js").CatalogTariffZone;
+  priceVersion: number;
   evidence: import("../catalog-pricing.js").CatalogPriceEvidence;
   searchTerms: string[];
   createdAt: Date;

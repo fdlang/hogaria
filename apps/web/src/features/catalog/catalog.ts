@@ -34,7 +34,7 @@ export const CATALOG: CatalogCategory[] = [
   { categoria: "Previos y gestión", items: [
     { ref: "PRE-001", descripcion: "Protección de zonas comunes y vivienda", unidad: "global", precio: 380, iva: 21 },
     { ref: "PRE-002", descripcion: "Implantación, medios auxiliares y señalización", unidad: "global", precio: 650, iva: 21 },
-    { ref: "PRE-003", descripcion: "Coordinación y seguimiento de obra", unidad: "mes", precio: 520, iva: 21 },
+    { ref: "PRE-003", descripcion: "Coordinación y seguimiento de obra", unidad: "global", precio: 520, iva: 21 },
     { ref: "PRE-004", descripcion: "Contenedor y gestión de residuos", unidad: "ud", precio: 420, iva: 21 },
     { ref: "PRE-005", descripcion: "Limpieza final profesional de obra", unidad: "m²", precio: 7.5, iva: 21 },
   ] },
