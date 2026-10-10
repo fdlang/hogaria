@@ -190,7 +190,7 @@ export class InMemoryCatalogRepository implements ICatalogRepository {
   async findById(id: number) { return this.items.find(item => item.id === id) ?? null; }
   async findByReference(reference: string) { return this.items.find(item => item.reference === reference) ?? null; }
   async save(item: Omit<CatalogItem, "id" | "createdAt" | "updatedAt">) { const now = new Date(); const saved = { ...item, id: this.nextId++, createdAt: now, updatedAt: now }; this.items.push(saved); return saved; }
-  async update(id: number, changes: Partial<Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate" | "active">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Partida de catálogo"); const next = { ...old, ...changes, updatedAt: new Date() }; this.items[this.items.indexOf(old)] = next; return next; }
+  async update(id: number, changes: Partial<Omit<CatalogItem, "id" | "createdAt" | "updatedAt">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Partida de catálogo"); const next = { ...old, ...changes, updatedAt: new Date() }; this.items[this.items.indexOf(old)] = next; return next; }
 }
 
 export class InMemoryEstimateRepository implements IEstimateRepository {

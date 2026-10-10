@@ -1,15 +1,25 @@
 import type { CatalogItem, User } from "@reformapro/domain/entities";
 import type { ICatalogRepository, IUserRepository } from "@reformapro/domain/repositories";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@reformapro/domain/errors";
-import { fiscalPolicyAt, hasAtMostTwoDecimals } from "@reformapro/domain";
+import {
+  fiscalPolicyAt, hasAtMostTwoDecimals, isValidCatalogCostBreakdown,
+  type CatalogCostBreakdown, type CatalogItemType, type CatalogPriceEvidence,
+} from "@reformapro/domain";
 
-type CatalogInput = Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate">;
+type CatalogBaseInput = Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate">;
+type CatalogInput = CatalogBaseInput & Partial<Pick<CatalogItem, "itemType" | "costBreakdown" | "evidence" | "searchTerms">>;
 type CatalogPatch = Partial<CatalogInput & Pick<CatalogItem, "active">>;
+
+const emptyCosts = (): CatalogCostBreakdown => ({ laborCost: null, materialCost: null, auxiliaryCost: null, overheadPercent: null, targetMarginPercent: null });
+const emptyEvidence = (): CatalogPriceEvidence => ({ sourceName: null, sourceUrl: null, priceDate: null, validFrom: null, validUntil: null });
 
 function assertAdmin(user: User | null): asserts user is User { if (!user || user.rol !== "admin") throw new ForbiddenError(); }
 
-function normalize(input: CatalogInput): CatalogInput {
-  const reference = input.reference?.trim().toUpperCase(); const category = input.category?.trim(); const description = input.description?.trim(); const unit = input.unit?.trim();
+function normalize(input: CatalogInput): Omit<CatalogItem, "id" | "active" | "createdAt" | "updatedAt"> {
+  const reference = input.reference?.trim().toUpperCase();
+  const category = input.category?.trim();
+  const description = input.description?.trim();
+  const unit = input.unit?.trim();
   if (!reference || !/^[A-Z0-9][A-Z0-9-]{1,39}$/.test(reference)) throw new ValidationError("Referencia inválida", "reference");
   if (!category || category.length > 80) throw new ValidationError("Categoría obligatoria", "category");
   if (!description || description.length > 280) throw new ValidationError("Descripción obligatoria", "description");
@@ -17,7 +27,28 @@ function normalize(input: CatalogInput): CatalogInput {
   if (!Number.isFinite(input.salePrice) || input.salePrice < 0 || input.salePrice > 999_999_999.99 || !hasAtMostTwoDecimals(input.salePrice)) throw new ValidationError("Precio de venta inválido", "salePrice");
   if (!Number.isInteger(input.vatRate) || input.vatRate < 0 || input.vatRate > 100) throw new ValidationError("IVA inválido", "vatRate");
   if (!fiscalPolicyAt(new Date()).selectableVatRates.includes(input.vatRate)) throw new ValidationError("IVA no permitido por la política fiscal vigente", "vatRate");
-  return { reference, category, description, unit, salePrice: input.salePrice, vatRate: input.vatRate };
+
+  const itemType: CatalogItemType = input.itemType ?? "simple";
+  if (!(["simple", "composite"] as const).includes(itemType)) throw new ValidationError("Tipo de partida inválido", "itemType");
+  const costBreakdown = { ...emptyCosts(), ...input.costBreakdown };
+  if (!isValidCatalogCostBreakdown(costBreakdown) || Object.values(costBreakdown).some(value => value != null && !hasAtMostTwoDecimals(value))) throw new ValidationError("Desglose de costes inválido", "costBreakdown");
+
+  const evidence = { ...emptyEvidence(), ...input.evidence };
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+  for (const key of ["priceDate", "validFrom", "validUntil"] as const) if (evidence[key] != null && !isoDate.test(evidence[key]!)) throw new ValidationError("Fecha de precios inválida", `evidence.${key}`);
+  if (evidence.sourceUrl != null) {
+    try { const url = new URL(evidence.sourceUrl); if (!(["http:", "https:"] as string[]).includes(url.protocol)) throw new Error(); }
+    catch { throw new ValidationError("URL de fuente inválida", "evidence.sourceUrl"); }
+  }
+  if (evidence.validFrom && evidence.validUntil && evidence.validUntil < evidence.validFrom) throw new ValidationError("La vigencia final no puede ser anterior a la inicial", "evidence.validUntil");
+  const hasCosts = [costBreakdown.laborCost, costBreakdown.materialCost, costBreakdown.auxiliaryCost].some(value => value != null);
+  if (hasCosts && (!evidence.sourceName?.trim() || !evidence.priceDate)) throw new ValidationError("Los costes contrastados requieren fuente y fecha", "evidence.sourceName");
+  evidence.sourceName = evidence.sourceName?.trim() || null;
+  evidence.sourceUrl = evidence.sourceUrl?.trim() || null;
+
+  const searchTerms = [...new Set((input.searchTerms ?? []).map(term => term.trim().toLocaleLowerCase("es")).filter(Boolean))];
+  if (searchTerms.some(term => term.length > 60) || searchTerms.length > 20) throw new ValidationError("Sinónimos inválidos", "searchTerms");
+  return { reference, category, description, unit, salePrice: input.salePrice, vatRate: input.vatRate, itemType, costBreakdown, evidence, searchTerms };
 }
 
 export class CatalogUseCases {
@@ -31,10 +62,18 @@ export class CatalogUseCases {
   async update(actorId: number, id: number, input: CatalogPatch) {
     assertAdmin(await this.users.findById(actorId)); const current = await this.catalog.findById(id); if (!current) throw new NotFoundError("Partida de catálogo");
     if (input.active !== undefined && typeof input.active !== "boolean") throw new ValidationError("Estado no válido", "active");
-    const candidate = normalize({ reference: input.reference ?? current.reference, category: input.category ?? current.category, description: input.description ?? current.description, unit: input.unit ?? current.unit, salePrice: input.salePrice ?? current.salePrice, vatRate: input.vatRate ?? current.vatRate });
+    const candidate = normalize({
+      reference: input.reference ?? current.reference, category: input.category ?? current.category,
+      description: input.description ?? current.description, unit: input.unit ?? current.unit,
+      salePrice: input.salePrice ?? current.salePrice, vatRate: input.vatRate ?? current.vatRate,
+      itemType: input.itemType ?? current.itemType,
+      costBreakdown: { ...(current.costBreakdown ?? emptyCosts()), ...(input.costBreakdown ?? {}) },
+      evidence: { ...(current.evidence ?? emptyEvidence()), ...(input.evidence ?? {}) },
+      searchTerms: input.searchTerms ?? current.searchTerms ?? [],
+    });
     if (candidate.reference !== current.reference) { const existing = await this.catalog.findByReference(candidate.reference); if (existing && existing.id !== id) throw new ConflictError("Ya existe una partida con esa referencia"); }
     const changes: CatalogPatch = {};
-    for (const key of ["reference", "category", "description", "unit", "salePrice", "vatRate"] as const) {
+    for (const key of ["reference", "category", "description", "unit", "salePrice", "vatRate", "itemType", "costBreakdown", "evidence", "searchTerms"] as const) {
       if (input[key] !== undefined) changes[key] = candidate[key] as never;
     }
     if (input.active !== undefined) changes.active = input.active;

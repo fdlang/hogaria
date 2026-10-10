@@ -1,12 +1,15 @@
-- Estado: centro de notificaciones multicanal terminado en la rama actual; pendiente de commit, migración y despliegue.
-- Hecho: campana persistente por usuario con contador, histórico paginado, lectura individual/global y actualización periódica.
-- Hecho: una política de dominio decide destinatarios por rol y excluye al actor, datos reservados y áreas ajenas.
-- Hecho: outbox transaccional; la campana y el correo tienen estados, reintentos e idempotencia independientes.
-- Hecho: eventos cubiertos para solicitudes, presupuestos, obras, documentos, órdenes de cambio y jornadas.
-- Hecho: enlaces construidos en cliente desde rutas cerradas por rol; la API no entrega URL ni texto arbitrario.
-- Hecho: la cola antigua queda solo para confirmaciones externas ya existentes, sin duplicar nuevos avisos de cuenta.
-- Validación: typecheck, 312 tests, build y 10 pruebas responsive de navegación en Chromium/WebKit correctos.
-- Operación: ejecutar la migración versionada `app-notifications.sql` antes de desplegar esta versión.
-- Operación: `CLIENT_NOTIFICATIONS_ENABLED=true` activa correo; la campana funciona aunque el correo esté desactivado.
-- Compatibilidad temporal: retirar `SIGNATURE_HMAC_LEGACY_V2_USE_SESSION_KEY` cuando no queden firmas v2.
-- Pendiente gestor/DPD: identidad fiscal, política fiscal y retención de IP, user-agent y auditoría.
+- Estado: catálogo de costes y plantillas implementado; base objetivo migrada, código pendiente de despliegue.
+- Hecho: desglose interno de mano de obra, material, auxiliares, gastos y margen objetivo.
+- Hecho: fuente, fecha, vigencia, sinónimos y tipo simple/compuesto con validación API/BD.
+- Hecho: histórico automático e inmutable de cambios de precio mediante migración incremental.
+- Hecho: cálculo de venta sugerida; nunca sustituye el precio sin acción del administrador.
+- Hecho: plantillas de baño, cocina y armarios con mediciones revisables antes de guardar.
+- Hecho: 7 partidas de mano de obra contrastadas con CYPE, archivadas y sin precio de venta.
+- Hecho: metadatos de regla HOG-CAT-002 y tests de cálculo, trazabilidad y plantillas.
+- Validación: typecheck completo correcto.
+- Validación: 64 archivos y 328 tests correctos; migración PGlite e idempotencia verificadas.
+- Validación: build de API y web correcto.
+- Validación: 124 pruebas de navegador; un timeout WebKit pasó al repetirlo aisladamente.
+- Producción: `catalog-pricing.sql` aplicada; segunda ejecución 0 migraciones; seed preservó datos existentes.
+- Pendiente operativo: la configuración local no puede verificar firmas v3 con key id `sig-2026-10`.
+- Pendiente negocio: fijar gastos, margen y precio de venta antes de activar cada nueva partida.

@@ -8,7 +8,14 @@ export type EstimateDraftDTO = { titulo: string; referencia?: string; validezDia
 export type PublicEstimateLineDTO = Pick<EstimateLineDTO, "id" | "categoria" | "descripcion" | "cantidad" | "unidad" | "precioVentaUnitario" | "descuento" | "iva" | "notaCliente">;
 export type PublicProposalDTO = { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; partidas: PublicEstimateLineDTO[]; totalSinIva: number; totalIva: number; totalConIva: number; enviadoAt: string | null; expiresAt: string | null; firmadoAt: string | null; hash: string | null };
 export type EstimateDTO = { id: number; numero: string; clienteNombre: string; titulo: string; estado: string; versionActual: number; motivoRechazo: string | null; propuesta: PublicProposalDTO | null; createdAt: string; updatedAt: string };
-export type CatalogItemDTO = { id: number; reference: string; category: string; description: string; unit: string; salePrice: number; vatRate: number; active: boolean; updatedAt: string };
+export type CatalogItemDTO = {
+  id: number; reference: string; category: string; description: string; unit: string;
+  salePrice: number; vatRate: number; active: boolean; itemType: "simple" | "composite";
+  costBreakdown: { laborCost: number | null; materialCost: number | null; auxiliaryCost: number | null; overheadPercent: number | null; targetMarginPercent: number | null };
+  evidence: { sourceName: string | null; sourceUrl: string | null; priceDate: string | null; validFrom: string | null; validUntil: string | null };
+  searchTerms: string[]; updatedAt: string;
+};
+export type CatalogWriteDTO = Pick<CatalogItemDTO, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate"> & Partial<Pick<CatalogItemDTO, "itemType" | "costBreakdown" | "evidence" | "searchTerms" | "active">>;
 export type AdminEstimateDTO = { id: number; oportunidadId: number; estado: string; borrador: EstimateDraftDTO };
 export type ChangeOrderDTO = { id: number; numero: string; estado: string; payload?: EstimateDraftDTO; propuesta?: Pick<PublicProposalDTO, "titulo" | "partidas" | "condicionesPago"> };
 
@@ -51,8 +58,8 @@ export class SalesApi {
   updateOpportunity(id: number, input: Partial<OpportunityDTO>, expectedUpdatedAt: string) { return this.http.patch<OpportunityDTO>(`/opportunities/${id}`, { ...input, expectedUpdatedAt }); }
   catalog() { return this.http.get<CatalogItemDTO[]>("/catalog"); }
   adminCatalog() { return this.http.get<CatalogItemDTO[]>("/catalog?includeInactive=true"); }
-  createCatalogItem(input: Omit<CatalogItemDTO, "id" | "active" | "updatedAt">) { return this.http.post<CatalogItemDTO>("/catalog", input); }
-  updateCatalogItem(id: number, input: Partial<Omit<CatalogItemDTO, "id" | "updatedAt">>) { return this.http.patch<CatalogItemDTO>(`/catalog/${id}`, input); }
+  createCatalogItem(input: CatalogWriteDTO) { return this.http.post<CatalogItemDTO>("/catalog", input); }
+  updateCatalogItem(id: number, input: Partial<CatalogWriteDTO>) { return this.http.patch<CatalogItemDTO>(`/catalog/${id}`, input); }
   archiveCatalogItem(id: number) { return this.http.delete<CatalogItemDTO>(`/catalog/${id}`); }
   createOpportunity(input: Omit<OpportunityDTO, "id" | "createdAt" | "updatedAt">) { return this.http.post<OpportunityDTO>("/opportunities", input); }
   async estimates(page = 0, search = "", status = "") { return parseEstimateList(await this.http.get<unknown>(`/estimates?page=${page}&search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`)); }

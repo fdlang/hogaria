@@ -2,6 +2,7 @@ import type { CatalogUseCases } from "../../application/use-cases/catalog.use-ca
 import { toHttpError } from "./errorMiddleware.js";
 import type { HttpRequest, HttpResponse } from "./authController.js";
 import { positiveId } from "./requestValidation.js";
+import type { CatalogItem } from "@reformapro/domain/entities";
 
 export function catalogController(deps: { catalog: CatalogUseCases }) {
   return {
@@ -19,6 +20,11 @@ export function catalogController(deps: { catalog: CatalogUseCases }) {
   };
 }
 
-function dto(item: { id: number; reference: string; category: string; description: string; unit: string; salePrice: number; vatRate: number; active: boolean; updatedAt: Date }) {
-  return { id: item.id, reference: item.reference, category: item.category, description: item.description, unit: item.unit, salePrice: item.salePrice, vatRate: item.vatRate, active: item.active, updatedAt: item.updatedAt.toISOString() };
+function dto(item: CatalogItem) {
+  return {
+    id: item.id, reference: item.reference, category: item.category, description: item.description,
+    unit: item.unit, salePrice: item.salePrice, vatRate: item.vatRate, active: item.active,
+    itemType: item.itemType, costBreakdown: item.costBreakdown, evidence: item.evidence,
+    searchTerms: item.searchTerms, updatedAt: item.updatedAt.toISOString(),
+  };
 }

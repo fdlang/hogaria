@@ -4,7 +4,7 @@ import { EstimateDocuments, EstimateSearch } from "./EstimateContent";
 import { filterEstimates } from "../estimate-search";
 import { EstimateHistory } from "./EstimateHistory";
 import { formatDate, formatMoney } from "@/shared/lib/formatters";
-import { CatalogPicker } from "@/features/catalog/CatalogPicker";
+import { CatalogPicker, type TemplateCatalogItem } from "@/features/catalog/CatalogPicker";
 import {
   type CatalogCategory,
   type CatalogItem,
@@ -83,7 +83,12 @@ export function SalesPipeline({
     const grouped = new Map<string, CatalogItem[]>();
     catalogItems.filter(item => item.active).forEach(item => {
       const entries = grouped.get(item.category) ?? [];
-      entries.push({ ref: item.reference, descripcion: item.description, unidad: item.unit, precio: item.salePrice, iva: item.vatRate });
+      entries.push({
+        ref: item.reference, descripcion: item.description, unidad: item.unit,
+        precio: item.salePrice, iva: item.vatRate,
+        costeUnitario: item.costBreakdown ? (item.costBreakdown.laborCost ?? 0) + (item.costBreakdown.materialCost ?? 0) + (item.costBreakdown.auxiliaryCost ?? 0) || null : null,
+        searchTerms: item.searchTerms ?? [],
+      });
       grouped.set(item.category, entries);
     });
     return [...grouped].map(([categoria, items]) => ({ categoria, items }));
@@ -368,6 +373,12 @@ export function SalesPipeline({
         ...current.partidas,
         ...items.map((item) => lineFromCatalog(item, category)),
       ],
+    }));
+  };
+  const importCatalogTemplate = (items: TemplateCatalogItem[]) => {
+    setDraft(current => ({
+      ...current,
+      partidas: [...current.partidas, ...items.map(({ item, categoria, cantidad }) => ({ ...lineFromCatalog(item, categoria), cantidad }))],
     }));
   };
   const openNewEstimate = () => {
@@ -684,6 +695,7 @@ export function SalesPipeline({
                 catalog={catalog}
                 onPickItem={addCatalogItem}
                 onImportCategory={importCatalogCategory}
+                onImportTemplate={importCatalogTemplate}
               />)}
             </section>
           )}
@@ -1089,6 +1101,7 @@ function lineFromCatalog(
     descripcion: item.descripcion,
     unidad: item.unidad,
     precioVentaUnitario: item.precio,
+    costeUnitario: item.costeUnitario ?? null,
     iva: item.iva,
   };
 }

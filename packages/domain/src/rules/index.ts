@@ -145,6 +145,12 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/catalog.use-cases.ts"], tests: ["apps/api/src/application/use-cases/catalog.use-cases.test.ts", "apps/web/e2e/catalog.browser.ts"],
   },
   {
+    id: "HOG-CAT-002", description: "Los precios del catálogo separan coste contrastado y precio comercial, conservan fuente, vigencia e histórico.", origin: "business", owner: "administracion",
+    assumption: "La empresa necesita presupuestar con rapidez sin confundir referencias técnicas de coste con precios de venta.", validScale: "Una zona tarifaria y una moneda; requiere listas por delegación antes de operar en varios mercados.", validFrom: "2026-10-10", validUntil: null, nextReview: "2027-01-10",
+    metrics: [metric("catalog_evidence_coverage", "Partidas activas con fuente y fecha de precio", "database"), metric("catalog_stale_price_rate", "Partidas activas con vigencia vencida", "database"), metric("catalog_price_override_rate", "Precios de catálogo modificados al presupuestar")],
+    implementation: ["packages/domain/src/catalog-pricing.ts", "apps/api/database/catalog-pricing.sql", "apps/api/src/application/use-cases/catalog.use-cases.ts"], tests: ["packages/domain/src/catalog-pricing.test.ts", "apps/api/src/application/use-cases/catalog.use-cases.test.ts"],
+  },
+  {
     id: "HOG-FIN-002", description: "Cada obra nueva conserva instantáneas fiscales inmutables de la propuesta firmada y de cada orden aprobada, sin reinterpretar importes históricos.", origin: "legal_fiscal", owner: "administracion",
     assumption: "Base imponible, cuota de IVA y total deben poder reconstruirse exactamente desde los documentos contractuales aceptados.", validScale: "Una entidad fiscal y operaciones en euros; requiere ampliar el modelo antes de admitir otras jurisdicciones, monedas o inversión del sujeto pasivo.", validFrom: "2026-09-25", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("fiscal_snapshot_coverage", "Obras nuevas con instantánea fiscal completa", "database"), metric("fiscal_snapshot_rectification_rate", "Rectificaciones por discrepancias de base, IVA o total", "audit_log")],

@@ -36,6 +36,26 @@ describe("CatalogUseCases — administración exclusiva", () => {
     await expect(catalog.create(admin.id, { ...input, vatRate: 17 })).rejects.toThrow("IVA");
   });
 
+  it("rechaza costes sin fuente y fecha de contraste", async () => {
+    const { admin, catalog } = await setup();
+    await expect(catalog.create(admin.id, {
+      ...input,
+      costBreakdown: { laborCost: 75.76, materialCost: null, auxiliaryCost: null, overheadPercent: null, targetMarginPercent: null },
+    })).rejects.toThrow("fuente y fecha");
+  });
+
+  it("normaliza sinónimos y conserva la evidencia del coste", async () => {
+    const { admin, catalog } = await setup();
+    const item = await catalog.create(admin.id, {
+      ...input,
+      costBreakdown: { laborCost: 75.76, materialCost: 2.55, auxiliaryCost: null, overheadPercent: 13, targetMarginPercent: 20 },
+      evidence: { sourceName: " CYPE ", sourceUrl: "https://example.test/precio", priceDate: "2026-10-10", validFrom: "2026-10-10", validUntil: null },
+      searchTerms: [" Plato de ducha ", "plato de ducha"],
+    });
+    expect(item.evidence.sourceName).toBe("CYPE");
+    expect(item.searchTerms).toEqual(["plato de ducha"]);
+  });
+
   it("updates only explicitly supplied fields after normalization", async () => {
     const users = new InMemoryUserRepository(hasher);
     const admin = await users.save({ id: 0, email: Email.of("patch@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() });

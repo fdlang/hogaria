@@ -21,5 +21,20 @@ export interface EstimateDraft { titulo: string; referencia?: string; validezDia
 export interface Estimate { id: number; oportunidadId: number; clienteId: number; numero: string; titulo: string; estado: EstimateStatus; versionActual: number; borrador: EstimateDraft; motivoRechazo: string | null; createdAt: Date; updatedAt: Date; }
 export interface EstimateVersion { id: number; estimateId: number; version: number; snapshot: EstimateDraft; enviadoAt: Date | null; firmadoAt: Date | null; firma: Record<string, unknown> | null; createdAt: Date; }
 export interface ChangeOrder { id: number; projectId: number; numero: string; estado: ChangeOrderStatus; payload: EstimateDraft; aprobadoAt: Date | null; createdAt: Date; }
-export interface CatalogItem { id: number; reference: string; category: string; description: string; unit: string; salePrice: number; vatRate: number; active: boolean; createdAt: Date; updatedAt: Date; }
+export interface CatalogItem {
+  id: number;
+  reference: string;
+  category: string;
+  description: string;
+  unit: string;
+  salePrice: number;
+  vatRate: number;
+  active: boolean;
+  itemType: import("../catalog-pricing.js").CatalogItemType;
+  costBreakdown: import("../catalog-pricing.js").CatalogCostBreakdown;
+  evidence: import("../catalog-pricing.js").CatalogPriceEvidence;
+  searchTerms: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 export interface AuditEntry { id: string; action: string; userId: number; userName: string; details: Record<string, unknown>; timestamp: Date; ip: string; userAgent: string; }

@@ -143,6 +143,21 @@ export class PostgresCatalogRepository implements ICatalogRepository {
       id: Number(row.id), reference: row.reference, category: row.category,
       description: row.description, unit: row.unit, salePrice: Number(row.sale_price),
       vatRate: Number(row.vat_rate), active: row.active,
+      itemType: row.item_type ?? "simple",
+      costBreakdown: {
+        laborCost: row.labor_cost == null ? null : Number(row.labor_cost),
+        materialCost: row.material_cost == null ? null : Number(row.material_cost),
+        auxiliaryCost: row.auxiliary_cost == null ? null : Number(row.auxiliary_cost),
+        overheadPercent: row.overhead_percent == null ? null : Number(row.overhead_percent),
+        targetMarginPercent: row.target_margin_percent == null ? null : Number(row.target_margin_percent),
+      },
+      evidence: {
+        sourceName: row.source_name ?? null, sourceUrl: row.source_url ?? null,
+        priceDate: row.price_date?.toISOString?.().slice(0, 10) ?? row.price_date ?? null,
+        validFrom: row.valid_from?.toISOString?.().slice(0, 10) ?? row.valid_from ?? null,
+        validUntil: row.valid_until?.toISOString?.().slice(0, 10) ?? row.valid_until ?? null,
+      },
+      searchTerms: row.search_terms ?? [],
       createdAt: date(row.created_at), updatedAt: date(row.updated_at),
     };
   }
@@ -154,10 +169,29 @@ export class PostgresCatalogRepository implements ICatalogRepository {
   }
   async findById(id: number) { const result = await this.pool.query("SELECT * FROM catalog_items WHERE id=$1", [id]); return result.rows[0] ? this.map(result.rows[0]) : null; }
   async findByReference(reference: string) { const result = await this.pool.query("SELECT * FROM catalog_items WHERE reference=$1", [reference]); return result.rows[0] ? this.map(result.rows[0]) : null; }
-  async save(item: Omit<CatalogItem, "id" | "createdAt" | "updatedAt">) { const result = await this.pool.query("INSERT INTO catalog_items(reference,category,description,unit,sale_price,vat_rate,active) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *", [item.reference,item.category,item.description,item.unit,item.salePrice,item.vatRate,item.active]); return this.map(result.rows[0]); }
-  async update(id: number, changes: Partial<Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate" | "active">>) {
-    const columns: Record<string, string> = { reference: "reference", category: "category", description: "description", unit: "unit", salePrice: "sale_price", vatRate: "vat_rate", active: "active" };
-    const entries = Object.entries(changes).filter(([, value]) => value !== undefined);
+  async save(item: Omit<CatalogItem, "id" | "createdAt" | "updatedAt">) {
+    const c = item.costBreakdown; const e = item.evidence;
+    const result = await this.pool.query(`INSERT INTO catalog_items(
+      reference,category,description,unit,sale_price,vat_rate,active,item_type,
+      labor_cost,material_cost,auxiliary_cost,overhead_percent,target_margin_percent,
+      source_name,source_url,price_date,valid_from,valid_until,search_terms
+    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+    [item.reference,item.category,item.description,item.unit,item.salePrice,item.vatRate,item.active,item.itemType,
+      c.laborCost,c.materialCost,c.auxiliaryCost,c.overheadPercent,c.targetMarginPercent,
+      e.sourceName,e.sourceUrl,e.priceDate,e.validFrom,e.validUntil,item.searchTerms]);
+    return this.map(result.rows[0]);
+  }
+  async update(id: number, changes: Partial<Omit<CatalogItem, "id" | "createdAt" | "updatedAt">>) {
+    const flat: Record<string, unknown> = { ...changes };
+    delete flat.costBreakdown; delete flat.evidence;
+    if (changes.costBreakdown) Object.assign(flat, changes.costBreakdown);
+    if (changes.evidence) Object.assign(flat, changes.evidence);
+    const columns: Record<string, string> = {
+      reference: "reference", category: "category", description: "description", unit: "unit", salePrice: "sale_price", vatRate: "vat_rate", active: "active", itemType: "item_type",
+      laborCost: "labor_cost", materialCost: "material_cost", auxiliaryCost: "auxiliary_cost", overheadPercent: "overhead_percent", targetMarginPercent: "target_margin_percent",
+      sourceName: "source_name", sourceUrl: "source_url", priceDate: "price_date", validFrom: "valid_from", validUntil: "valid_until", searchTerms: "search_terms",
+    };
+    const entries = Object.entries(flat).filter(([key, value]) => columns[key] && value !== undefined);
     if (!entries.length) { const current = await this.findById(id); if (!current) throw new NotFoundError("Partida de catálogo"); return current; }
     const values: unknown[] = [id];
     const assignments = entries.map(([key, value]) => { values.push(value); return `${columns[key]}=$${values.length}`; });

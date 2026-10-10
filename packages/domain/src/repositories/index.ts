@@ -14,7 +14,7 @@ export interface ICatalogRepository {
   findById(id: number): Promise<CatalogItem | null>;
   findByReference(reference: string): Promise<CatalogItem | null>;
   save(item: Omit<CatalogItem, "id" | "createdAt" | "updatedAt">): Promise<CatalogItem>;
-  update(id: number, changes: Partial<Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate" | "active">>): Promise<CatalogItem>;
+  update(id: number, changes: Partial<Omit<CatalogItem, "id" | "createdAt" | "updatedAt">>): Promise<CatalogItem>;
 }
 export interface EstimatePageQuery { clientId?: number; page: number; limit: number; search: string; status: string; }
 export interface IAuditRepository { append(entry: AuditEntry): Promise<void>; findAll(opts: { page?: number; limit?: number; action?: string | null; userId?: number | null; from?: Date | null; to?: Date | null }): Promise<{ items: AuditEntry[]; total: number; page: number; limit: number; pages: number }>; }

@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { CatalogItemDTO } from "@/features/sales/api/sales.api";
 import { catalogCategories, filterCatalogItems, groupCatalogItems, validateCatalogForm } from "./catalog-manager.utils";
 
+const pricing = { itemType: "simple" as const, costBreakdown: { laborCost: null, materialCost: null, auxiliaryCost: null, overheadPercent: null, targetMarginPercent: null }, evidence: { sourceName: null, sourceUrl: null, priceDate: null, validFrom: null, validUntil: null }, searchTerms: [] };
 const items: CatalogItemDTO[] = [
-  { id: 1, reference: "BAN-002", category: "Baño", description: "Mampara de vidrio", unit: "ud", salePrice: 950, vatRate: 21, active: true, updatedAt: "2026-01-01" },
-  { id: 2, reference: "ALB-001", category: "Albañilería", description: "Tabique de pladur", unit: "m²", salePrice: 58, vatRate: 21, active: true, updatedAt: "2026-01-01" },
-  { id: 3, reference: "BAN-003", category: "Baño", description: "Inodoro suspendido", unit: "ud", salePrice: 790, vatRate: 21, active: false, updatedAt: "2026-01-01" },
+  { id: 1, reference: "BAN-002", category: "Baño", description: "Mampara de vidrio", unit: "ud", salePrice: 950, vatRate: 21, active: true, updatedAt: "2026-01-01", ...pricing },
+  { id: 2, reference: "ALB-001", category: "Albañilería", description: "Tabique de pladur", unit: "m²", salePrice: 58, vatRate: 21, active: true, updatedAt: "2026-01-01", ...pricing },
+  { id: 3, reference: "BAN-003", category: "Baño", description: "Inodoro suspendido", unit: "ud", salePrice: 790, vatRate: 21, active: false, updatedAt: "2026-01-01", ...pricing },
 ];
 
 describe("catalog manager utilities", () => {
@@ -33,5 +34,23 @@ describe("catalog manager utilities", () => {
     expect(validateCatalogForm({ reference: "DEM-1", category: "Demoliciones", description: "Trabajo", unit: "ud", salePrice: "0", vatRate: "21" })).toEqual({});
     expect(validateCatalogForm({ reference: "DEM-1", category: "Demoliciones", description: "Trabajo", unit: "ud", salePrice: "1.001", vatRate: "21" })).toHaveProperty("salePrice");
     expect(validateCatalogForm({ reference: "DEM-1", category: "Demoliciones", description: "Trabajo", unit: "ud", salePrice: "1000000000", vatRate: "21" })).toHaveProperty("salePrice");
+  });
+
+  it("requires traceability when direct costs are entered", () => {
+    const errors = validateCatalogForm({
+      reference: "FON-010", category: "Fontanería", description: "Recibido de plato",
+      unit: "ud", salePrice: "110.61", vatRate: "21", laborCost: "75.76",
+    });
+    expect(errors.sourceName).toBeTruthy();
+    expect(errors.priceDate).toBeTruthy();
+  });
+
+  it("accepts a sourced direct cost and valid commercial rates", () => {
+    expect(validateCatalogForm({
+      reference: "FON-010", category: "Fontanería", description: "Recibido de plato",
+      unit: "ud", salePrice: "110.61", vatRate: "21", laborCost: "75.76",
+      materialCost: "2.55", overheadPercent: "13", targetMarginPercent: "20",
+      sourceName: "CYPE", priceDate: "2026-10-10",
+    })).toEqual({});
   });
 });

@@ -1,6 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 
-const item = { id: 1, reference: "TST-001", category: "Prueba", description: "Partida guardada", unit: "ud", salePrice: 123, vatRate: 21, active: true, updatedAt: "2026-09-19" };
+const item = {
+  id: 1, reference: "TST-001", category: "Prueba", description: "Partida guardada", unit: "ud",
+  salePrice: 123, vatRate: 21, active: true, itemType: "simple" as const,
+  costBreakdown: { laborCost: null, materialCost: null, auxiliaryCost: null, overheadPercent: null, targetMarginPercent: null },
+  evidence: { sourceName: null, sourceUrl: null, priceDate: null, validFrom: null, validUntil: null },
+  searchTerms: [], updatedAt: "2026-09-19",
+};
 async function setup(page: Page, state: { fail: boolean; items: typeof item[]; gate?: Promise<void> }) {
   await page.addInitScript(() => sessionStorage.setItem("rp_token", "test-token"));
   await page.route("**/api/**", async route => {

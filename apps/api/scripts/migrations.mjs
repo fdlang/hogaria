@@ -15,6 +15,7 @@ export const MIGRATIONS = [
   "commercial-workflow.sql",
   "durable-audit.sql",
   "app-notifications.sql",
+  "catalog-pricing.sql",
 ];
 
 export const migrationChecksum = (sql) => createHash("sha256").update(sql).digest("hex");

@@ -12,6 +12,16 @@ export interface CatalogItem {
   unidad: string;
   precio: number;
   iva: number;
+  costeUnitario?: number | null;
+  searchTerms?: string[];
+  active?: boolean;
+  itemType?: "simple" | "composite";
+  laborCost?: number | null;
+  materialCost?: number | null;
+  auxiliaryCost?: number | null;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
+  priceDate?: string | null;
 }
 
 export interface CatalogCategory { categoria: string; items: CatalogItem[]; }
@@ -31,6 +41,7 @@ export const CATALOG: CatalogCategory[] = [
     { ref: "DEM-004", descripcion: "Picado de alicatado existente", unidad: "m²", precio: 22, iva: 21 },
     { ref: "DEM-005", descripcion: "Desmontaje de sanitarios y grifería", unidad: "ud", precio: 95, iva: 21 },
     { ref: "DEM-006", descripcion: "Vaciado integral de vivienda", unidad: "m²", precio: 29, iva: 21 },
+    { ref: "DEM-008", descripcion: "Desmontaje de mobiliario de cocina y encimera, con retirada ordenada", unidad: "ml", precio: 0, iva: 21, active: false, laborCost: 62.49, sourceName: "CYPE DSC020", sourceUrl: "https://generadordeprecios.info/rehabilitacion/Demoliciones/Equipamiento/Cocinas/DSC020_Desmontaje_de_conjunto_de_mobiliari.html", priceDate: "2026-10-10", searchTerms: ["retirada cocina", "desmontaje muebles"] },
   ] },
   { categoria: "Albañilería y pladur", items: [
     { ref: "ALB-001", descripcion: "Tabique de placa de yeso laminado con aislamiento", unidad: "m²", precio: 58, iva: 21 },
@@ -48,6 +59,9 @@ export const CATALOG: CatalogCategory[] = [
     { ref: "FON-004", descripcion: "Renovación completa de fontanería de cocina", unidad: "ud", precio: 1450, iva: 21 },
     { ref: "FON-005", descripcion: "Montaje de inodoro suspendido con bastidor", unidad: "ud", precio: 590, iva: 21 },
     { ref: "FON-006", descripcion: "Instalación de lavabo y grifería", unidad: "ud", precio: 285, iva: 21 },
+    { ref: "FON-010", descripcion: "Recibido, nivelación y sellado de plato de ducha", unidad: "ud", precio: 0, iva: 21, active: false, laborCost: 75.76, materialCost: 2.55, sourceName: "CYPE", sourceUrl: "https://generadordeprecios.info/rehabilitacion/Remates_y_ayudas/Recibidos/Aparatos_sanitarios/Recibido_de_plato_de_ducha.html", priceDate: "2026-10-10", searchTerms: ["instalar plato ducha", "colocar plato"] },
+    { ref: "FON-011", descripcion: "Instalación y conexión de inodoro sobre preinstalación existente", unidad: "ud", precio: 0, iva: 21, active: false, laborCost: 43.36, sourceName: "CYPE SAI005", sourceUrl: "https://generadordeprecios.info/rehabilitacion/Senalizacion_y_equipamiento/Aparatos_sanitarios/Inodoros/SAI005_Inodoro_con_tanque_bajo__de_porcela_0_2c15_0_1_0_1c4_0.html", priceDate: "2026-10-10", searchTerms: ["montaje inodoro", "colocar wc"] },
+    { ref: "FON-012", descripcion: "Instalación y conexión de grifería de lavabo", unidad: "ud", precio: 0, iva: 21, active: false, laborCost: 14.44, sourceName: "CYPE SGL020", sourceUrl: "https://generadordeprecios.info/rehabilitacion/Senalizacion_y_equipamiento/Griferias/Para_lavabos/Griferia_monomando_para_lavabo_0_2_0_0_0_0_0_2.html", priceDate: "2026-10-10", searchTerms: ["montaje grifo", "grifo lavabo"] },
   ] },
   { categoria: "Electricidad e iluminación", items: [
     { ref: "ELE-001", descripcion: "Punto de luz completo con mecanismo", unidad: "ud", precio: 105, iva: 21 },
@@ -63,6 +77,7 @@ export const CATALOG: CatalogCategory[] = [
     { ref: "CLI-002", descripcion: "Instalación de split mural de hasta 3,5 kW", unidad: "ud", precio: 1150, iva: 21 },
     { ref: "CLI-003", descripcion: "Extractor de baño silencioso con conducto", unidad: "ud", precio: 245, iva: 21 },
     { ref: "CLI-004", descripcion: "Conducto flexible aislado para ventilación", unidad: "ml", precio: 34, iva: 21 },
+    { ref: "CLI-005", descripcion: "Instalación y conexión de extractor sobre alimentación existente", unidad: "ud", precio: 0, iva: 21, active: false, laborCost: 10.59, sourceName: "CYPE IVM014", sourceUrl: "https://generadordeprecios.info/rehabilitacion/calculaprecio.asp?Valor=2%7C0_0_0_0_0_0%7C1%7CIVM014%7Civm_014%3Ac3_0_590_5c11_0", priceDate: "2026-10-10", searchTerms: ["montaje extractor", "ventilador baño"] },
   ] },
   { categoria: "Revestimientos", items: [
     { ref: "REV-001", descripcion: "Alicatado porcelánico formato estándar", unidad: "m²", precio: 64, iva: 21 },
@@ -98,5 +113,7 @@ export const CATALOG: CatalogCategory[] = [
     { ref: "PIN-001", descripcion: "Alisado y reparación de paramentos", unidad: "m²", precio: 19, iva: 21 },
     { ref: "PIN-002", descripcion: "Pintura plástica lavable, dos manos", unidad: "m²", precio: 15.5, iva: 21 },
     { ref: "PIN-003", descripcion: "Esmaltado de puertas o radiadores", unidad: "ud", precio: 82, iva: 21 },
+    { ref: "PIN-004", descripcion: "Aplicación de pintura plástica sobre soporte de yeso ya preparado", unidad: "m²", precio: 0, iva: 21, active: false, laborCost: 5.48, sourceName: "CYPE RIP030", sourceUrl: "https://generadordeprecios.info/rehabilitacion/Revestimientos_y_trasdosados/Pinturas_en_paramentos_interiores/Plasticas/RIP030_Pintura_plastica_sobre_paramento_in.html", priceDate: "2026-10-10", searchTerms: ["pintar pared", "pintura yeso"] },
+    { ref: "PIN-005", descripcion: "Aplicación de esmalte al agua sobre madera preparada", unidad: "m²", precio: 0, iva: 21, active: false, laborCost: 8.94, sourceName: "CYPE RME030", sourceUrl: "https://generadordeprecios.info/rehabilitacion/Revestimientos_y_trasdosados/RM_Pinturas_y_tratamientos_sobre_/Esmaltes/Esmalte_al_agua_para_madera.html", priceDate: "2026-10-10", searchTerms: ["esmaltar madera", "pintar carpintería"] },
   ] },
 ];

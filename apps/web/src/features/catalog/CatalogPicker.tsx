@@ -7,15 +7,36 @@ import { useMemo, useState } from "react";
 import type { CatalogCategory, CatalogItem } from "./catalog";
 import { Input, Button, Badge } from "@/shared/ui";
 import { formatMoney } from "@/shared/lib/formatters";
+import { ESTIMATE_TEMPLATES, type EstimateTemplate } from "@reformapro/domain";
+
+export type TemplateMeasurements = { floorArea: number; wallArea: number; linearMetres: number };
+export type TemplateCatalogItem = { categoria: string; item: CatalogItem; cantidad: number };
+
+export function resolveCatalogTemplate(template: EstimateTemplate, catalog: CatalogCategory[], measurements: TemplateMeasurements): TemplateCatalogItem[] {
+  const items = new Map(catalog.flatMap(category => category.items.map(item => [item.ref, { categoria: category.categoria, item }] as const)));
+  return template.items.flatMap(entry => {
+    const found = items.get(entry.reference);
+    if (!found) return [];
+    const cantidad = entry.measurement ? measurements[entry.measurement] : entry.quantity;
+    return cantidad > 0 ? [{ ...found, cantidad }] : [];
+  });
+}
 
 interface Props {
   onPickItem:     (ref: string) => void;
   onImportCategory: (categoria: string, items: CatalogItem[]) => void;
+  onImportTemplate: (items: TemplateCatalogItem[]) => void;
   catalog: CatalogCategory[];
 }
 
-export function CatalogPicker({ onPickItem, onImportCategory, catalog }: Props) {
+export function CatalogPicker({ onPickItem, onImportCategory, onImportTemplate, catalog }: Props) {
   const [search, setSearch] = useState("");
+  const [measurements, setMeasurements] = useState({ floorArea: "", wallArea: "", linearMetres: "" });
+  const numericMeasurements = useMemo<TemplateMeasurements>(() => ({
+    floorArea: Number(measurements.floorArea) || 0,
+    wallArea: Number(measurements.wallArea) || 0,
+    linearMetres: Number(measurements.linearMetres) || 0,
+  }), [measurements]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -23,6 +44,7 @@ export function CatalogPicker({ onPickItem, onImportCategory, catalog }: Props) 
     return catalog
       .map(c => ({ ...c, items: c.items.filter(i =>
         i.descripcion.toLowerCase().includes(q) ||
+        i.searchTerms?.some(term => term.toLowerCase().includes(q)) ||
         i.ref.toLowerCase().includes(q) ||
         c.categoria.toLowerCase().includes(q)
       )}))
@@ -31,6 +53,26 @@ export function CatalogPicker({ onPickItem, onImportCategory, catalog }: Props) 
 
   return (
     <div>
+      <section className="catalog-templates" aria-labelledby="catalog-templates-title">
+        <div>
+          <strong id="catalog-templates-title">Plantillas rápidas</strong>
+          <p>Indica las medidas disponibles. Podrás revisar todas las cantidades antes de guardar.</p>
+        </div>
+        <div className="catalog-template-measurements">
+          <label>Suelo (m²)<input type="number" min="0" step="0.01" value={measurements.floorArea} onChange={event => setMeasurements(current => ({ ...current, floorArea: event.target.value }))} /></label>
+          <label>Paredes (m²)<input type="number" min="0" step="0.01" value={measurements.wallArea} onChange={event => setMeasurements(current => ({ ...current, wallArea: event.target.value }))} /></label>
+          <label>Frente (ml)<input type="number" min="0" step="0.01" value={measurements.linearMetres} onChange={event => setMeasurements(current => ({ ...current, linearMetres: event.target.value }))} /></label>
+        </div>
+        <div className="catalog-template-actions">
+          {ESTIMATE_TEMPLATES.map(template => {
+            const resolved = resolveCatalogTemplate(template, catalog, numericMeasurements);
+            const needsFloor = template.items.some(item => item.measurement === "floorArea") && numericMeasurements.floorArea <= 0;
+            const needsWall = template.items.some(item => item.measurement === "wallArea") && numericMeasurements.wallArea <= 0;
+            const needsLinear = template.items.some(item => item.measurement === "linearMetres") && numericMeasurements.linearMetres <= 0;
+            return <Button key={template.id} small variant="ghost" disabled={needsFloor || needsWall || needsLinear || resolved.length === 0} onClick={() => onImportTemplate(resolved)} title={template.description}>+ {template.name}</Button>;
+          })}
+        </div>
+      </section>
       <Input
         label="Buscar en catálogo"
         placeholder="REF, descripción o categoría…"
