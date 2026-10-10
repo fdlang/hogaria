@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { validPdf } from "./pdf-fixture";
 const proposal = {
   id: 1,
   numero: "HOG-2026-001",
@@ -48,7 +49,7 @@ async function fixture(page: Page, role: string) {
     if (path.endsWith("/pdf"))
       return route.fulfill({
         contentType: "application/pdf",
-        body: "%PDF-1.4\n%%EOF",
+        body: validPdf,
       });
     if (path.endsWith("/email")) {
       emails.push(route.request().postDataJSON());
@@ -188,7 +189,11 @@ for (const role of ["admin", "cliente"])
         .click();
       const dialog = page.getByRole("dialog");
       await expect(dialog.getByText("María García", { exact: true })).toBeVisible();
-      await expect(dialog.getByTitle("Vista previa del presupuesto en PDF")).toBeVisible();
+      const preview = dialog.getByLabel("Vista previa del presupuesto en PDF");
+      await expect(preview).toBeVisible();
+      const firstPage = preview.getByRole("img", { name: "Página 1 de 1" });
+      await expect(firstPage).toBeVisible();
+      expect(await firstPage.evaluate((canvas: HTMLCanvasElement) => canvas.width > 0 && canvas.height > 0)).toBe(true);
       expect(
         await dialog.evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
       ).toBe(true);

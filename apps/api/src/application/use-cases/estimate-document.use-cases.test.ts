@@ -248,7 +248,23 @@ describe("Download-only budget PDF", () => {
       id: String(i),
     }));
     const bytes = await r.render(doc);
-    expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(1);
+    const rendered = await PDFDocument.load(bytes);
+    expect(rendered.getPageCount()).toBeGreaterThan(1);
+    expect(rendered.getTitle()).toContain(doc.numero);
+    expect(rendered.getSubject()).toContain(doc.clienteNombre);
+    expect(rendered.getPages()[0]?.getSize()).toEqual({ width: 595.28, height: 841.89 });
     expect(await r.render(doc)).toBe(bytes);
+  });
+
+  it("keeps long customer-facing line descriptions inside paginated PDFs", async () => {
+    const f = await setup();
+    const renderer = new PdfEstimateRenderer();
+    const document = await f.estimateUseCases.publicGet(f.clientA.id, f.estimateA.id);
+    document.propuesta!.partidas[0]!.descripcion = "Detalle técnico completo ".repeat(180);
+
+    const rendered = await PDFDocument.load(await renderer.render(document));
+
+    expect(rendered.getPageCount()).toBeGreaterThan(1);
+    expect(rendered.getPages().every(page => page.getHeight() === 841.89)).toBe(true);
   });
 });

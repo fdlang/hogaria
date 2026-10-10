@@ -89,6 +89,35 @@ describe("SalesApi", () => {
     expect(http.download).toHaveBeenCalledTimes(2);
   });
 
+  it("clears cached documents when the authenticated user changes", async () => {
+    const http = createHttp();
+    vi.mocked(http.download).mockResolvedValue(new Blob(["pdf"], { type: "application/pdf" }));
+    const api = new SalesApi(http);
+
+    await api.downloadPdf(7, 1, "revision");
+    api.clearPdfCache();
+    await api.downloadPdf(7, 1, "revision");
+
+    expect(http.download).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not repopulate the PDF cache from an old session request", async () => {
+    const http = createHttp();
+    let finishDownload!: (blob: Blob) => void;
+    vi.mocked(http.download)
+      .mockReturnValueOnce(new Promise(resolve => { finishDownload = resolve; }))
+      .mockResolvedValue(new Blob(["new-session"], { type: "application/pdf" }));
+    const api = new SalesApi(http);
+
+    const oldRequest = api.downloadPdf(7, 1, "revision");
+    api.clearPdfCache();
+    finishDownload(new Blob(["old-session"], { type: "application/pdf" }));
+    await oldRequest;
+    await api.downloadPdf(7, 1, "revision");
+
+    expect(http.download).toHaveBeenCalledTimes(2);
+  });
+
   it("uses one look-ahead item to expose reliable pagination", async () => {
     const http = createHttp();
     vi.mocked(http.get).mockResolvedValue(Array.from({ length: 21 }, (_, index) => ({ id: index + 1, numero: `HOG-${index}`, clienteNombre: "Cliente", titulo: "Obra", estado: "enviado", versionActual: 1, motivoRechazo: null, propuesta: null, createdAt: "2026-01-01", updatedAt: "2026-01-01" })));

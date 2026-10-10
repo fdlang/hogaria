@@ -34,8 +34,14 @@ const ensurePdf = (blob: Blob): Blob => {
 export class SalesApi {
   private readonly pdfCache = new Map<string, Blob>();
   private readonly pendingPdfs = new Map<string, Promise<Blob>>();
+  private pdfCacheGeneration = 0;
 
   constructor(private readonly http: ApiClient) {}
+  clearPdfCache() {
+    this.pdfCacheGeneration += 1;
+    this.pdfCache.clear();
+    this.pendingPdfs.clear();
+  }
   opportunities() { return this.http.get<OpportunityDTO[]>("/opportunities"); }
   opportunity(id: number) { return this.http.get<OpportunityDTO>(`/opportunities/${id}`); }
   opportunityPage(query: { page: number; limit?: number; search?: string; status?: string }) {
@@ -83,9 +89,11 @@ export class SalesApi {
     const pending = this.pendingPdfs.get(key);
     if (pending) return pending;
 
+    const generation = this.pdfCacheGeneration;
     const request = this.http.download(`/estimates/${id}/pdf?version=${version}`)
       .then(ensurePdf)
       .then(blob => {
+        if (generation !== this.pdfCacheGeneration) return blob;
         this.pdfCache.set(key, blob);
         while (this.pdfCache.size > 8) {
           const oldest = this.pdfCache.keys().next().value as string | undefined;

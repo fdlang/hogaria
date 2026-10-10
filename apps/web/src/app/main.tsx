@@ -36,6 +36,7 @@ const api = new ApiClient({
 });
 
 // 2) Auth store — owns session state
+const salesApi = new SalesApi(api);
 authStore = new AuthStore(api);
 
 // 3) Feature APIs — each receives the shared transport
@@ -47,9 +48,18 @@ const apis = {
   audit:            new AuditApi(api),
   solicitudes:      new SolicitudesApi(api),
   adminSolicitudes: new AdminSolicitudesApi(api),
-  sales:            new SalesApi(api),
+  sales:            salesApi,
   notifications:    new UserNotificationsApi(api),
 };
+
+let cachedUserId: number | null = null;
+authStore.subscribe(state => {
+  const userId = state.status === "authenticated" ? state.user?.id ?? null : null;
+  if (userId !== cachedUserId) {
+    salesApi.clearPdfCache();
+    cachedUserId = userId;
+  }
+});
 
 // 4) Restore session on boot (best-effort; failures silently sign out)
 authStore.restore().catch(() => { /* logged inside store */ });

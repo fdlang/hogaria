@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/shared/ui";
 import type { EstimateDTO, SalesApi } from "../api/sales.api";
 import { estimateStatus } from "../estimate-search";
+import { PdfPreview } from "./PdfPreview";
 import "../estimates.css";
 
 export function EstimateSearch({
@@ -63,7 +64,7 @@ export function EstimateDocuments({
   item: EstimateDTO;
   reusePdf?: boolean;
 }) {
-  const [documentUrl, setDocumentUrl] = useState(""),
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null),
     [busy, setBusy] = useState(true),
     [error, setError] = useState(""),
     [retry, setRetry] = useState(0);
@@ -72,36 +73,35 @@ export function EstimateDocuments({
 
   useEffect(() => {
     let active = true;
-    let url = "";
     setBusy(true);
     setError("");
-    setDocumentUrl("");
+    setPdfBlob(null);
     void api.downloadPdf(item.id, item.versionActual, item.updatedAt, { reuse: reusePdf })
       .then(blob => {
         if (!active) return;
-        url = URL.createObjectURL(blob);
-        setDocumentUrl(url);
+        setPdfBlob(blob);
       })
       .catch(e => {
         if (!active) return;
+        setBusy(false);
         setError((e as { message?: string })?.message ?? "No se pudo cargar el PDF.");
-      })
-      .finally(() => { if (active) setBusy(false); });
+      });
     return () => {
       active = false;
-      if (url) URL.revokeObjectURL(url);
     };
   }, [api, item.id, item.updatedAt, item.versionActual, retry, reusePdf]);
 
   function download() {
-    if (!documentUrl || lock.current) return;
+    if (!pdfBlob || lock.current) return;
     lock.current = true;
+    const documentUrl = URL.createObjectURL(pdfBlob);
     const link = document.createElement("a");
     link.href = documentUrl;
     link.download = filename;
     document.body.append(link);
     link.click();
     link.remove();
+    setTimeout(() => URL.revokeObjectURL(documentUrl), 0);
     lock.current = false;
   }
 
@@ -114,7 +114,7 @@ export function EstimateDocuments({
           <strong>{item.clienteNombre}</strong>
           <small>{item.numero} · Versión {item.versionActual} · {estimateStatus(item.estado)}</small>
         </div>
-        <Button variant="ghost" disabled={!documentUrl} onClick={download}>
+        <Button variant="ghost" disabled={!pdfBlob} onClick={download}>
           Descargar PDF
         </Button>
       </header>
@@ -123,11 +123,14 @@ export function EstimateDocuments({
         <p role="alert">{error}</p>
         <Button small variant="ghost" onClick={() => setRetry(value => value + 1)}>Reintentar</Button>
       </div>}
-      {documentUrl && (
-        <iframe
-          className="estimate-pdf-viewer"
-          src={documentUrl}
-          title="Vista previa del presupuesto en PDF"
+      {pdfBlob && !error && (
+        <PdfPreview
+          blob={pdfBlob}
+          onReady={() => setBusy(false)}
+          onError={() => {
+            setBusy(false);
+            setError("No se pudo mostrar la vista previa del PDF. Puedes reintentar la carga.");
+          }}
         />
       )}
     </section>

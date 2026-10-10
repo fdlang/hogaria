@@ -17,6 +17,7 @@ export function estimateDocumentController(useCases: EstimateDocumentUseCases) {
         status: 200,
         headers: {
           "Content-Type": "application/pdf",
+          "Content-Length": String(result.bytes.byteLength),
           "Content-Disposition": `inline; filename="${result.filename}"`,
           "Cache-Control": "no-store",
         },

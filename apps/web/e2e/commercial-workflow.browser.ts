@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { validPdf } from "./pdf-fixture";
 async function authenticated(page: Page, role: string) {
   await page.addInitScript(() => sessionStorage.setItem("rp_token", "test"));
   await page.route("**/api/**", route => {
@@ -56,7 +57,7 @@ test("client can inspect and download a published historical version", async ({p
   await authenticated(page,"cliente");
   await page.route("**/api/estimates?*",route => route.fulfill({json:[estimate]}));
   await page.route("**/api/estimates/1/history",route => route.fulfill({json:[{...estimate,versionActual:1,estado:"sustituido"}]}));
-  await page.route("**/api/estimates/1/pdf?version=1",route => route.fulfill({contentType:"application/pdf",body:"%PDF-1.4\n%%EOF"}));
+  await page.route("**/api/estimates/1/pdf?version=1",route => route.fulfill({contentType:"application/pdf",body:validPdf}));
   await page.goto("/cliente/budgets");
   await page.getByRole("button",{name:/Ver propuesta/}).click();
   await page.getByRole("button",{name:"Ver histórico de versiones"}).click();
