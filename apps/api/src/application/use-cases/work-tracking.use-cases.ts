@@ -109,7 +109,7 @@ export class WorkTrackingUseCases {
       !project.profesionalesAsignados.some((p) => p.userId === actorId)
     )
       throw new ForbiddenError();
-    if (!["planificacion", "en_curso"].includes(project.estado))
+    if (project.estado !== "en_curso")
       throw new ConflictError("La obra no está abierta para registrar trabajo");
     return project;
   }

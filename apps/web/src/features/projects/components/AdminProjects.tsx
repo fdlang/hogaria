@@ -66,9 +66,9 @@ export function AdminProjects({ api, onOpenProject }: Props) {
 
       <div className="private-filter-bar" style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
-          <Input placeholder="Buscar por nombre o dirección…" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setPage(1); }} />
+          <Input aria-label="Buscar obras por nombre o dirección" placeholder="Buscar por nombre o dirección…" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setPage(1); }} />
         </div>
-        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1); }}
+        <select aria-label="Filtrar obras por estado" value={statusFilter} onChange={e => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1); }}
           style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", minWidth: 160 }}>
           <option value="all">Todos</option>
           <option value="planificacion">Planificación</option>
@@ -82,6 +82,7 @@ export function AdminProjects({ api, onOpenProject }: Props) {
         data={projects.data?.items ?? []}
         columns={columns}
         rowKey={p => p.id}
+        rowLabel={p => `Abrir obra ${p.nombre}`}
         onRowClick={p => onOpenProject(p.id)}
         loading={projects.loading}
         error={projects.error}

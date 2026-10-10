@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { calculateCatalogPrice, CURRENT_FISCAL_POLICY, type CatalogCostBreakdown } from "@reformapro/domain";
+import { calculateCatalogPrice, catalogActivationIssues, CURRENT_FISCAL_POLICY, type CatalogCostBreakdown } from "@reformapro/domain";
 import { Button } from "@/shared/ui";
 import { formatMoney } from "@/shared/lib/formatters";
 import { SalesApi, type CatalogItemDTO, type CatalogWriteDTO } from "@/features/sales/api/sales.api";
@@ -12,6 +12,7 @@ type Form = {
   itemType: "simple" | "composite"; laborCost: string; materialCost: string; auxiliaryCost: string;
   overheadPercent: string; targetMarginPercent: string; sourceName: string; sourceUrl: string;
   priceDate: string; validFrom: string; validUntil: string; searchTerms: string;
+  replacementReference: string; reviewNote: string;
 };
 
 const blank = (): Form => ({
@@ -19,6 +20,7 @@ const blank = (): Form => ({
   vatRate: String(CURRENT_FISCAL_POLICY.defaultVatRate), itemType: "simple", laborCost: "",
   materialCost: "", auxiliaryCost: "", overheadPercent: "", targetMarginPercent: "",
   sourceName: "", sourceUrl: "", priceDate: "", validFrom: "", validUntil: "", searchTerms: "",
+  replacementReference: "", reviewNote: "",
 });
 const optionalNumber = (value: string) => value.trim() === "" ? null : Number(value);
 const optionalText = (value: string) => value.trim() || null;
@@ -55,6 +57,7 @@ export function CatalogManager({ api }: { api: SalesApi }) {
         priceDate: optionalText(form.priceDate), validFrom: optionalText(form.validFrom), validUntil: optionalText(form.validUntil),
       },
       searchTerms: [...new Set(form.searchTerms.split(",").map(term => term.trim()).filter(Boolean))],
+      replacementReference: optionalText(form.replacementReference), reviewNote: optionalText(form.reviewNote),
     };
     try {
       setSaving(true); setError("");
@@ -74,6 +77,7 @@ export function CatalogManager({ api }: { api: SalesApi }) {
       targetMarginPercent: item.costBreakdown.targetMarginPercent?.toString() ?? "", sourceName: item.evidence.sourceName ?? "",
       sourceUrl: item.evidence.sourceUrl ?? "", priceDate: item.evidence.priceDate ?? "", validFrom: item.evidence.validFrom ?? "",
       validUntil: item.evidence.validUntil ?? "", searchTerms: item.searchTerms.join(", "),
+      replacementReference: item.replacementReference ?? "", reviewNote: item.reviewNote ?? "",
     });
     requestAnimationFrame(() => {
       const input = document.querySelector<HTMLInputElement>(".catalog-manager .sales-card input");
@@ -81,9 +85,22 @@ export function CatalogManager({ api }: { api: SalesApi }) {
     });
   };
   const archive = async (item: CatalogItemDTO) => {
-    if (!item.active || !window.confirm(`¿Archivar ${item.reference}? Dejará de aparecer al crear propuestas.`)) return;
+    if (item.reviewStatus === "archived" || !window.confirm(`¿Archivar ${item.reference}? Dejará de aparecer al crear propuestas.`)) return;
     try { await api.archiveCatalogItem(item.id); await load(); }
     catch (cause) { setError((cause as { message?: string }).message ?? "No se pudo archivar la partida"); }
+  };
+  const activate = async (item: CatalogItemDTO) => {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    const issues = catalogActivationIssues(item, today);
+    if (issues.length) { setError(`No se puede activar ${item.reference}. Completa precio, fuente y vigencia y comprueba que no se venda por debajo del coste.`); return; }
+    try { setSaving(true); setError(""); await api.updateCatalogItem(item.id, { reviewStatus: "verified" }); await load(); }
+    catch (cause) { setError((cause as { message?: string }).message ?? "No se pudo activar la partida"); }
+    finally { setSaving(false); }
+  };
+  const reopen = async (item: CatalogItemDTO) => {
+    try { setSaving(true); setError(""); await api.updateCatalogItem(item.id, { reviewStatus: "pending_review" }); await load(); }
+    catch (cause) { setError((cause as { message?: string }).message ?? "No se pudo reabrir la revisión"); }
+    finally { setSaving(false); }
   };
 
   return <section className="private-page catalog-manager">
@@ -126,6 +143,8 @@ export function CatalogManager({ api }: { api: SalesApi }) {
           <label>Vigente desde<input type="date" value={form.validFrom} onChange={event => set("validFrom", event.target.value)} /></label>
           <label>Vigente hasta<input type="date" value={form.validUntil} onChange={event => set("validUntil", event.target.value)} /></label>
           <label>Sinónimos de búsqueda<input value={form.searchTerms} onChange={event => set("searchTerms", event.target.value)} placeholder="separados por comas" /></label>
+          <label>Referencia sustituta<input value={form.replacementReference} onChange={event => set("replacementReference", event.target.value)} placeholder="Solo para partidas reemplazadas" /></label>
+          <label>Nota de revisión<input value={form.reviewNote} onChange={event => set("reviewNote", event.target.value)} maxLength={500} /></label>
         </div>
       </details>
       <div className="catalog-manager__form-actions">
@@ -149,12 +168,13 @@ export function CatalogManager({ api }: { api: SalesApi }) {
             <thead><tr><th>Ref.</th><th>Partida</th><th>Precio</th><th>Estado</th><th /></tr></thead>
             <tbody>{group.items.map(item => {
               const directCost = calculateCatalogPrice(item.costBreakdown).directCost;
-              return <tr key={item.id} style={{ opacity: item.active ? 1 : .55 }}>
+              const status = item.reviewStatus === "verified" ? "Verificada" : item.reviewStatus === "archived" ? "Archivada" : "Pendiente de revisión";
+              return <tr key={item.id} style={{ opacity: item.reviewStatus === "archived" ? .55 : 1 }}>
                 <td data-label="Referencia"><code>{item.reference}</code></td>
                 <td data-label="Partida"><strong>{item.description}</strong><br /><small>{item.unit} · IVA {item.vatRate}%{directCost > 0 ? ` · coste ${formatMoney(directCost)}` : ""}</small>{item.evidence.sourceName && <><br /><small>Fuente: {item.evidence.sourceName}{item.evidence.priceDate ? ` · ${item.evidence.priceDate}` : ""}</small></>}</td>
                 <td data-label="Precio">{formatMoney(item.salePrice)}</td>
-                <td data-label="Estado">{item.active ? "Activa" : "Archivada"}</td>
-                <td><div className="catalog-manager__row-actions"><Button small variant="ghost" onClick={() => edit(item)}>Editar</Button>{item.active && <Button small variant="ghost" onClick={() => void archive(item)}>Archivar</Button>}</div></td>
+                <td data-label="Estado">{status}{item.replacementReference ? <><br /><small>Sustituida por {item.replacementReference}</small></> : null}</td>
+                <td><div className="catalog-manager__row-actions"><Button small variant="ghost" onClick={() => edit(item)}>Editar</Button>{item.reviewStatus === "pending_review" && <Button small onClick={() => void activate(item)}>Validar y activar</Button>}{item.reviewStatus === "archived" && <Button small variant="ghost" onClick={() => void reopen(item)}>Reabrir revisión</Button>}{item.reviewStatus !== "archived" && <Button small variant="ghost" onClick={() => void archive(item)}>Archivar</Button>}</div></td>
               </tr>;
             })}</tbody>
           </table></div>

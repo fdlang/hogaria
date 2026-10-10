@@ -30,6 +30,9 @@ export interface CatalogItem {
   salePrice: number;
   vatRate: number;
   active: boolean;
+  reviewStatus: import("../catalog-pricing.js").CatalogReviewStatus;
+  replacementReference: string | null;
+  reviewNote: string | null;
   itemType: import("../catalog-pricing.js").CatalogItemType;
   costBreakdown: import("../catalog-pricing.js").CatalogCostBreakdown;
   evidence: import("../catalog-pricing.js").CatalogPriceEvidence;

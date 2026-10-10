@@ -7,6 +7,10 @@ import type { ICatalogRepository } from "@reformapro/domain/repositories";
 
 const hasher = { hash: async () => "hash", verify: async () => true };
 const input = { reference: "DEM-900", category: "Demoliciones", description: "Partida de prueba", unit: "ud", salePrice: 125, vatRate: 21 };
+const traceable = {
+  ...input,
+  evidence: { sourceName: "Tarifa proveedor", sourceUrl: null, priceDate: "2026-10-10", validFrom: "2026-10-10", validUntil: "2027-01-10" },
+};
 
 async function setup() {
   const users = new InMemoryUserRepository(hasher);
@@ -22,13 +26,23 @@ describe("CatalogUseCases — administración exclusiva", () => {
     await expect(catalog.list(client.id)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it("crea y archiva sin eliminar el registro histórico", async () => {
+  it("crea pendiente, valida y archiva sin eliminar el registro histórico", async () => {
     const { admin, catalog } = await setup();
-    const item = await catalog.create(admin.id, input);
+    const item = await catalog.create(admin.id, traceable);
+    expect(item.reviewStatus).toBe("pending_review");
+    expect(await catalog.list(admin.id)).toHaveLength(0);
+    const verified = await catalog.update(admin.id, item.id, { reviewStatus: "verified" });
+    expect(verified.active).toBe(true);
     expect((await catalog.list(admin.id)).map(row => row.reference)).toContain("DEM-900");
     await catalog.archive(admin.id, item.id);
     expect(await catalog.list(admin.id)).toHaveLength(0);
     expect((await catalog.list(admin.id, true))[0]?.active).toBe(false);
+  });
+
+  it("bloquea la activación sin trazabilidad, vigencia o precio positivo", async () => {
+    const { admin, catalog } = await setup();
+    const item = await catalog.create(admin.id, input);
+    await expect(catalog.update(admin.id, item.id, { reviewStatus: "verified" })).rejects.toThrow("no puede activarse");
   });
 
   it("rechaza tipos de IVA fuera de la política fiscal vigente", async () => {
@@ -59,7 +73,12 @@ describe("CatalogUseCases — administración exclusiva", () => {
   it("updates only explicitly supplied fields after normalization", async () => {
     const users = new InMemoryUserRepository(hasher);
     const admin = await users.save({ id: 0, email: Email.of("patch@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() });
-    const stored = { id: 7, ...input, active: true, createdAt: new Date(), updatedAt: new Date() };
+    const stored = {
+      id: 7, ...traceable, active: true, reviewStatus: "verified" as const,
+      replacementReference: null, reviewNote: null, itemType: "simple" as const,
+      costBreakdown: { laborCost: null, materialCost: null, auxiliaryCost: null, overheadPercent: null, targetMarginPercent: null },
+      searchTerms: [], createdAt: new Date(), updatedAt: new Date(),
+    };
     let received: Record<string, unknown> | undefined;
     const repository = {
       findById: async () => stored,

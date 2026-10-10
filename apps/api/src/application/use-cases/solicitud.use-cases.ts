@@ -31,6 +31,7 @@ export interface ISolicitudRepository {
 // Rate-limit port — production impl would use Redis INCR + EXPIRE
 export interface ICooldownGate {
   check(key: string, limit: number, windowMs: number): Promise<boolean>;
+  reset?(keys: string[]): Promise<void>;
 }
 
 export class SubmitSolicitudUseCase {
@@ -115,4 +116,5 @@ export class InMemoryCooldownGate implements ICooldownGate {
     this.hits.set(key, hist);
     return true;
   }
+  async reset(keys: string[]) { keys.forEach(key => this.hits.delete(key)); }
 }

@@ -143,6 +143,9 @@ export class PostgresCatalogRepository implements ICatalogRepository {
       id: Number(row.id), reference: row.reference, category: row.category,
       description: row.description, unit: row.unit, salePrice: Number(row.sale_price),
       vatRate: Number(row.vat_rate), active: row.active,
+      reviewStatus: row.review_status ?? (row.active ? "pending_review" : "archived"),
+      replacementReference: row.replacement_reference ?? null,
+      reviewNote: row.review_note ?? null,
       itemType: row.item_type ?? "simple",
       costBreakdown: {
         laborCost: row.labor_cost == null ? null : Number(row.labor_cost),
@@ -164,7 +167,7 @@ export class PostgresCatalogRepository implements ICatalogRepository {
   async findAll(includeInactive = false) {
     const query = includeInactive
       ? "SELECT * FROM catalog_items ORDER BY category, reference"
-      : "SELECT * FROM catalog_items WHERE active=true ORDER BY category, reference";
+      : "SELECT * FROM catalog_items WHERE active=true AND review_status='verified' AND (valid_from IS NULL OR valid_from<=CURRENT_DATE) AND (valid_until IS NULL OR valid_until>=CURRENT_DATE) ORDER BY category, reference";
     return (await this.pool.query(query)).rows.map(row => this.map(row));
   }
   async findById(id: number) { const result = await this.pool.query("SELECT * FROM catalog_items WHERE id=$1", [id]); return result.rows[0] ? this.map(result.rows[0]) : null; }
@@ -174,11 +177,13 @@ export class PostgresCatalogRepository implements ICatalogRepository {
     const result = await this.pool.query(`INSERT INTO catalog_items(
       reference,category,description,unit,sale_price,vat_rate,active,item_type,
       labor_cost,material_cost,auxiliary_cost,overhead_percent,target_margin_percent,
-      source_name,source_url,price_date,valid_from,valid_until,search_terms
-    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+      source_name,source_url,price_date,valid_from,valid_until,search_terms,
+      review_status,replacement_reference,review_note
+    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
     [item.reference,item.category,item.description,item.unit,item.salePrice,item.vatRate,item.active,item.itemType,
       c.laborCost,c.materialCost,c.auxiliaryCost,c.overheadPercent,c.targetMarginPercent,
-      e.sourceName,e.sourceUrl,e.priceDate,e.validFrom,e.validUntil,item.searchTerms]);
+      e.sourceName,e.sourceUrl,e.priceDate,e.validFrom,e.validUntil,item.searchTerms,
+      item.reviewStatus,item.replacementReference,item.reviewNote]);
     return this.map(result.rows[0]);
   }
   async update(id: number, changes: Partial<Omit<CatalogItem, "id" | "createdAt" | "updatedAt">>) {
@@ -190,6 +195,7 @@ export class PostgresCatalogRepository implements ICatalogRepository {
       reference: "reference", category: "category", description: "description", unit: "unit", salePrice: "sale_price", vatRate: "vat_rate", active: "active", itemType: "item_type",
       laborCost: "labor_cost", materialCost: "material_cost", auxiliaryCost: "auxiliary_cost", overheadPercent: "overhead_percent", targetMarginPercent: "target_margin_percent",
       sourceName: "source_name", sourceUrl: "source_url", priceDate: "price_date", validFrom: "valid_from", validUntil: "valid_until", searchTerms: "search_terms",
+      reviewStatus: "review_status", replacementReference: "replacement_reference", reviewNote: "review_note",
     };
     const entries = Object.entries(flat).filter(([key, value]) => columns[key] && value !== undefined);
     if (!entries.length) { const current = await this.findById(id); if (!current) throw new NotFoundError("Partida de catálogo"); return current; }
@@ -243,7 +249,7 @@ export class PostgresChangeOrderRepository implements IChangeOrderRepository {
           ...current,
           presupuesto: current.presupuesto.plus(Money.of(fiscalSnapshot.baseAmount)),
           revision: (current.revision ?? 0) + 1,
-          ...(current.fiscalSnapshots ? { fiscalSnapshots: [...current.fiscalSnapshots, fiscalSnapshot] } : {}),
+          fiscalSnapshots: [...(current.fiscalSnapshots ?? []), fiscalSnapshot],
         };
         await client.query("UPDATE projects SET payload=$2 WHERE id=$1", [projectId, projectPayload(updated)]);
       }

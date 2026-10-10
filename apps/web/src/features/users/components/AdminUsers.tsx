@@ -131,16 +131,16 @@ export function AdminUsers({ api }: Props) {
 
       <div className="private-filter-bar" style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
-          <Input placeholder="Buscar por nombre o email…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+          <Input aria-label="Buscar usuarios por nombre o correo" placeholder="Buscar por nombre o email…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
         </div>
-        <select value={filterRol} onChange={e => { setFilterRol(e.target.value as typeof filterRol); setPage(1); }}
+        <select aria-label="Filtrar usuarios por rol" value={filterRol} onChange={e => { setFilterRol(e.target.value as typeof filterRol); setPage(1); }}
           style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", minWidth: 160 }}>
           <option value="all">Todos los roles</option>
           <option value="admin">Admins</option>
           <option value="cliente">Clientes</option>
           <option value="profesional">Profesionales</option>
         </select>
-        <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value as typeof filterStatus); setPage(1); }}
+        <select aria-label="Filtrar usuarios por estado" value={filterStatus} onChange={e => { setFilterStatus(e.target.value as typeof filterStatus); setPage(1); }}
           style={{ background: "#fffaf4", border: "1px solid #cdb69d", borderRadius: 8, padding: "9px 13px", color: "#302d29", minWidth: 145 }}>
           <option value="current">Usuarios actuales</option>
           <option value="active">Activos</option>

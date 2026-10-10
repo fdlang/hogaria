@@ -11,11 +11,13 @@ export type EstimateDTO = { id: number; numero: string; clienteNombre: string; t
 export type CatalogItemDTO = {
   id: number; reference: string; category: string; description: string; unit: string;
   salePrice: number; vatRate: number; active: boolean; itemType: "simple" | "composite";
+  reviewStatus: "pending_review" | "verified" | "archived";
+  replacementReference: string | null; reviewNote: string | null;
   costBreakdown: { laborCost: number | null; materialCost: number | null; auxiliaryCost: number | null; overheadPercent: number | null; targetMarginPercent: number | null };
   evidence: { sourceName: string | null; sourceUrl: string | null; priceDate: string | null; validFrom: string | null; validUntil: string | null };
   searchTerms: string[]; updatedAt: string;
 };
-export type CatalogWriteDTO = Pick<CatalogItemDTO, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate"> & Partial<Pick<CatalogItemDTO, "itemType" | "costBreakdown" | "evidence" | "searchTerms" | "active">>;
+export type CatalogWriteDTO = Pick<CatalogItemDTO, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate"> & Partial<Pick<CatalogItemDTO, "itemType" | "costBreakdown" | "evidence" | "searchTerms" | "active" | "reviewStatus" | "replacementReference" | "reviewNote">>;
 export type AdminEstimateDTO = { id: number; oportunidadId: number; estado: string; borrador: EstimateDraftDTO };
 export type ChangeOrderDTO = { id: number; numero: string; estado: string; payload?: EstimateDraftDTO; propuesta?: Pick<PublicProposalDTO, "titulo" | "partidas" | "condicionesPago"> };
 

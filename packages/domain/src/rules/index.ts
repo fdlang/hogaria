@@ -126,8 +126,8 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/sales.use-cases.ts", "apps/api/database/commercial-workflow.sql"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
   },
   {
-    id: "HOG-WRK-001", description: "Solo un profesional activo y asignado puede iniciar una jornada en una obra.", origin: "business", owner: "operaciones",
-    assumption: "Toda presencia en obra corresponde a una asignación previa.", validScale: "Plantilla y autónomos identificados individualmente; no cubre subcontratas por cuadrilla.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
+    id: "HOG-WRK-001", description: "Solo un profesional activo y asignado puede iniciar una jornada en una obra en curso.", origin: "business", owner: "operaciones",
+    assumption: "Toda presencia corresponde a una asignación previa y a una obra formalmente iniciada.", validScale: "Plantilla y autónomos identificados individualmente; no cubre subcontratas por cuadrilla.", validFrom: "2026-10-10", validUntil: null, nextReview: "2027-01-10",
     metrics: [metric("unassigned_clock_in_denial_rate", "Fichajes rechazados por falta de asignación", "audit_log"), metric("manual_time_entry_rate", "Partes creados o corregidos manualmente")],
     implementation: ["apps/api/src/application/use-cases/work-tracking.use-cases.ts"], tests: ["apps/api/src/application/use-cases/work-tracking.use-cases.test.ts", "apps/web/e2e/work.browser.ts"],
   },
@@ -145,10 +145,10 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/catalog.use-cases.ts"], tests: ["apps/api/src/application/use-cases/catalog.use-cases.test.ts", "apps/web/e2e/catalog.browser.ts"],
   },
   {
-    id: "HOG-CAT-002", description: "Los precios del catálogo separan coste contrastado y precio comercial, conservan fuente, vigencia e histórico.", origin: "business", owner: "administracion",
-    assumption: "La empresa necesita presupuestar con rapidez sin confundir referencias técnicas de coste con precios de venta.", validScale: "Una zona tarifaria y una moneda; requiere listas por delegación antes de operar en varios mercados.", validFrom: "2026-10-10", validUntil: null, nextReview: "2027-01-10",
+    id: "HOG-CAT-002", description: "Solo los precios positivos, contrastados y dentro de vigencia se activan; el resto permanece pendiente o archivado con histórico.", origin: "business", owner: "administracion",
+    assumption: "La empresa necesita presupuestar con rapidez sin confundir referencias técnicas de coste con precios de venta no revisados.", validScale: "Una zona tarifaria y una moneda; requiere listas por delegación antes de operar en varios mercados.", validFrom: "2026-10-10", validUntil: null, nextReview: "2027-01-10",
     metrics: [metric("catalog_evidence_coverage", "Partidas activas con fuente y fecha de precio", "database"), metric("catalog_stale_price_rate", "Partidas activas con vigencia vencida", "database"), metric("catalog_price_override_rate", "Precios de catálogo modificados al presupuestar")],
-    implementation: ["packages/domain/src/catalog-pricing.ts", "apps/api/database/catalog-pricing.sql", "apps/api/src/application/use-cases/catalog.use-cases.ts"], tests: ["packages/domain/src/catalog-pricing.test.ts", "apps/api/src/application/use-cases/catalog.use-cases.test.ts"],
+    implementation: ["packages/domain/src/catalog-pricing.ts", "apps/api/database/catalog-governance.sql", "apps/api/src/application/use-cases/catalog.use-cases.ts"], tests: ["packages/domain/src/catalog-pricing.test.ts", "apps/api/src/application/use-cases/catalog.use-cases.test.ts"],
   },
   {
     id: "HOG-FIN-002", description: "Cada obra nueva conserva instantáneas fiscales inmutables de la propuesta firmada y de cada orden aprobada, sin reinterpretar importes históricos.", origin: "legal_fiscal", owner: "administracion",
@@ -232,8 +232,8 @@ export const BUSINESS_RULES = [
     implementation: ["vercel.json", "apps/api/src/application/use-cases/auth.use-cases.ts"], tests: ["apps/api/src/interfaces/http/authController.test.ts", "apps/api/src/application/use-cases/security-regressions.test.ts"],
   },
   {
-    id: "HOG-PRJ-003", description: "Una obra solo comienza con fechas coherentes, al menos un hito y un profesional asignado.", origin: "business", owner: "operaciones",
-    assumption: "Una planificacion minima evita iniciar obras sin responsable ni referencia de avance.", validScale: "Obras gestionadas por asignaciones e hitos individuales.", validFrom: "2026-09-26", validUntil: null, nextReview: "2026-12-20",
+    id: "HOG-PRJ-003", description: "Una obra solo comienza con fechas coherentes, hitos dentro del periodo y al menos un profesional asignado.", origin: "business", owner: "operaciones",
+    assumption: "Una planificacion cronológicamente válida evita iniciar obras sin responsable ni referencia de avance.", validScale: "Obras gestionadas por asignaciones e hitos individuales.", validFrom: "2026-10-10", validUntil: null, nextReview: "2027-01-10",
     metrics: [metric("project_start_denial_rate", "Inicios bloqueados por planificacion incompleta", "audit_log")],
     implementation: ["packages/domain/src/workflows.ts", "apps/api/src/application/use-cases/project.use-cases.ts"], tests: ["packages/domain/src/workflows.test.ts", "apps/api/src/application/use-cases/project-professionals.use-cases.test.ts"],
   },

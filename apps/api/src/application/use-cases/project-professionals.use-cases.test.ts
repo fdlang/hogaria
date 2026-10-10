@@ -44,6 +44,8 @@ describe("project professional assignments", () => {
     await expect(update.execute({ actorId: professional.id, projectId: project.id, changes: { hitos: [{ id: "new", nombre: "Sustituido", completado: true, fecha: milestoneDate.toISOString() }], revision: 0 }, ctx })).rejects.toThrow("existentes");
     const updated = await update.execute({ actorId: professional.id, projectId: project.id, changes: { hitos: [{ id: "h1", nombre: "Inicio", completado: true, fecha: milestoneDate.toISOString() }], revision: 0 }, ctx });
     expect(updated.hitos[0]?.completado).toBe(true);
+    await expect(update.execute({ actorId: admin.id, projectId: project.id, changes: { fechaFinPrevista: "2026-09-15", revision: updated.revision }, ctx }))
+      .rejects.toThrow("hitos");
   });
 
   it("blocks professional changes after completion and direct contractual budget edits", async () => {

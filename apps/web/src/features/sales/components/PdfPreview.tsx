@@ -73,9 +73,25 @@ function PdfPage({
   );
 }
 
+function LazyPdfPage(props: Parameters<typeof PdfPage>[0]) {
+  const placeholderRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(props.pageNumber === 1);
+  useEffect(() => {
+    const node = placeholderRef.current;
+    if (!node || visible) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) setVisible(true);
+    }, { rootMargin: "500px 0px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [visible]);
+  return visible
+    ? <PdfPage {...props} />
+    : <div ref={placeholderRef} className="estimate-pdf-page-placeholder" style={{ minHeight: Math.round(props.pageWidth * 1.414) }} aria-label={`Página ${props.pageNumber} pendiente de visualizar`} />;
+}
+
 export function PdfPreview({ blob, onReady, onError }: PdfPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const renderedPages = useRef(new Set<number>());
   const callbacks = useRef({ onReady, onError });
   const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
   const [pageWidth, setPageWidth] = useState(0);
@@ -95,7 +111,6 @@ export function PdfPreview({ blob, onReady, onError }: PdfPreviewProps) {
   useEffect(() => {
     let active = true;
     let loadingTask: ReturnType<(typeof import("pdfjs-dist"))["getDocument"]> | null = null;
-    renderedPages.current.clear();
     setDocument(null);
 
     void blob.arrayBuffer()
@@ -121,10 +136,8 @@ export function PdfPreview({ blob, onReady, onError }: PdfPreviewProps) {
   }, [blob]);
 
   const markRendered = useCallback((pageNumber: number) => {
-    if (!document) return;
-    renderedPages.current.add(pageNumber);
-    if (renderedPages.current.size === document.numPages) callbacks.current.onReady();
-  }, [document]);
+    if (pageNumber === 1) callbacks.current.onReady();
+  }, []);
 
   const reportError = useCallback((error: Error) => callbacks.current.onError(error), []);
 
@@ -135,7 +148,7 @@ export function PdfPreview({ blob, onReady, onError }: PdfPreviewProps) {
       aria-label="Vista previa del presupuesto en PDF"
     >
       {document && Array.from({ length: document.numPages }, (_, index) => (
-        <PdfPage
+        <LazyPdfPage
           key={index + 1}
           document={document}
           pageNumber={index + 1}

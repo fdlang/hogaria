@@ -209,7 +209,13 @@ export async function buildApp(): Promise<AppDependencies> {
   const events    = new InMemoryEventEmitter();
   const memoryCooldown = new InMemoryCooldownGate();
 
-  const pool = databaseUrl ? auditedPool(new pg.Pool({ connectionString: databaseUrl })) : null;
+  const pool = databaseUrl ? auditedPool(new pg.Pool({
+    connectionString: databaseUrl,
+    max: 3,
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 10_000,
+    statement_timeout: 15_000,
+  })) : null;
   const cooldown = pool ? new PostgresCooldownGate(pool) : memoryCooldown;
   const users: IUserRepository = pool ? new PostgresUserRepository(pool, hasher) : new InMemoryUserRepository(hasher);
   const projects: IProjectRepository = pool ? new PostgresProjectRepository(pool) : new InMemoryProjectRepository();

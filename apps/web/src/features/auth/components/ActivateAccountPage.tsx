@@ -7,7 +7,7 @@ import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword } from "@reformap
 const ACTIVATION_TOKEN_KEY = "hogaria_activation_token";
 
 export function ActivateAccountPage({ api }: { api: UsersApi }) {
-  const [token] = useState(() => {
+  const [token, setToken] = useState<string | null>(() => {
     const fromLink = activationTokenFromLocation(window.location);
     if (fromLink) sessionStorage.setItem(ACTIVATION_TOKEN_KEY, fromLink);
     return fromLink || sessionStorage.getItem(ACTIVATION_TOKEN_KEY);
@@ -40,7 +40,12 @@ export function ActivateAccountPage({ api }: { api: UsersApi }) {
       sessionStorage.removeItem(ACTIVATION_TOKEN_KEY);
       setDone(true);
     } catch (cause) {
-      setError((cause as { message?: string } | null)?.message ?? "No se pudo activar la cuenta.");
+      const error = cause as { status?: number; field?: string; message?: string } | null;
+      if (error?.status === 409 || error?.field === "token") {
+        sessionStorage.removeItem(ACTIVATION_TOKEN_KEY);
+        setToken(null);
+      }
+      setError(error?.message ?? "No se pudo activar la cuenta.");
     } finally {
       setSaving(false);
     }
@@ -66,6 +71,7 @@ export function ActivateAccountPage({ api }: { api: UsersApi }) {
         <Input label="Repite la contraseña" type="password" required autoComplete="new-password" value={confirm} onChange={event => setConfirm(event.target.value)} aria-describedby={error ? "activation-error" : undefined} />
         <Button type="submit" loading={saving}>Guardar contraseña</Button>
       </form>}
+      <p style={{ marginTop: 20, fontSize: 12, textAlign: "center" }}><a href="#/privacidad">Información sobre privacidad</a></p>
     </div>
   </section>;
 }

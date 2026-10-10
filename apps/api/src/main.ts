@@ -91,7 +91,7 @@ function getRuntime(): Promise<Runtime> {
     const documents = estimateDocumentController(app.useCases.estimateDocuments);
     const userNotifications = userNotificationController(app.useCases.userNotifications);
 
-    return { authMiddleware: requireAuth(app.tokens, app.users), flushNotifications: async()=>{await app.useCases.userNotifications.retry(1);}, routes: [
+    return { authMiddleware: requireAuth(app.tokens, app.users), flushNotifications: async()=>{await app.useCases.userNotifications.processPending(10);}, routes: [
   route("GET", "/work/current", work.current, { protected: true }),
   route("GET", "/work/audit", work.audit, { protected: true }),
   route("GET", "/work/entries", work.list, { protected: true }),
@@ -230,7 +230,7 @@ export async function apiHandler(req: IncomingMessage, res: ServerResponse): Pro
     url.searchParams.forEach((v, k) => { query[k] = v; });
 
     // Parse body
-    const body = await parseJsonBody(req);
+    const body = (await parseJsonBody(req)) ?? {};
 
     const httpReq: Req = {
       body, headers: req.headers as Record<string, string>, ip: getClientIP(req),

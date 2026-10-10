@@ -83,6 +83,12 @@ async function setup() {
   };
 }
 describe("work tracking isolation and lifecycle", () => {
+  it("does not register work before the project formally starts", async () => {
+    const s = await setup();
+    await s.projects.update(s.project.id, { estado: "planificacion" }, s.project.revision ?? 0);
+    await expect(s.start()).rejects.toThrow("no está abierta");
+  });
+
   it("subtracts pauses, freezes the cost and audits each transition", async () => {
     const s = await setup();
     let e = await s.start();

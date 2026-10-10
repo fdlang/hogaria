@@ -22,6 +22,7 @@ interface Props<T> {
   columns: ReadonlyArray<ColumnDef<T>>;
   rowKey: (row: T) => string | number;
   onRowClick?: (row: T) => void;
+  rowLabel?: (row: T) => string;
   loading?: boolean;
   error?: string | null;
   emptyMessage?: string;
@@ -30,7 +31,7 @@ interface Props<T> {
 
 type SortState = { key: string; dir: "asc" | "desc" } | null;
 
-export function DataTable<T>({ data, columns, rowKey, onRowClick, loading, error, emptyMessage, actions }: Props<T>) {
+export function DataTable<T>({ data, columns, rowKey, onRowClick, rowLabel, loading, error, emptyMessage, actions }: Props<T>) {
   const [sort, setSort] = useState<SortState>(null);
 
   const sorted = useMemo(() => {
@@ -84,7 +85,7 @@ export function DataTable<T>({ data, columns, rowKey, onRowClick, loading, error
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               onKeyDown={onRowClick ? event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onRowClick(row); } } : undefined}
               tabIndex={onRowClick ? 0 : undefined}
-              aria-label={onRowClick ? "Abrir detalle" : undefined}
+              aria-label={onRowClick ? (rowLabel?.(row) ?? `Abrir detalle ${rowKey(row)}`) : undefined}
               style={{ borderBottom: "1px solid #decdb8", cursor: onRowClick ? "pointer" : "default" }}
               onMouseEnter={e => onRowClick && (e.currentTarget.style.background = "#fffaf4")}
               onMouseLeave={e => onRowClick && (e.currentTarget.style.background = "transparent")}>

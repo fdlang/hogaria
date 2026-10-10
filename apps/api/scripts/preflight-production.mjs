@@ -87,6 +87,10 @@ export async function inspectProductionDatabase(pool, env) {
       else if (applied.get(name) !== checksum) errors.push(`Checksum distinto en migracion aplicada: ${name}`);
     }
     for (const name of applied.keys()) if (!expected.has(name)) warnings.push(`Migracion registrada pero desconocida por este codigo: ${name}`);
+    if (applied.get("catalog-governance.sql") === expected.get("catalog-governance.sql")) {
+      const usableCatalogItems = Number((await pool.query("SELECT count(*) FROM catalog_items WHERE active=true AND review_status='verified' AND (valid_from IS NULL OR valid_from<=CURRENT_DATE) AND (valid_until IS NULL OR valid_until>=CURRENT_DATE)")).rows[0]?.count ?? 0);
+      if (usableCatalogItems === 0) errors.push("El catalogo no contiene ninguna partida verificada y vigente");
+    }
   }
 
   let signatures = { v1: 0, v2: 0, v3: 0, unknown: 0, v3KeyIds: [] };

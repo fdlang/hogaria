@@ -2,6 +2,9 @@
 -- Platform-managed objects outside this explicit list are never touched.
 BEGIN;
 DROP TABLE IF EXISTS
+  user_notifications,
+  notification_event_outbox,
+  catalog_price_history,
   professional_documents,
   client_email_notifications,
   rate_limit_windows,
@@ -22,6 +25,7 @@ DROP TABLE IF EXISTS
   account_activation_tokens,
   solicitudes,
   audit_entries,
-  users
+  users,
+  schema_migrations
 CASCADE;
 COMMIT;

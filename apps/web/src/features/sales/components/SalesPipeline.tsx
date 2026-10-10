@@ -20,7 +20,7 @@ import {
 import { useCatalog } from "@/features/catalog/useCatalog";
 import { CatalogLoadState } from "@/features/catalog/CatalogLoadState";
 import { blankOpportunity, opportunityForSelection } from "../sales-pipeline.utils";
-import { calculateEstimateTotals, CURRENT_FISCAL_POLICY, hasAtMostTwoDecimals } from "@reformapro/domain";
+import { calculateCatalogPrice, calculateEstimateTotals, CURRENT_FISCAL_POLICY, hasAtMostTwoDecimals } from "@reformapro/domain";
 
 const steps = ["Oportunidad", "Alcance", "Partidas", "Revisión"];
 
@@ -47,6 +47,26 @@ const blankDraft = (): EstimateDraftDTO => ({
   partidas: [],
 });
 
+const SALES_DRAFT_KEY = "hogaria_sales_draft";
+type RecoverableSalesDraft = {
+  step: number; opportunity: ReturnType<typeof blankOpportunity>; selected: number | null;
+  draft: EstimateDraftDTO; existingOpportunity: string; editingId: number | null;
+};
+const recoverSalesDraft = (): RecoverableSalesDraft | null => {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(SALES_DRAFT_KEY) ?? "null") as Partial<RecoverableSalesDraft> | null;
+    if (!parsed || !parsed.draft || !Array.isArray(parsed.draft.partidas) || !parsed.opportunity) return null;
+    return {
+      step: Number.isInteger(parsed.step) ? Math.max(0, Math.min(3, Number(parsed.step))) : 0,
+      opportunity: parsed.opportunity,
+      selected: Number.isSafeInteger(parsed.selected) ? Number(parsed.selected) : null,
+      draft: parsed.draft,
+      existingOpportunity: typeof parsed.existingOpportunity === "string" ? parsed.existingOpportunity : "",
+      editingId: Number.isSafeInteger(parsed.editingId) ? Number(parsed.editingId) : null,
+    };
+  } catch { return null; }
+};
+
 const statusLabel = (status: string) =>
   ({
     borrador: "Borrador",
@@ -65,6 +85,7 @@ export function SalesPipeline({
   api: SalesApi;
   users: UsersApi;
 }) {
+  const [recoveredDraft] = useState(recoverSalesDraft);
   const [opportunities, setOpportunities] = useState<OpportunityDTO[]>([]);
   const [opportunityPage, setOpportunityPage] = useState(1);
   const [opportunityPages, setOpportunityPages] = useState(1);
@@ -81,19 +102,20 @@ export function SalesPipeline({
   const { items: catalogItems, loading: catalogLoading, error: catalogError, reload: reloadCatalog } = useCatalog(api);
   const catalog = useMemo<CatalogCategory[]>(() => {
     const grouped = new Map<string, CatalogItem[]>();
-    catalogItems.filter(item => item.active).forEach(item => {
+    catalogItems.filter(item => item.active && item.reviewStatus === "verified").forEach(item => {
       const entries = grouped.get(item.category) ?? [];
+      const pricing = calculateCatalogPrice(item.costBreakdown);
       entries.push({
         ref: item.reference, descripcion: item.description, unidad: item.unit,
         precio: item.salePrice, iva: item.vatRate,
-        costeUnitario: item.costBreakdown ? (item.costBreakdown.laborCost ?? 0) + (item.costBreakdown.materialCost ?? 0) + (item.costBreakdown.auxiliaryCost ?? 0) || null : null,
+        costeUnitario: pricing.costWithOverhead ?? (pricing.directCost > 0 ? pricing.directCost : null),
         searchTerms: item.searchTerms ?? [],
       });
       grouped.set(item.category, entries);
     });
     return [...grouped].map(([categoria, items]) => ({ categoria, items }));
   }, [catalogItems]);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(recoveredDraft?.step ?? 0);
   const [saving, setSaving] = useState(false);
   const [openingId, setOpeningId] = useState<number | null>(null);
   const [converting, setConverting] = useState<number | null>(null);
@@ -101,15 +123,19 @@ export function SalesPipeline({
   const [showCatalog, setShowCatalog] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<EstimateDTO | null>(null);
-  const [showEditor, setShowEditor] = useState(() => Boolean(new URLSearchParams(window.location.hash.split("?")[1] ?? window.location.search).get("opportunity")));
-  const [opportunity, setOpportunity] = useState(blankOpportunity);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [draft, setDraft] = useState(blankDraft);
-  const [existingOpportunity, setExistingOpportunity] = useState(() => new URLSearchParams(window.location.hash.split("?")[1] ?? window.location.search).get("opportunity") ?? "");
+  const [showEditor, setShowEditor] = useState(() => Boolean(recoveredDraft || new URLSearchParams(window.location.hash.split("?")[1] ?? window.location.search).get("opportunity")));
+  const [opportunity, setOpportunity] = useState(recoveredDraft?.opportunity ?? blankOpportunity);
+  const [selected, setSelected] = useState<number | null>(recoveredDraft?.selected ?? null);
+  const [draft, setDraft] = useState(recoveredDraft?.draft ?? blankDraft);
+  const [existingOpportunity, setExistingOpportunity] = useState(() => recoveredDraft?.existingOpportunity ?? new URLSearchParams(window.location.hash.split("?")[1] ?? window.location.search).get("opportunity") ?? "");
   useEffect(() => {
     setOpportunity(opportunityForSelection(existingOpportunity, opportunities));
   }, [existingOpportunity, opportunities]);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(recoveredDraft?.editingId ?? null);
+  useEffect(() => {
+    if (!showEditor) { sessionStorage.removeItem(SALES_DRAFT_KEY); return; }
+    sessionStorage.setItem(SALES_DRAFT_KEY, JSON.stringify({ step, opportunity, selected, draft, existingOpportunity, editingId } satisfies RecoverableSalesDraft));
+  }, [showEditor, step, opportunity, selected, draft, existingOpportunity, editingId]);
   const editorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (showEditor) editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1002,6 +1028,8 @@ function EstimateLineEditor({
             <option value="m²">m²</option>
             <option value="ml">ml</option>
             <option value="h">h</option>
+            <option value="global">global</option>
+            <option value="mes">mes</option>
           </select>
         </label>
         <label>

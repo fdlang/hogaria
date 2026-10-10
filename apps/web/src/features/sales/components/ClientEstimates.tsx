@@ -244,7 +244,7 @@ export function ClientEstimates({
           </p>
         )}
       </section>
-      <nav className="client-estimates__pagination" aria-label="Páginas de presupuestos"><Button small variant="ghost" disabled={page === 0 || loading} onClick={() => setPage(value => value - 1)}>Anterior</Button><span>Página {page + 1}</span><Button small variant="ghost" disabled={!hasNextPage || loading} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>
+      <nav className="client-estimates__pagination" aria-label="Páginas de presupuestos"><Button type="button" small variant="ghost" disabled={page === 0} onClick={() => setPage(value => Math.max(0, value - 1))}>Anterior</Button><span>Página {page + 1}</span><Button type="button" small variant="ghost" disabled={!hasNextPage} onClick={() => setPage(value => value + 1)}>Siguiente</Button></nav>
       </>}
       {view === "projects" && <section className="client-estimates__section client-estimates__section--projects" aria-labelledby="client-projects">
         <div className="client-estimates__section-heading">

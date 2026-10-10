@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isValidAccountPassword } from "./credentials.js";
+import { isValidAccountPassword, isWithinAccountPasswordByteLimit } from "./credentials.js";
 
 describe("isValidAccountPassword", () => {
   it.each(["short1", "abcdefghijkl", "123456789012"])("rejects %s", value => {
@@ -7,5 +7,9 @@ describe("isValidAccountPassword", () => {
   });
   it("accepts 12 to 72 bytes containing letters and numbers", () => {
     expect(isValidAccountPassword("ClaveSegura2026")).toBe(true);
+  });
+  it("applies the bcrypt byte limit independently from the creation policy", () => {
+    expect(isWithinAccountPasswordByteLimit("legacy-short")).toBe(true);
+    expect(isWithinAccountPasswordByteLimit("ñ".repeat(37))).toBe(false);
   });
 });

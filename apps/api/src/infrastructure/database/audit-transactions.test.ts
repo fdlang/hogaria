@@ -198,7 +198,9 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
       expect((await projects.findById(project.id))?.presupuesto.amount).toBe(100);
     } finally { await db.exec("DROP TRIGGER change_apply_failure ON projects; DROP FUNCTION fail_apply_change();"); }
     await changes.transition(order.id,project.id,"enviado","aprobado",clientId);
-    expect((await projects.findById(project.id))?.presupuesto.amount).toBe(200);
+    const updated = await projects.findById(project.id);
+    expect(updated?.presupuesto.amount).toBe(200);
+    expect(updated?.fiscalSnapshots).toHaveLength(1);
     await expect(changes.transition(order.id,project.id,"enviado","aprobado",clientId)).rejects.toThrow();
     expect((await projects.findById(project.id))?.presupuesto.amount).toBe(200);
     await expect(query("DELETE FROM projects WHERE id=$1",[project.id])).rejects.toThrow("histórico");

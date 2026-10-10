@@ -10,7 +10,7 @@ export type CatalogFormValues = {
   reference: string; category: string; description: string; unit: string; salePrice: string; vatRate: string;
   laborCost?: string; materialCost?: string; auxiliaryCost?: string; overheadPercent?: string;
   targetMarginPercent?: string; sourceName?: string; sourceUrl?: string; priceDate?: string;
-  validFrom?: string; validUntil?: string; searchTerms?: string;
+  validFrom?: string; validUntil?: string; searchTerms?: string; replacementReference?: string; reviewNote?: string;
 };
 
 export function validateCatalogForm(form: CatalogFormValues): Partial<Record<keyof CatalogFormValues, string>> {
@@ -61,7 +61,7 @@ export function filterCatalogItems(
   const query = searchable(search.trim());
 
   return items.filter((item) => {
-    if (!includeArchived && !item.active) return false;
+    if (!includeArchived && item.reviewStatus === "archived") return false;
     if (category && item.category !== category) return false;
     if (!query) return true;
 

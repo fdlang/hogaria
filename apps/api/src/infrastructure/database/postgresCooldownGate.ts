@@ -5,9 +5,12 @@ import { RATE_LIMIT_POLICY } from "@reformapro/domain";
 /** Shared, atomic limiter for serverless instances backed by PostgreSQL. */
 export class PostgresCooldownGate implements ICooldownGate {
   constructor(private readonly pool: pg.Pool) {}
-  async check(key: string, limit: number, windowMs: number): Promise<boolean> {
+  private async digest(key: string) {
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
-    const pseudonymousKey = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  }
+  async check(key: string, limit: number, windowMs: number): Promise<boolean> {
+    const pseudonymousKey = await this.digest(key);
     await this.pool.query(
       "DELETE FROM rate_limit_windows WHERE window_started_at <= NOW() - ($1 * INTERVAL '1 millisecond')",
       [RATE_LIMIT_POLICY.retentionMs],
@@ -23,5 +26,9 @@ export class PostgresCooldownGate implements ICooldownGate {
       [pseudonymousKey, limit, windowMs],
     );
     return result.rowCount === 1;
+  }
+  async reset(keys: string[]) {
+    if (!keys.length) return;
+    await this.pool.query("DELETE FROM rate_limit_windows WHERE key = ANY($1::text[])", [await Promise.all(keys.map(key => this.digest(key)))]);
   }
 }

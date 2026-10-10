@@ -1,15 +1,13 @@
-- Estado: catálogo de costes y plantillas desplegado en producción.
-- Hecho: desglose interno de mano de obra, material, auxiliares, gastos y margen objetivo.
-- Hecho: fuente, fecha, vigencia, sinónimos y tipo simple/compuesto con validación API/BD.
-- Hecho: histórico automático e inmutable de cambios de precio mediante migración incremental.
-- Hecho: cálculo de venta sugerida; nunca sustituye el precio sin acción del administrador.
-- Hecho: plantillas de baño, cocina y armarios con mediciones revisables antes de guardar.
-- Hecho: 7 partidas de mano de obra contrastadas con CYPE, archivadas y sin precio de venta.
-- Hecho: metadatos de regla HOG-CAT-002 y tests de cálculo, trazabilidad y plantillas.
-- Validación: typecheck completo correcto.
-- Validación: 64 archivos y 328 tests correctos; migración PGlite e idempotencia verificadas.
-- Validación: build de API y web correcto.
-- Validación: 124 pruebas de navegador; un timeout WebKit pasó al repetirlo aisladamente.
-- Producción: `catalog-pricing.sql` aplicada; segunda ejecución 0 migraciones; seed preservó datos existentes.
-- Producción: Vercel `Ready`; aliases activos; landing 200 y catálogo sin sesión 401.
-- Pendiente negocio: fijar gastos, margen y precio de venta antes de activar cada nueva partida.
+- Estado: candidato validado; despliegue de producción en curso.
+- Hecho: gobernanza del catálogo pendiente/verificado/archivado e histórico inmutable.
+- Hecho: reset completo incluye ledger, notificaciones e histórico de catálogo.
+- Hecho: preflight de build comprueba esquema, firmas y catálogo operativo.
+- Hecho: instantáneas fiscales legacy, rate limit de login y límite Bcrypt corregidos.
+- Hecho: correos con timeout/idempotencia; reintentos terminales recuperados.
+- Hecho: operaciones ya no esperan envío externo de correo.
+- Hecho: borrador comercial recuperable tras expirar sesión y PDF progresivo.
+- Hecho: Jornadas solo en obra en curso; cronología de hitos validada.
+- Hecho: typecheck, build, 335 tests y 124 flujos Chromium/WebKit correctos; npm audit limpio.
+- Pendiente: identidad legal, domicilio, proveedores/regiones y matriz de retención aprobada.
+- Hecho: 60 precios aportados por administración quedan verificados hasta 2027-01-10; 7 candidatos sin precio siguen pendientes.
+- Hecho: 3 migraciones aplicadas y variables requeridas presentes en Vercel Production.

@@ -20,6 +20,7 @@ const notification = (row: Record<string, unknown>): StoredUserNotification => (
 export class PostgresUserNotificationStore implements UserNotificationStore {
   constructor(private readonly pool: Pool) {}
   async claimEvent() {
+    await this.pool.query("UPDATE notification_event_outbox SET state='failed',failure_reason=COALESCE(failure_reason,'attempts_exhausted') WHERE state='processing' AND attempts>=8 AND next_attempt_at<=now()");
     const result = await this.pool.query(`WITH candidate AS (
       SELECT id FROM notification_event_outbox WHERE state IN ('pending','processing') AND next_attempt_at<=now() AND attempts<8 ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1
     ) UPDATE notification_event_outbox n SET state='processing',attempts=attempts+1,next_attempt_at=now()+interval '2 minutes'

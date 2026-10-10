@@ -78,6 +78,7 @@ test("client pagination searches beyond the current page", async ({page}) => {
     return route.fulfill({json:searching ? [{...estimate,id:51,titulo:"Reforma lejana"}] : second ? [{...estimate,id:21,titulo:"Página segunda"}] : Array.from({length:21},(_,i)=>({...estimate,id:i+1,numero:`HOG-${i+1}`}))});
   });
   await page.goto("/cliente/budgets");
+  await expect(page.getByText("20 propuestas en esta página", { exact: true })).toBeVisible();
   await page.getByRole("button",{name:"Siguiente",exact:true}).click();
   await expect(page.getByText("Página segunda",{exact:true})).toBeVisible();
   await page.getByLabel("Buscar presupuestos").fill("Reforma lejana");

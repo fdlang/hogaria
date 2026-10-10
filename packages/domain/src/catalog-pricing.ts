@@ -1,4 +1,5 @@
 export type CatalogItemType = "simple" | "composite";
+export type CatalogReviewStatus = "pending_review" | "verified" | "archived";
 
 export interface CatalogCostBreakdown {
   laborCost: number | null;
@@ -20,6 +21,12 @@ export interface CatalogPriceCalculation {
   directCost: number;
   costWithOverhead: number | null;
   suggestedSalePrice: number | null;
+}
+
+export interface CatalogActivationCandidate {
+  salePrice: number;
+  costBreakdown: CatalogCostBreakdown;
+  evidence: CatalogPriceEvidence;
 }
 
 const cents = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
@@ -48,6 +55,34 @@ export function calculateCatalogPrice(value: CatalogCostBreakdown): CatalogPrice
     costWithOverhead,
     suggestedSalePrice: cents(costWithOverhead / (1 - value.targetMarginPercent / 100)),
   };
+}
+
+const realIsoDate = (value: string | null): value is string => {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
+
+/**
+ * Business activation gate for a commercial catalogue price.
+ * Origin: business/security. Assumption: only traceable prices within their
+ * declared validity window may be offered in new estimates.
+ * Valid from 2026-10-10. Next review 2027-01-10.
+ */
+export function catalogActivationIssues(value: CatalogActivationCandidate, today: string): string[] {
+  const issues: string[] = [];
+  if (!realIsoDate(today)) throw new RangeError("Fecha de control no válida");
+  if (!Number.isFinite(value.salePrice) || value.salePrice <= 0) issues.push("sale_price");
+  if (!value.evidence.sourceName?.trim()) issues.push("source");
+  if (!realIsoDate(value.evidence.priceDate)) issues.push("price_date");
+  if (!realIsoDate(value.evidence.validFrom)) issues.push("valid_from");
+  if (!realIsoDate(value.evidence.validUntil)) issues.push("valid_until");
+  if (realIsoDate(value.evidence.priceDate) && value.evidence.priceDate > today) issues.push("future_price_date");
+  if (realIsoDate(value.evidence.validFrom) && value.evidence.validFrom > today) issues.push("not_yet_valid");
+  if (realIsoDate(value.evidence.validUntil) && value.evidence.validUntil < today) issues.push("expired");
+  const calculation = calculateCatalogPrice(value.costBreakdown);
+  if (calculation.costWithOverhead != null && value.salePrice < calculation.costWithOverhead) issues.push("below_cost");
+  return issues;
 }
 
 export interface EstimateTemplate {

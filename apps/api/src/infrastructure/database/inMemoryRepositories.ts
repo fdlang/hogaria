@@ -232,7 +232,7 @@ export class InMemoryChangeOrderRepository implements IChangeOrderRepository {
         const fiscalSnapshot = createFiscalSnapshot(item.payload.partidas, { type: "change_order", id: item.id }, approvedAt);
         await this.projects.update(projectId, {
           presupuesto: project.presupuesto.plus(Money.of(fiscalSnapshot.baseAmount)),
-          ...(project.fiscalSnapshots ? { fiscalSnapshots: [...project.fiscalSnapshots, fiscalSnapshot] } : {}),
+          fiscalSnapshots: [...(project.fiscalSnapshots ?? []), fiscalSnapshot],
         }, project.revision ?? 0);
       }
       return this.update(id, { estado: next, aprobadoAt: next === "aprobado" ? new Date() : null });

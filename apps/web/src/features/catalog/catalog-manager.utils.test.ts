@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { CatalogItemDTO } from "@/features/sales/api/sales.api";
 import { catalogCategories, filterCatalogItems, groupCatalogItems, validateCatalogForm } from "./catalog-manager.utils";
 
-const pricing = { itemType: "simple" as const, costBreakdown: { laborCost: null, materialCost: null, auxiliaryCost: null, overheadPercent: null, targetMarginPercent: null }, evidence: { sourceName: null, sourceUrl: null, priceDate: null, validFrom: null, validUntil: null }, searchTerms: [] };
+const pricing = { itemType: "simple" as const, reviewStatus: "verified" as const, replacementReference: null, reviewNote: null, costBreakdown: { laborCost: null, materialCost: null, auxiliaryCost: null, overheadPercent: null, targetMarginPercent: null }, evidence: { sourceName: null, sourceUrl: null, priceDate: null, validFrom: null, validUntil: null }, searchTerms: [] };
 const items: CatalogItemDTO[] = [
   { id: 1, reference: "BAN-002", category: "Baño", description: "Mampara de vidrio", unit: "ud", salePrice: 950, vatRate: 21, active: true, updatedAt: "2026-01-01", ...pricing },
   { id: 2, reference: "ALB-001", category: "Albañilería", description: "Tabique de pladur", unit: "m²", salePrice: 58, vatRate: 21, active: true, updatedAt: "2026-01-01", ...pricing },
-  { id: 3, reference: "BAN-003", category: "Baño", description: "Inodoro suspendido", unit: "ud", salePrice: 790, vatRate: 21, active: false, updatedAt: "2026-01-01", ...pricing },
+  { id: 3, reference: "BAN-003", category: "Baño", description: "Inodoro suspendido", unit: "ud", salePrice: 790, vatRate: 21, active: false, updatedAt: "2026-01-01", ...pricing, reviewStatus: "archived" },
 ];
 
 describe("catalog manager utilities", () => {

@@ -39,14 +39,15 @@ export function CatalogPicker({ onPickItem, onImportCategory, onImportTemplate, 
   }), [measurements]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es-ES");
+    const q = normalize(search.trim());
     if (!q) return catalog;
     return catalog
       .map(c => ({ ...c, items: c.items.filter(i =>
-        i.descripcion.toLowerCase().includes(q) ||
-        i.searchTerms?.some(term => term.toLowerCase().includes(q)) ||
-        i.ref.toLowerCase().includes(q) ||
-        c.categoria.toLowerCase().includes(q)
+        normalize(i.descripcion).includes(q) ||
+        i.searchTerms?.some(term => normalize(term).includes(q)) ||
+        normalize(i.ref).includes(q) ||
+        normalize(c.categoria).includes(q)
       )}))
       .filter(c => c.items.length > 0);
   }, [catalog, search]);
@@ -69,7 +70,9 @@ export function CatalogPicker({ onPickItem, onImportCategory, onImportTemplate, 
             const needsFloor = template.items.some(item => item.measurement === "floorArea") && numericMeasurements.floorArea <= 0;
             const needsWall = template.items.some(item => item.measurement === "wallArea") && numericMeasurements.wallArea <= 0;
             const needsLinear = template.items.some(item => item.measurement === "linearMetres") && numericMeasurements.linearMetres <= 0;
-            return <Button key={template.id} small variant="ghost" disabled={needsFloor || needsWall || needsLinear || resolved.length === 0} onClick={() => onImportTemplate(resolved)} title={template.description}>+ {template.name}</Button>;
+            const incomplete = resolved.length !== template.items.length;
+            const title = incomplete ? `${template.description} Faltan ${template.items.length - resolved.length} partidas verificadas.` : template.description;
+            return <Button key={template.id} small variant="ghost" disabled={needsFloor || needsWall || needsLinear || resolved.length === 0 || incomplete} onClick={() => onImportTemplate(resolved)} title={title}>+ {template.name} ({resolved.length}/{template.items.length})</Button>;
           })}
         </div>
       </section>
@@ -102,7 +105,7 @@ export function CatalogPicker({ onPickItem, onImportCategory, onImportTemplate, 
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#302d29" }}>
                     {formatMoney(item.precio)} <span style={{ color: "#71685e", fontSize: 12 }}>/ {item.unidad}</span>
                   </span>
-                  <Button small onClick={() => onPickItem(item.ref)}>+ Añadir</Button>
+                  <Button small aria-label={`Añadir ${item.ref}: ${item.descripcion}`} onClick={() => onPickItem(item.ref)}>+ Añadir</Button>
                 </div>
               </li>
             ))}

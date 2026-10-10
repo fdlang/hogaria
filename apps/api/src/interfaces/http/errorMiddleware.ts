@@ -30,6 +30,9 @@ export function toHttpError(err: unknown): HttpErrorResponse {
   if (err instanceof DomainError)             return { status: 400, body: { code: err.code, message: err.message } };
 
   // Unknown error — never leak internals in production
-  console.error("[unhandled]", err);
+  console.error(JSON.stringify({
+    event: "UNHANDLED_ERROR",
+    errorType: err instanceof Error ? err.name : typeof err,
+  }));
   return { status: 500, body: { code: "INTERNAL", message: "Error interno" } };
 }

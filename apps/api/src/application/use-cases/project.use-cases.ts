@@ -88,7 +88,11 @@ export class UpdateProjectUseCase {
       });
       if (!readiness.ready) throw new ValidationError("Completa la planificación: fecha de entrega posterior, al menos un profesional y un hito");
     }
-    if((allowedChanges.fechaFinPrevista??project.fechaFinPrevista)<(allowedChanges.fechaInicio??project.fechaInicio))throw new ValidationError("La fecha final no puede ser anterior al inicio");
+    const effectiveStart = allowedChanges.fechaInicio ?? project.fechaInicio;
+    const effectiveEnd = allowedChanges.fechaFinPrevista ?? project.fechaFinPrevista;
+    if (effectiveEnd <= effectiveStart) throw new ValidationError("La fecha final debe ser posterior al inicio");
+    if ((allowedChanges.hitos ?? project.hitos).some(hito => hito.fecha < effectiveStart || hito.fecha > effectiveEnd))
+      throw new ValidationError("Las fechas de los hitos deben estar dentro del periodo de la obra");
     // Capture old values before repositories that mutate in place run.
     const previousState = project.estado;
     const visibleKeys = ["estado","progreso","hitos","fechaInicio","fechaFinPrevista","nombre","descripcion","direccion","tipo","presupuesto"] as const;

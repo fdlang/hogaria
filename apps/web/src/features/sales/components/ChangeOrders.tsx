@@ -15,8 +15,13 @@ export function ChangeOrders({ api, projectId, admin, onChanged }: { api: Projec
   const [password, setPassword] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const reload = async () => setItems(await api.changes(projectId));
+  const reload = async () => {
+    setLoading(true);
+    try { setItems(await api.changes(projectId)); }
+    finally { setLoading(false); }
+  };
   useEffect(() => { void reload().catch(() => setError("No se pudieron cargar las órdenes de cambio")); }, [api, projectId]);
   const run = async (action: () => Promise<unknown>) => {
     if (busy) return; setBusy(true); setError("");
@@ -29,6 +34,7 @@ export function ChangeOrders({ api, projectId, admin, onChanged }: { api: Projec
     <Button small variant="ghost" disabled={busy} onClick={() => void run(reload)}>Actualizar órdenes</Button>
     </header>
     {error && <p className="project-change-orders__alert" role="alert">{error}</p>}
+    {loading && <p role="status">Cargando órdenes de cambio…</p>}
     {admin && <form className="project-change-orders__form" onSubmit={event => { event.preventDefault(); void run(async () => {
       const draft = { titulo: description.trim(), validezDias: 30, condicionesPago: conditions, garantia: "", notasCliente: "", notasInternas: "", partidas: [{ id: crypto.randomUUID(), categoria: "Ampliación", descripcion: description.trim(), cantidad: 1, unidad: "global", precioVentaUnitario: Number(price), costeUnitario: null, descuento: 0, iva: vat }] };
       if (editing) await api.editChange(projectId, editing.id, draft); else await api.createChange(projectId, draft);
@@ -41,7 +47,7 @@ export function ChangeOrders({ api, projectId, admin, onChanged }: { api: Projec
       <Button type="submit" loading={busy}>{editing ? "Guardar cambios del borrador" : "Guardar ampliación como borrador"}</Button>
       {editing && <Button type="button" variant="ghost" disabled={busy} onClick={() => { setEditing(null); setDescription(""); setPrice(""); setConditions(""); }}>Cancelar edición</Button>}
     </form>}
-    {items.length === 0 && <p>No hay órdenes de cambio publicadas.</p>}
+    {!loading && !error && items.length === 0 && <p>No hay órdenes de cambio publicadas.</p>}
     {items.map(item => {
       const proposal = item.propuesta ?? item.payload;
       const total = proposal?.partidas.reduce((sum,line) => sum + line.cantidad*line.precioVentaUnitario*(1-line.descuento/100)*(1+line.iva/100),0) ?? 0;

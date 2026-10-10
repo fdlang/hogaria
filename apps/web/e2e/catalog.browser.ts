@@ -3,6 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 const item = {
   id: 1, reference: "TST-001", category: "Prueba", description: "Partida guardada", unit: "ud",
   salePrice: 123, vatRate: 21, active: true, itemType: "simple" as const,
+  reviewStatus: "verified" as "verified" | "pending_review" | "archived", replacementReference: null, reviewNote: null,
   costBreakdown: { laborCost: null, materialCost: null, auxiliaryCost: null, overheadPercent: null, targetMarginPercent: null },
   evidence: { sourceName: null, sourceUrl: null, priceDate: null, validFrom: null, validUntil: null },
   searchTerms: [], updatedAt: "2026-09-19",
@@ -50,7 +51,7 @@ test("catalog clears errors on retry and distinguishes archived items", async ({
   await page.getByRole("button", { name: "Reintentar catálogo" }).click();
   await expect(page.getByText(item.description, { exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
-  state.items = [{ ...item, active: false }];
+  state.items = [{ ...item, active: false, reviewStatus: "archived" }];
   await page.getByRole("button", { name: "Actualizar", exact: true }).click();
   await expect(page.getByText(/Todas las partidas están archivadas/)).toBeVisible();
   await page.getByLabel("Incluir archivadas").check();
@@ -79,7 +80,7 @@ for (const fail of [false, true]) test("estimate never falls back to static pric
     await catalog.getByRole("button", { name: "Reintentar catálogo" }).click();
     await expect(catalog.getByText(item.description, { exact: true })).toBeVisible();
     await expect(catalog.getByRole("alert")).toHaveCount(0);
-    await catalog.getByRole("button", { name: "+ Añadir", exact: true }).click();
+    await catalog.getByRole("button", { name: `Añadir ${item.reference}: ${item.description}`, exact: true }).click();
     await expect(page.locator(".estimate-line")).toHaveCount(1);
   } else {
     await expect(catalog.getByRole("status")).toContainText("No hay partidas activas");

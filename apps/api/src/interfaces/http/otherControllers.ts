@@ -113,7 +113,7 @@ export function toFileDTO(f: ProjectFile) {
     id: f.id, projectId: f.projectId, uploadedBy: f.uploadedBy,
     nombre: f.nombre, tipo: f.tipo, tamaño: f.tamaño,
     sensitive: f.sensitive,
-    classification: f.classification ?? (f.sensitive ? "reservado" : "publico"),
+    classification: f.classification ?? "reservado",
     uploadedAt: f.uploadedAt.toISOString(),
   };
 }

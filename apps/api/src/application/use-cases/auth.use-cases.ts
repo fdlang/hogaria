@@ -9,7 +9,7 @@ import { UnauthorizedError, ValidationError } from "@reformapro/domain/errors";
 import { User } from "@reformapro/domain/entities";
 import { RateLimitError } from "@reformapro/domain/errors";
 import type { ICooldownGate } from "./solicitud.use-cases.js";
-import { ABUSE_LIMITS } from "@reformapro/domain";
+import { ABUSE_LIMITS, isWithinAccountPasswordByteLimit } from "@reformapro/domain";
 
 export interface ITokenService {
   sign(payload: { userId: number; email: string; rol: string; exp: number; sessionVersion: number }): Promise<string>;
@@ -38,10 +38,12 @@ export class LoginUseCase {
 
   async execute(email: string, password: string, ctx: ClientContext): Promise<LoginResult> {
     if (!email || !password) throw new ValidationError("Email y contraseña obligatorios");
+    if (!isWithinAccountPasswordByteLimit(password)) throw new ValidationError("La contraseña supera el máximo de 72 bytes");
     const normalizedEmail = email.trim().toLowerCase();
+    const rateLimitKeys = [`login:ip:${ctx.ip}`, `login:account:${normalizedEmail}`] as const;
     const [ipAllowed, accountAllowed] = await Promise.all([
-      this.loginGate.check(`login:ip:${ctx.ip}`, ABUSE_LIMITS.login.limit, ABUSE_LIMITS.login.windowMs),
-      this.loginGate.check(`login:account:${normalizedEmail}`, ABUSE_LIMITS.login.limit, ABUSE_LIMITS.login.windowMs),
+      this.loginGate.check(rateLimitKeys[0], ABUSE_LIMITS.login.limit, ABUSE_LIMITS.login.windowMs),
+      this.loginGate.check(rateLimitKeys[1], ABUSE_LIMITS.login.limit, ABUSE_LIMITS.login.windowMs),
     ]);
     if (!ipAllowed || !accountAllowed) {
       throw new RateLimitError("Demasiados intentos. Espera unos minutos antes de volver a intentarlo.");
@@ -50,6 +52,7 @@ export class LoginUseCase {
     const user = await this.users.verifyPassword(email, password);
     if (!user)  throw new UnauthorizedError("Credenciales incorrectas");
     if (!user.activo) throw new UnauthorizedError("Usuario desactivado");
+    await this.loginGate.reset?.([...rateLimitKeys]);
 
     const exp = Date.now() + this.tokenTTLms;
     const token = await this.tokens.sign({
