@@ -1,4 +1,4 @@
-- Estado: candidato validado; despliegue de producción en curso.
+- Estado: producción desplegada y verificada el 2026-10-10 (commit 84c2290).
 - Hecho: gobernanza del catálogo pendiente/verificado/archivado e histórico inmutable.
 - Hecho: reset completo incluye ledger, notificaciones e histórico de catálogo.
 - Hecho: preflight de build comprueba esquema, firmas y catálogo operativo.
