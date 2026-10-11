@@ -353,7 +353,7 @@ export class PdfEstimateRenderer implements EstimatePdfRenderer {
       }
     };
     for (const [title, body] of [
-      ["Condiciones de pago", p.condicionesPago],
+      ["Observaciones y condiciones", p.condicionesPago],
       ["Garantía", p.garantia],
       ["Observaciones", p.notasCliente],
     ] as const) {

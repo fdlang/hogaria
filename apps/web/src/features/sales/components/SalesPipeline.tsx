@@ -18,7 +18,7 @@ import {
 } from "../api/sales.api";
 
 import { blankOpportunity, mergeCatalogLines, opportunityForSelection } from "../sales-pipeline.utils";
-import { calculateEstimateTotals, CURRENT_FISCAL_POLICY, hasAtMostTwoDecimals } from "@reformapro/domain";
+import { calculateEstimateTotals, CURRENT_FISCAL_POLICY, DEFAULT_ESTIMATE_OBSERVATIONS, hasAtMostTwoDecimals } from "@reformapro/domain";
 
 const steps = ["Oportunidad", "Alcance", "Partidas", "Revisión"];
 
@@ -37,8 +37,7 @@ const newLine = () => ({
 const blankDraft = (): EstimateDraftDTO => ({
   titulo: "",
   validezDias: 30,
-  condicionesPago:
-    "50 % a la aceptación del presupuesto, destinado a la planificación e inicio de los trabajos, y 50 % a la finalización de la obra, una vez comprobada la correcta ejecución.",
+  condicionesPago: DEFAULT_ESTIMATE_OBSERVATIONS,
   garantia: "",
   notasCliente: "",
   notasInternas: "",
@@ -776,7 +775,7 @@ export function SalesPipeline({
             />
           </label>
           <label>
-            Condiciones de pago *
+            Observaciones y condiciones *
             <textarea
               required
               value={draft.condicionesPago}
@@ -904,7 +903,7 @@ export function SalesPipeline({
               <span>Total <strong>{formatMoney(reviewTotals.totalConIva)}</strong></span>
             </div>;
           })()}
-          <details className="estimate-review-conditions"><summary>Condiciones de pago</summary><p>{draft.condicionesPago}</p></details>
+          <details className="estimate-review-conditions"><summary>Observaciones y condiciones</summary><p>{draft.condicionesPago}</p></details>
           <p>
             Las notas y costes internos no forman parte de la versión que verá
             el cliente.

@@ -119,6 +119,12 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/sales.use-cases.ts", "apps/api/src/infrastructure/database/postgresRepositories.ts", "apps/web/src/features/sales/components/SalesPipeline.tsx"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/api/src/interfaces/http/salesController.test.ts"],
   },
   {
+    id: "HOG-EST-008", description: "Todo presupuesto nuevo propone observaciones editables que distinguen estimaciones, plazos condicionados y forma de pago.", origin: "business", owner: "comercial",
+    assumption: "Un texto inicial homogéneo reduce omisiones, pero debe adaptarse al alcance definitivo antes de publicar la propuesta.", validScale: "Operación en Madrid con fabricación dependiente de proveedores; revisar al cambiar condiciones comerciales o zonas de servicio.", validFrom: "2026-10-11", validUntil: null, nextReview: "2027-01-11", externalValidation: "asesoria_juridica",
+    metrics: [metric("estimate_default_terms_edit_rate", "Presupuestos que modifican las observaciones predeterminadas", "not_instrumented"), metric("estimate_terms_rectification_rate", "Rectificaciones motivadas por observaciones o condiciones ambiguas", "not_instrumented")],
+    implementation: ["packages/domain/src/estimate-defaults.ts", "apps/web/src/features/sales/components/SalesPipeline.tsx"], tests: ["packages/domain/src/estimate-defaults.test.ts"],
+  },
+  {
     id: "HOG-PRJ-001", description: "Los proyectos avanzan por transiciones de estado permitidas y solo finalizan al 100 %.", origin: "business", owner: "operaciones",
     assumption: "Planificación, curso, pausa y finalización describen todo el ciclo de obra.", validScale: "Obras sin fases contractuales independientes ni reapertura posterior al cierre.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("project_transition_denial_rate", "Transiciones de estado rechazadas", "audit_log"), metric("project_reopen_requests", "Solicitudes manuales de reapertura")],

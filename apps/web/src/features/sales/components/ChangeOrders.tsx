@@ -43,7 +43,7 @@ export function ChangeOrders({ api, projectId, admin, onChanged }: { api: Projec
       <label>Alcance de la ampliación<textarea required value={description} onChange={event => setDescription(event.target.value)} /></label>
       <label>Importe sin IVA (€)<input type="number" required min="0.01" step="0.01" value={price} onChange={event => setPrice(event.target.value)} /></label>
       <label>IVA (%)<select value={vat} onChange={event => setVat(Number(event.target.value))}>{CURRENT_FISCAL_POLICY.selectableVatRates.map(value => <option key={value} value={value}>{value} %</option>)}</select></label>
-      <label>Condiciones de pago<textarea required value={conditions} onChange={event => setConditions(event.target.value)} /></label>
+      <label>Observaciones y condiciones<textarea required value={conditions} onChange={event => setConditions(event.target.value)} /></label>
       <Button type="submit" loading={busy}>{editing ? "Guardar cambios del borrador" : "Guardar ampliación como borrador"}</Button>
       {editing && <Button type="button" variant="ghost" disabled={busy} onClick={() => { setEditing(null); setDescription(""); setPrice(""); setConditions(""); }}>Cancelar edición</Button>}
     </form>}
