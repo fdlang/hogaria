@@ -30,6 +30,7 @@ const colors = {
   muted: rgb(0.4, 0.36, 0.32),
   copper: rgb(0.66, 0.31, 0.16),
   copperLight: rgb(0.94, 0.87, 0.81),
+  alert: rgb(0.7, 0.11, 0.08),
   paper: rgb(0.985, 0.973, 0.952),
   line: rgb(0.83, 0.78, 0.72),
   white: rgb(1, 1, 1),
@@ -255,6 +256,7 @@ export class PdfEstimateRenderer implements EstimatePdfRenderer {
       const detailRows = detail ? wrap(detail, regular, 7.5, 230) : [];
       const rows = [
         ...titleRows.map(value => ({ value, font: bold, size: 9, height: 11, color: colors.ink })),
+        ...(line.pendingConfirmation ? wrap("ESTIMACIÓN PENDIENTE DE CONFIRMACIÓN", bold, 7.5, 230).map(value => ({ value, font: bold, size: 7.5, height: 9, color: colors.alert })) : []),
         ...detailRows.map(value => ({ value, font: regular, size: 7.5, height: 9, color: colors.muted })),
       ];
       const subtotal = calculateEstimateLineTotals(line).totalSinIva;

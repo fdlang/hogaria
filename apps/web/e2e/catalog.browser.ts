@@ -101,4 +101,11 @@ for (const fail of [false, true]) test("estimate never falls back to static pric
     await page.getByRole("button", { name: "+ Partida manual", exact: true }).click();
     await expect(page.locator(".estimate-line")).toHaveCount(1);
   }
+  if (await catalog.isVisible()) await catalog.getByRole("button", { name: "Cerrar modal" }).click();
+  const line = page.locator(".estimate-line").first();
+  await line.getByText(/Añadir observación para el cliente/).click();
+  await line.getByLabel("Observación de la partida").fill("Acabado mate confirmado con el cliente");
+  await line.getByLabel("Marcar como estimación pendiente de confirmación").check();
+  await expect(line.getByText("ESTIMACIÓN PENDIENTE DE CONFIRMACIÓN", { exact: true })).toBeVisible();
+  await expect(line.getByText("Se mostrará al cliente y en el PDF del presupuesto.")).toBeVisible();
 });

@@ -55,6 +55,7 @@ type PublicEstimateLine = Pick<
   | "descuento"
   | "iva"
   | "notaCliente"
+  | "pendingConfirmation"
 >;
 type PublicEstimateSnapshot = Pick<
   EstimateDraft,
@@ -124,6 +125,7 @@ function publicSnapshot(draft: EstimateDraft): PublicEstimateSnapshot {
         descuento,
         iva,
         notaCliente,
+        pendingConfirmation,
       }) => ({
         id,
         categoria,
@@ -134,6 +136,7 @@ function publicSnapshot(draft: EstimateDraft): PublicEstimateSnapshot {
         descuento,
         iva,
         ...(notaCliente === undefined ? {} : { notaCliente }),
+        ...(pendingConfirmation === undefined ? {} : { pendingConfirmation }),
       }),
     ),
   };

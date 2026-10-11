@@ -78,6 +78,10 @@ describe("Audit: strict DTOs", () => {
     expect(() => validateDraft({ ...draft, partidas: [{ ...catalogLine, precioVentaUnitario: 90 }] })).toThrow("priceOverrideReason");
     expect(() => validateDraft({ ...draft, partidas: [{ ...catalogLine, precioVentaUnitario: 90, priceOverrideReason: "Ajuste por alcance real" }] })).not.toThrow();
   });
+  it("only accepts a boolean pending-confirmation marker", () => {
+    expect(() => validateDraft({ ...draft, partidas: [{ ...draft.partidas[0], pendingConfirmation: "yes" }] })).toThrow("pendingConfirmation");
+    expect(() => validateDraft({ ...draft, partidas: [{ ...draft.partidas[0], pendingConfirmation: true }] })).not.toThrow();
+  });
   it.each([
     { precioVentaUnitario: 10.005 },
     { costeUnitario: 2.345 },

@@ -29,4 +29,12 @@ describe("mergeCatalogLines", () => {
       mergedCount: 0,
     });
   });
+
+  it("does not merge a confirmed line with a pending estimate", () => {
+    const current = [{ ...catalogLine, id: "existing", pendingConfirmation: true }];
+    expect(mergeCatalogLines(current, [catalogLine])).toEqual({
+      lines: [current[0], catalogLine],
+      mergedCount: 0,
+    });
+  });
 });

@@ -125,6 +125,12 @@ export const BUSINESS_RULES = [
     implementation: ["packages/domain/src/estimate-defaults.ts", "apps/web/src/features/sales/components/SalesPipeline.tsx"], tests: ["packages/domain/src/estimate-defaults.test.ts"],
   },
   {
+    id: "HOG-EST-009", description: "Las partidas con importe aún no confirmado se marcan explícitamente y conservan el aviso en la propuesta y el PDF.", origin: "business", owner: "comercial",
+    assumption: "Distinguir visualmente una estimación evita que el cliente interprete como definitivo un importe todavía sujeto a medición, diseño o materiales.", validScale: "Todo presupuesto con partidas provisionales; revisar si se incorpora un flujo formal de conversión a precio confirmado.", validFrom: "2026-10-11", validUntil: null, nextReview: "2027-01-11", externalValidation: "asesoria_juridica",
+    metrics: [metric("pending_estimate_line_rate", "Partidas publicadas pendientes de confirmación", "database"), metric("pending_estimate_rectification_rate", "Rectificaciones relacionadas con importes provisionales", "not_instrumented")],
+    implementation: ["packages/domain/src/entities/index.ts", "apps/api/src/application/use-cases/sales.use-cases.ts", "apps/api/src/infrastructure/documents/estimatePdf.ts", "apps/web/src/features/sales/components/SalesPipeline.tsx"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/api/src/application/use-cases/audit-regressions.test.ts", "apps/web/e2e/catalog.browser.ts"],
+  },
+  {
     id: "HOG-PRJ-001", description: "Los proyectos avanzan por transiciones de estado permitidas y solo finalizan al 100 %.", origin: "business", owner: "operaciones",
     assumption: "Planificación, curso, pausa y finalización describen todo el ciclo de obra.", validScale: "Obras sin fases contractuales independientes ni reapertura posterior al cierre.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("project_transition_denial_rate", "Transiciones de estado rechazadas", "audit_log"), metric("project_reopen_requests", "Solicitudes manuales de reapertura")],

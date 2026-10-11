@@ -24,8 +24,12 @@ export function opportunityForSelection(id: string, opportunities: OpportunityDT
 }
 
 const sameCatalogOrigin = (left: EstimateLineDTO, right: EstimateLineDTO) => {
+  const sameAnnotations =
+    (left.notaCliente ?? "") === (right.notaCliente ?? "") &&
+    (left.notaInterna ?? "") === (right.notaInterna ?? "") &&
+    Boolean(left.pendingConfirmation) === Boolean(right.pendingConfirmation);
   if (left.catalogItemId !== undefined || right.catalogItemId !== undefined) {
-    return left.catalogItemId === right.catalogItemId && left.catalogPriceVersion === right.catalogPriceVersion && left.precioVentaUnitario === right.precioVentaUnitario && left.descuento === right.descuento;
+    return left.catalogItemId === right.catalogItemId && left.catalogPriceVersion === right.catalogPriceVersion && left.precioVentaUnitario === right.precioVentaUnitario && left.descuento === right.descuento && sameAnnotations;
   }
   return left.categoria === right.categoria &&
   left.descripcion === right.descripcion &&
@@ -34,8 +38,7 @@ const sameCatalogOrigin = (left: EstimateLineDTO, right: EstimateLineDTO) => {
   left.costeUnitario === right.costeUnitario &&
   left.descuento === right.descuento &&
   left.iva === right.iva &&
-  (left.notaCliente ?? "") === (right.notaCliente ?? "") &&
-  (left.notaInterna ?? "") === (right.notaInterna ?? "");
+  sameAnnotations;
 };
 
 export function mergeCatalogLines(current: EstimateLineDTO[], additions: EstimateLineDTO[]) {

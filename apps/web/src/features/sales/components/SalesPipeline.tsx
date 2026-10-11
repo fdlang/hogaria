@@ -891,6 +891,8 @@ export function SalesPipeline({
               <div key={line.id}>
                 <span>{index + 1}. {line.descripcion}</span>
                 <small>{line.cantidad} {line.unidad} × {formatMoney(line.precioVentaUnitario)}{line.descuento ? ` · -${line.descuento}%` : ""}</small>
+                {line.pendingConfirmation && <b className="estimate-pending-confirmation">ESTIMACIÓN PENDIENTE DE CONFIRMACIÓN</b>}
+                {line.notaCliente?.trim() && <em>{line.notaCliente}</em>}
                 <strong>{formatMoney(line.cantidad * line.precioVentaUnitario * (1 - line.descuento / 100))}</strong>
               </div>
             ))}
@@ -1107,11 +1109,16 @@ function EstimateLineEditor({
   const priceOverridden = line.catalogBasePrice !== undefined && Math.abs(line.precioVentaUnitario - line.catalogBasePrice) >= 0.005;
   const invalidOverride = priceOverridden && !line.priceOverrideReason?.trim();
   const invalid = invalidDescription || invalidQuantity || invalidPrice || invalidDiscount || invalidVat || invalidOverride;
+  const [clientNoteOpen, setClientNoteOpen] = useState(Boolean(line.notaCliente?.trim()));
   const categoryOptions = [...new Set(["General", "Demoliciones", "Albañilería", "Instalaciones", "Carpintería", "Acabados", ...categories])];
   return (
     <article className={invalid ? "estimate-line estimate-line--invalid" : "estimate-line"}>
       <header>
-        <div><span>Partida {index + 1}</span><strong>{line.descripcion || "Sin descripción"}</strong></div>
+        <div>
+          <span>Partida {index + 1}</span>
+          <strong>{line.descripcion || "Sin descripción"}</strong>
+          {line.pendingConfirmation && <span className="estimate-pending-confirmation">ESTIMACIÓN PENDIENTE DE CONFIRMACIÓN</span>}
+        </div>
         <button
           type="button"
           className="estimate-line__remove"
@@ -1165,6 +1172,28 @@ function EstimateLineEditor({
         </label>
         <span className="estimate-line__quick-total">Importe<strong>{formatMoney(sale)}</strong></span>
       </div>
+      <label className="estimate-line__pending-toggle">
+        <input
+          type="checkbox"
+          checked={Boolean(line.pendingConfirmation)}
+          onChange={(event) => onChange({ pendingConfirmation: event.target.checked })}
+        />
+        Marcar como estimación pendiente de confirmación
+      </label>
+      <details className="estimate-line__client-note" open={clientNoteOpen} onToggle={event => setClientNoteOpen(event.currentTarget.open)}>
+        <summary>{line.notaCliente?.trim() ? "Editar observación para el cliente" : "+ Añadir observación para el cliente"}</summary>
+        <label>
+          Observación de la partida
+          <textarea
+            rows={2}
+            maxLength={10000}
+            value={line.notaCliente ?? ""}
+            placeholder="Aclaración, alcance, acabado o condición específica de esta partida"
+            onChange={(event) => onChange({ notaCliente: event.target.value })}
+          />
+          <small>Se mostrará al cliente y en el PDF del presupuesto.</small>
+        </label>
+      </details>
       <details className="estimate-line__advanced">
         <summary>Editar descripción, categoría, descuento e IVA</summary>
         <div>

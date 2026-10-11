@@ -53,7 +53,7 @@ export function ChangeOrders({ api, projectId, admin, onChanged }: { api: Projec
       const total = proposal?.partidas.reduce((sum,line) => sum + line.cantidad*line.precioVentaUnitario*(1-line.descuento/100)*(1+line.iva/100),0) ?? 0;
       return <article className="project-change-order" key={item.id}>
         <p className="project-change-order__reference">{item.numero} · {item.estado}</p><h3>{proposal?.titulo}</h3>
-        {proposal?.partidas.map(line => <p key={line.id}>{line.descripcion} · {formatMoney(line.cantidad * line.precioVentaUnitario * (1-line.descuento/100))} sin IVA · IVA {line.iva}%</p>)}
+        {proposal?.partidas.map(line => <p key={line.id}>{line.descripcion} · {formatMoney(line.cantidad * line.precioVentaUnitario * (1-line.descuento/100))} sin IVA · IVA {line.iva}%{line.pendingConfirmation && <strong className="estimate-pending-confirmation"> · ESTIMACIÓN PENDIENTE DE CONFIRMACIÓN</strong>}</p>)}
         <p>{proposal?.condicionesPago}</p>
         <p><strong>Total de la ampliación con IVA: {formatMoney(total)}</strong></p>
         {admin && item.estado === "borrador" && <div className="project-change-order__actions">

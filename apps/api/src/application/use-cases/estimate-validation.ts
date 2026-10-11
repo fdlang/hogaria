@@ -58,6 +58,7 @@ export function validateDraft(value: unknown, options: { allowEmpty?: boolean } 
         (line.costeUnitario != null && !hasAtMostTwoDecimals(line.costeUnitario as number))) fail(prefix);
     for (const key of ["notaCliente", "notaInterna"])
       if (line[key] !== undefined) text(line[key], 10000, false, `${prefix}.${key}`);
+    if (line.pendingConfirmation !== undefined && typeof line.pendingConfirmation !== "boolean") fail(`${prefix}.pendingConfirmation`);
     const catalogFields = [line.catalogItemId, line.catalogReference, line.catalogPriceVersion, line.catalogBasePrice];
     const hasCatalogOrigin = catalogFields.some(value => value !== undefined);
     if (hasCatalogOrigin) {

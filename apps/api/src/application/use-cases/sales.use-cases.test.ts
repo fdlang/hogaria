@@ -48,13 +48,14 @@ describe("EstimateUseCases — client privacy and authorization", () => {
   it("lets an administrator preview a draft without exposing internal fields to the client", async () => {
     const { users, clientA, opportunityA, estimates, estimateUseCases } = await setup();
     const admin = await users.save({ id: 0, email: Email.of("preview-admin@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
-    const pending = await estimates.save({ oportunidadId: opportunityA.id, clienteId: clientA.id, numero: "HOG-DRAFT", titulo: draft.titulo, estado: "borrador", versionActual: 1, borrador: draft });
+    const pending = await estimates.save({ oportunidadId: opportunityA.id, clienteId: clientA.id, numero: "HOG-DRAFT", titulo: draft.titulo, estado: "borrador", versionActual: 1, borrador: { ...draft, partidas: [{ ...draft.partidas[0], pendingConfirmation: true }] } });
 
     const preview = await estimateUseCases.publicGet(admin.id, pending.id);
 
     expect(preview.clienteNombre).toBe("Cliente A");
     expect(preview.propuesta?.titulo).toBe(draft.titulo);
     expect(preview.propuesta?.totalConIva).toBe(242);
+    expect(preview.propuesta?.partidas[0]?.pendingConfirmation).toBe(true);
     expect(JSON.stringify(preview)).not.toContain("costeUnitario");
     expect(JSON.stringify(preview)).not.toContain("notaInterna");
     expect(JSON.stringify(preview)).not.toContain("Margen reservado");
