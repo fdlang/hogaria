@@ -2,7 +2,7 @@
 - Hecho: catálogo search-first con búsqueda normalizada, paginación y máximo de 12 resultados.
 - Hecho: plantillas contextuales de baño, cocina y armarios; cada una pide solo sus medidas aplicables.
 - Hecho: cocina separa suelo, muebles bajos, muebles altos opcionales y encimera; admite coma o punto decimal.
-- Hecho: editor compacto con autoguardado, control de concurrencia y observaciones por partida.
+- Hecho: buscador y plantillas están separados; las partidas válidas se resumen y solo se despliegan al editar.
 - Hecho: las partidas conservan referencia, versión, precio base y motivo de cualquier modificación.
 - Hecho: las estimaciones pendientes muestran aviso en editor, revisión, propuesta y PDF.
 - Hecho: hasta 6 partidas favoritas se guardan como preferencias del dispositivo.

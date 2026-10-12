@@ -101,6 +101,10 @@ test("a kitchen template requests contextual measurements and imports the right 
   await page.getByRole("button", { name: "Añadir desde catálogo" }).click();
 
   const catalog = page.locator(".catalog-picker-modal");
+  await expect(catalog.getByRole("searchbox", { name: "Buscar partida" })).toBeVisible();
+  await expect(catalog.getByRole("button", { name: /Cocina completa/ })).toHaveCount(0);
+  await catalog.getByRole("tab", { name: "Usar plantilla" }).click();
+  await expect(catalog.getByRole("searchbox", { name: "Buscar partida" })).toHaveCount(0);
   await catalog.getByRole("button", { name: /Cocina completa/ }).click();
   await expect(catalog.getByLabel("Longitud de muebles bajos *")).toBeVisible();
   await expect(catalog.getByLabel("Longitud de muebles altos (opcional)")).toBeVisible();
@@ -115,8 +119,13 @@ test("a kitchen template requests contextual measurements and imports the right 
   await catalog.getByRole("button", { name: "Añadir plantilla al presupuesto" }).click();
 
   await expect(page.locator(".estimate-line")).toHaveCount(8);
-  await expect(page.locator(".estimate-line").filter({ hasText: "COC-001" }).getByLabel("Cantidad")).toHaveValue("4.2");
-  await expect(page.locator(".estimate-line").filter({ hasText: "COC-003" }).getByLabel("Cantidad")).toHaveValue("3.8");
+  await expect(page.locator(".estimate-line").getByRole("button", { name: "Editar", exact: true })).toHaveCount(8);
+  const lowerCabinets = page.locator(".estimate-line").filter({ hasText: "COC-001" });
+  await lowerCabinets.getByRole("button", { name: "Editar", exact: true }).click();
+  await expect(lowerCabinets.getByLabel("Cantidad")).toHaveValue("4.2");
+  const worktop = page.locator(".estimate-line").filter({ hasText: "COC-003" });
+  await worktop.getByRole("button", { name: "Editar", exact: true }).click();
+  await expect(worktop.getByLabel("Cantidad")).toHaveValue("3.8");
   await expect(page.locator(".estimate-line").filter({ hasText: "COC-002" })).toHaveCount(0);
 });
 
@@ -136,10 +145,12 @@ for (const fail of [false, true]) test("estimate never falls back to static pric
   await expect(catalog.getByRole("button", { name: "+ Añadir", exact: true })).toHaveCount(0);
   await expect(catalog.getByText("DEM-001", { exact: false })).toHaveCount(0);
   if (fail) {
+    await catalog.getByRole("tab", { name: "Usar plantilla" }).click();
     await expect(catalog.getByRole("alert")).toContainText("No se pudieron cargar las plantillas del catálogo");
     state.fail = false;
     state.items = [item];
     await catalog.getByRole("button", { name: "Reintentar catálogo" }).click();
+    await catalog.getByRole("tab", { name: "Buscar partida" }).click();
     await catalog.getByRole("searchbox", { name: "Buscar partida" }).fill(item.reference);
     await expect(catalog.getByText(item.description, { exact: true })).toBeVisible();
     await expect(catalog.getByRole("alert")).toHaveCount(0);
@@ -163,6 +174,7 @@ for (const fail of [false, true]) test("estimate never falls back to static pric
     await catalog.getByRole("button", { name: "Cerrar modal" }).click();
   }
   const line = page.locator(".estimate-line").first();
+  if (await line.getByRole("button", { name: "Editar", exact: true }).isVisible()) await line.getByRole("button", { name: "Editar", exact: true }).click();
   await line.getByText(/Añadir observación para el cliente/).click();
   await line.getByLabel("Observación de la partida").fill("Acabado mate confirmado con el cliente");
   await line.getByLabel("Marcar como estimación pendiente de confirmación").check();

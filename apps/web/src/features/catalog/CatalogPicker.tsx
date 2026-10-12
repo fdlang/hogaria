@@ -49,11 +49,13 @@ const savePreference = (key: string, references: string[]) => {
 };
 
 export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props) {
+  const [mode, setMode] = useState<"search" | "template">("search");
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<CatalogCategory[]>([]);
   const [templateCatalog, setTemplateCatalog] = useState<CatalogCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [templateError, setTemplateError] = useState("");
   const request = useRef(0);
   const [favoriteRefs, setFavoriteRefs] = useState(() => readPreference(FAVORITES_KEY));
   const [recentRefs, setRecentRefs] = useState(() => readPreference(RECENT_KEY));
@@ -67,7 +69,10 @@ export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props
   const resultCount = results.reduce((total, category) => total + category.items.length, 0);
 
   const shortcutReferences = useMemo(() => [...new Set([...templateReferences, ...favoriteRefs, ...recentRefs])], [favoriteRefs, recentRefs]);
-  const loadTemplates = useCallback(() => loadItems("", shortcutReferences).then(setTemplateCatalog).catch(() => setError("No se pudieron cargar las plantillas del catálogo.")), [loadItems, shortcutReferences]);
+  const loadTemplates = useCallback(() => {
+    setTemplateError("");
+    return loadItems("", shortcutReferences).then(setTemplateCatalog).catch(() => setTemplateError("No se pudieron cargar las plantillas del catálogo."));
+  }, [loadItems, shortcutReferences]);
   useEffect(() => { void loadTemplates(); }, [loadTemplates]);
   useEffect(() => {
     const query = search.trim();
@@ -123,6 +128,11 @@ export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props
 
   return (
     <div>
+      <div className="catalog-picker-mode" role="tablist" aria-label="Forma de añadir partidas">
+        <button type="button" role="tab" aria-selected={mode === "search"} aria-controls="catalog-search-panel" onClick={() => setMode("search")}>Buscar partida</button>
+        <button type="button" role="tab" aria-selected={mode === "template"} aria-controls="catalog-template-panel" onClick={() => setMode("template")}>Usar plantilla</button>
+      </div>
+      {mode === "search" && <div id="catalog-search-panel" role="tabpanel">
       <Input
         label="Buscar partida"
         type="search"
@@ -143,6 +153,39 @@ export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props
         {recent.length > 0 && <CatalogShortcutGroup title="Usadas recientemente" items={recent} favorites={favoriteRefs} onPick={pick} onToggleFavorite={toggleFavorite} />}
         <small>Guardadas únicamente en este dispositivo.</small>
       </section>}
+      <CatalogLoadState loading={loading} error={error} reload={async () => { if (search.trim()) setSearch(value => `${value} `); }} />
+      {results.map(cat => (
+        <section key={cat.categoria} className="catalog-results-group">
+          <header className="catalog-category-header">
+            <h4>{cat.categoria}</h4>
+          </header>
+
+          <ul>
+            {cat.items.map(item => (
+              <li className="catalog-item" key={item.ref}>
+                <div className="catalog-item__description">
+                  <code>{item.ref}</code>
+                  <span>{item.descripcion}</span>
+                </div>
+                <div className="catalog-item__actions">
+                  <Badge color="#60a5fa">{item.iva}% IVA</Badge>
+                  <span className="catalog-item__price">
+                    {formatMoney(item.precio)} <small>/ {item.unidad}</small>
+                  </span>
+                  <button type="button" className="catalog-favorite" aria-label={`${favoriteRefs.includes(item.ref) ? "Quitar de" : "Añadir a"} favoritas: ${item.ref}`} aria-pressed={favoriteRefs.includes(item.ref)} onClick={() => toggleFavorite(item.ref)}>{favoriteRefs.includes(item.ref) ? "★" : "☆"}</button>
+                  <Button small aria-label={`Añadir ${item.ref}: ${item.descripcion}`} onClick={() => pick(item, cat.categoria)}>+ Añadir</Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+
+      {search.trim() && !loading && !error && results.length === 0 && (
+        <p className="catalog-search-empty">Ningún ítem coincide con "{search}".</p>
+      )}
+      </div>}
+      {mode === "template" && <div id="catalog-template-panel" role="tabpanel">
       <section className="catalog-templates" aria-labelledby="catalog-templates-title">
         <div>
           <strong id="catalog-templates-title">Plantillas rápidas</strong>
@@ -182,47 +225,14 @@ export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props
             })}
           </div>
           <div className="catalog-template-summary" role="status">
-            <span>{selectedResolved.length} de {selectedExpected.length} partidas verificadas disponibles</span>
+            <span>{selectedExpected.length - missingCatalogItems} de {selectedExpected.length} partidas verificadas disponibles</span>
             {missingCatalogItems > 0 && <strong>No se puede usar: faltan {missingCatalogItems} partidas verificadas en el catálogo.</strong>}
           </div>
           <Button onClick={importSelectedTemplate} disabled={missingCatalogItems > 0}>Añadir plantilla al presupuesto</Button>
         </div>}
       </section>
-
-      <CatalogLoadState loading={loading} error={error} reload={async () => { if (search.trim()) setSearch(value => `${value} `); else await loadTemplates(); }} />
-      {results.map(cat => (
-        <section key={cat.categoria} style={{ marginBottom: 20 }}>
-          <header className="catalog-category-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <h4 style={{ fontSize: 13, fontWeight: 700, color: "var(--copper-dark)" }}>{cat.categoria}</h4>
-          </header>
-
-          <ul style={{ display: "flex", flexDirection: "column", gap: 6, listStyle: "none", padding: 0 }}>
-            {cat.items.map(item => (
-              <li className="catalog-item" key={item.ref}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 8 }}>
-                <div className="catalog-item__description" style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-                  <code style={{ fontSize: 12, background: "#fffaf4", color: "var(--copper-dark)", padding: "2px 6px", borderRadius: 4 }}>{item.ref}</code>
-                  <span style={{ fontSize: 12, color: "#302d29", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.descripcion}</span>
-                </div>
-                <div className="catalog-item__actions" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <Badge color="#60a5fa">{item.iva}% IVA</Badge>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#302d29" }}>
-                    {formatMoney(item.precio)} <span style={{ color: "#71685e", fontSize: 12 }}>/ {item.unidad}</span>
-                  </span>
-                  <button type="button" className="catalog-favorite" aria-label={`${favoriteRefs.includes(item.ref) ? "Quitar de" : "Añadir a"} favoritas: ${item.ref}`} aria-pressed={favoriteRefs.includes(item.ref)} onClick={() => toggleFavorite(item.ref)}>{favoriteRefs.includes(item.ref) ? "★" : "☆"}</button>
-                  <Button small aria-label={`Añadir ${item.ref}: ${item.descripcion}`} onClick={() => pick(item, cat.categoria)}>+ Añadir</Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-
-      {search.trim() && !loading && !error && results.length === 0 && (
-        <p style={{ color: "#71685e", fontSize: 13, textAlign: "center", padding: 20 }}>
-          Ningún ítem coincide con "{search}".
-        </p>
-      )}
+      <CatalogLoadState loading={false} error={templateError} reload={loadTemplates} />
+      </div>}
     </div>
   );
 }

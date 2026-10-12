@@ -143,6 +143,12 @@ export const BUSINESS_RULES = [
     implementation: ["packages/domain/src/catalog-pricing.ts", "apps/web/src/features/catalog/CatalogPicker.tsx"], tests: ["packages/domain/src/catalog-pricing.test.ts", "apps/web/src/features/catalog/catalog-templates.test.ts", "apps/web/e2e/catalog.browser.ts"],
   },
   {
+    id: "HOG-EST-012", description: "La preparación de partidas separa búsqueda y plantillas, y mantiene contraídas las partidas válidas hasta que el administrador decide editarlas.", origin: "business", owner: "comercial",
+    assumption: "Reducir decisiones simultáneas y desplazamiento vertical disminuye la fatiga sin ocultar errores ni controles necesarios.", validScale: "Presupuestos con decenas de partidas creados por administración; revisar si se incorpora edición masiva o por teclado.", validFrom: "2026-10-12", validUntil: null, nextReview: "2027-01-12",
+    metrics: [metric("estimate_line_edit_rate", "Partidas importadas que necesitan edición manual", "not_instrumented"), metric("estimate_creation_duration", "Tiempo desde apertura hasta borrador guardado", "not_instrumented")],
+    implementation: ["apps/web/src/features/catalog/CatalogPicker.tsx", "apps/web/src/features/sales/components/SalesPipeline.tsx"], tests: ["apps/web/e2e/catalog.browser.ts"],
+  },
+  {
     id: "HOG-PRJ-001", description: "Los proyectos avanzan por transiciones de estado permitidas y solo finalizan al 100 %.", origin: "business", owner: "operaciones",
     assumption: "Planificación, curso, pausa y finalización describen todo el ciclo de obra.", validScale: "Obras sin fases contractuales independientes ni reapertura posterior al cierre.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("project_transition_denial_rate", "Transiciones de estado rechazadas", "audit_log"), metric("project_reopen_requests", "Solicitudes manuales de reapertura")],

@@ -522,6 +522,7 @@ export function SalesPipeline({
         : "Plantilla añadida al presupuesto.");
       return { ...current, partidas: merged.lines };
     });
+    setShowCatalog(false);
   };
   const openNewEstimate = () => {
     setEditingId(null);
@@ -1148,6 +1149,9 @@ function EstimateLineEditor({
   const invalidOverride = priceOverridden && !line.priceOverrideReason?.trim();
   const invalid = invalidDescription || invalidQuantity || invalidPrice || invalidDiscount || invalidVat || invalidOverride;
   const [clientNoteOpen, setClientNoteOpen] = useState(Boolean(line.notaCliente?.trim()));
+  const [expanded, setExpanded] = useState(invalid || !line.catalogReference);
+  const detailId = `estimate-line-${String(line.id).replace(/[^a-zA-Z0-9_-]/g, "-")}-details`;
+  useEffect(() => { if (invalid) setExpanded(true); }, [invalid]);
   const categoryOptions = [...new Set(["General", "Demoliciones", "Albañilería", "Instalaciones", "Carpintería", "Acabados", ...categories])];
   return (
     <article className={invalid ? "estimate-line estimate-line--invalid" : "estimate-line"}>
@@ -1157,15 +1161,25 @@ function EstimateLineEditor({
           <strong>{line.descripcion || "Sin descripción"}</strong>
           {line.pendingConfirmation && <span className="estimate-pending-confirmation">ESTIMACIÓN PENDIENTE DE CONFIRMACIÓN</span>}
         </div>
-        <button
-          type="button"
-          className="estimate-line__remove"
-          aria-label={`Eliminar partida ${index + 1}: ${line.descripcion || "sin descripción"}`}
-          onClick={onRemove}
-        >
-          Eliminar
-        </button>
+        <div className="estimate-line__header-actions">
+          <button type="button" className="estimate-line__edit" aria-expanded={expanded} aria-controls={detailId} onClick={() => setExpanded(value => !value)}>
+            {expanded ? "Cerrar" : "Editar"}
+          </button>
+          <button
+            type="button"
+            className="estimate-line__remove"
+            aria-label={`Eliminar partida ${index + 1}: ${line.descripcion || "sin descripción"}`}
+            onClick={onRemove}
+          >
+            Eliminar
+          </button>
+        </div>
       </header>
+      {!expanded && <div className="estimate-line__collapsed">
+        <span>{line.cantidad} {line.unidad} · {formatMoney(line.precioVentaUnitario)} por {line.unidad}</span>
+        <strong>{formatMoney(sale)}</strong>
+      </div>}
+      {expanded && <div id={detailId} className="estimate-line__details">
       <div className="estimate-line__quick">
         <label>
           Cantidad *
@@ -1287,6 +1301,7 @@ function EstimateLineEditor({
           <strong>{cost == null ? "Pendiente" : formatMoney(cost)}</strong>
         </span>
       </footer>
+      </div>}
     </article>
   );
 }
