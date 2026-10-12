@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ESTIMATE_TEMPLATES } from "@reformapro/domain";
-import { expectedTemplateItems, resolveCatalogTemplate, type TemplateMeasurements } from "./CatalogPicker";
+import { expectedTemplateItems, mergeCatalogCategories, resolveCatalogTemplate, type TemplateMeasurements } from "./CatalogPicker";
 
 const measurements = (values: Partial<TemplateMeasurements> = {}): TemplateMeasurements => ({
   floorArea: 0,
@@ -34,5 +34,17 @@ describe("estimate catalog templates", () => {
     expect(resolveCatalogTemplate(kitchen, catalog, values).map(item => [item.item.ref, item.cantidad]))
       .toEqual([["COC-001", 4.2], ["COC-003", 3.8]]);
     expect(expectedTemplateItems(kitchen, values).some(item => item.reference === "COC-002")).toBe(false);
+  });
+
+  it("merges paginated catalog items into their categories without duplicates", () => {
+    const first = { ref: "DEM-001", descripcion: "Demolición", unidad: "ud", precio: 10, iva: 21 };
+    const second = { ref: "DEM-002", descripcion: "Retirada", unidad: "ud", precio: 20, iva: 21 };
+    expect(mergeCatalogCategories(
+      [{ categoria: "Demoliciones", items: [first] }],
+      [{ categoria: "Demoliciones", items: [first, second] }, { categoria: "Fontanería", items: [] }],
+    )).toEqual([
+      { categoria: "Demoliciones", items: [first, second] },
+      { categoria: "Fontanería", items: [] },
+    ]);
   });
 });

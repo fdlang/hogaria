@@ -8,17 +8,25 @@ const item = {
   evidence: { sourceName: null, sourceUrl: null, priceDate: null, validFrom: null, validUntil: null },
   searchTerms: [], updatedAt: "2026-09-19",
 };
-async function setup(page: Page, state: { fail: boolean; items: typeof item[]; gate?: Promise<void>; estimates?: unknown[] }) {
+async function setup(page: Page, state: { fail: boolean; items: typeof item[]; gate?: Promise<void>; searchGate?: Promise<void>; estimates?: unknown[]; failPageOnce?: number; pickerLimits?: number[] }) {
   await page.addInitScript(() => sessionStorage.setItem("rp_token", "test-token"));
   await page.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/catalog") {
       if (state.gate) await state.gate;
-      const picker = new URL(route.request().url()).searchParams.get("picker") === "true";
+      const params = new URL(route.request().url()).searchParams;
+      const picker = params.get("picker") === "true";
+      if (picker && params.get("search") && state.searchGate) await state.searchGate;
+      const page = Number(params.get("page") ?? 0);
+      const limit = Number(params.get("limit") ?? 12);
+      if (picker) state.pickerLimits?.push(limit);
+      const pagedItems = state.items.slice(page * limit, (page + 1) * limit);
       const body = picker
-        ? { items: state.items.map(entry => ({ ...entry, priceVersion: 1, unitCost: null })), total: state.items.length, page: 0, limit: 12, pages: 1 }
+        ? { items: pagedItems.map(entry => ({ ...entry, priceVersion: 1, unitCost: null })), total: state.items.length, page, limit, pages: Math.max(1, Math.ceil(state.items.length / limit)) }
         : state.items;
-      return route.fulfill({ status: state.fail ? 500 : 200, json: state.fail ? { message: "Error de prueba" } : body });
+      const failThisPage = state.failPageOnce === page;
+      if (failThisPage) state.failPageOnce = undefined;
+      return route.fulfill({ status: state.fail || failThisPage ? 500 : 200, json: state.fail || failThisPage ? { message: "Error de prueba" } : body });
     }
     if (path === "/api/estimate-drafts" && route.request().method() === "POST") {
       const body = route.request().postDataJSON() as { oportunidadId: number; borrador: unknown };
@@ -38,6 +46,19 @@ async function setup(page: Page, state: { fail: boolean; items: typeof item[]; g
       : path === "/api/estimates" ? state.estimates ?? []
       : [] });
   });
+}
+
+async function openCatalogPicker(page: Page) {
+  await page.goto("/admin/budgets");
+  await page.getByRole("button", { name: "Nuevo presupuesto" }).click();
+  await page.getByLabel("Cliente existente").selectOption("2");
+  await page.getByLabel("Nombre de la oportunidad").fill("Reforma prueba");
+  await page.getByRole("textbox", { name: "Dirección *", exact: true }).fill("Dirección de prueba");
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await page.getByLabel("Título visible al cliente").fill("Propuesta de prueba");
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await page.getByRole("button", { name: "Añadir desde catálogo" }).click();
+  return page.locator(".catalog-picker-modal");
 }
 
 test("an administrator duplicates a proposal into an independent editable draft", async ({ page }) => {
@@ -89,20 +110,16 @@ test("catalog clears errors on retry and distinguishes archived items", async ({
 test("a kitchen template requests contextual measurements and imports the right quantities", async ({ page }) => {
   const kitchenItems = ["PRE-001", "DEM-003", "FON-004", "REV-003", "COC-001", "COC-002", "COC-003", "COC-005", "PRE-004"]
     .map((reference, index) => ({ ...item, id: index + 10, reference, description: `Partida ${reference}`, unit: reference === "COC-001" || reference === "COC-002" || reference === "COC-003" ? "ml" : "ud" }));
-  await setup(page, { fail: false, items: kitchenItems });
-  await page.goto("/admin/budgets");
-  await page.getByRole("button", { name: "Nuevo presupuesto" }).click();
-  await page.getByLabel("Cliente existente").selectOption("2");
-  await page.getByLabel("Nombre de la oportunidad").fill("Reforma cocina");
-  await page.getByRole("textbox", { name: "Dirección *", exact: true }).fill("Dirección de prueba");
-  await page.getByRole("button", { name: "Continuar", exact: true }).click();
-  await page.getByLabel("Título visible al cliente").fill("Cocina completa");
-  await page.getByRole("button", { name: "Continuar", exact: true }).click();
-  await page.getByRole("button", { name: "Añadir desde catálogo" }).click();
-
-  const catalog = page.locator(".catalog-picker-modal");
+  const state = { fail: false, items: kitchenItems, pickerLimits: [] as number[] };
+  await setup(page, state);
+  const catalog = await openCatalogPicker(page);
   await expect(catalog.getByRole("searchbox", { name: "Buscar partida" })).toBeVisible();
+  expect(state.pickerLimits.some(limit => limit > 12)).toBe(true);
   await expect(catalog.getByRole("button", { name: /Cocina completa/ })).toHaveCount(0);
+  await catalog.getByRole("tab", { name: "Ver por categorías" }).click();
+  await expect(catalog.getByText("9 de 9", { exact: true })).toBeVisible();
+  await catalog.getByText("Prueba", { exact: true }).click();
+  await expect(catalog.getByRole("button", { name: /Añadir COC-001:/ })).toBeVisible();
   await catalog.getByRole("tab", { name: "Usar plantilla" }).click();
   await expect(catalog.getByRole("searchbox", { name: "Buscar partida" })).toHaveCount(0);
   await catalog.getByRole("button", { name: /Cocina completa/ }).click();
@@ -121,12 +138,45 @@ test("a kitchen template requests contextual measurements and imports the right 
   await expect(page.locator(".estimate-line")).toHaveCount(8);
   await expect(page.locator(".estimate-line").getByRole("button", { name: "Editar", exact: true })).toHaveCount(8);
   const lowerCabinets = page.locator(".estimate-line").filter({ hasText: "COC-001" });
+  await expect(lowerCabinets.getByLabel("Cantidad")).toHaveCount(0);
   await lowerCabinets.getByRole("button", { name: "Editar", exact: true }).click();
   await expect(lowerCabinets.getByLabel("Cantidad")).toHaveValue("4.2");
   const worktop = page.locator(".estimate-line").filter({ hasText: "COC-003" });
   await worktop.getByRole("button", { name: "Editar", exact: true }).click();
   await expect(worktop.getByLabel("Cantidad")).toHaveValue("3.8");
   await expect(page.locator(".estimate-line").filter({ hasText: "COC-002" })).toHaveCount(0);
+});
+
+test("category browsing retries the failed next page without losing loaded items", async ({ page }) => {
+  const items = Array.from({ length: 51 }, (_, index) => ({
+    ...item, id: index + 1, reference: `TST-${String(index + 1).padStart(3, "0")}`, description: `Partida ${index + 1}`,
+  }));
+  const state = { fail: false, items, failPageOnce: 1 };
+  await setup(page, state);
+  const catalog = await openCatalogPicker(page);
+  await catalog.getByRole("tab", { name: "Ver por categorías" }).click();
+  await expect(catalog.getByText("50 de 51", { exact: true })).toBeVisible();
+  await catalog.getByRole("button", { name: "Mostrar 1 más" }).click();
+  await expect(catalog.getByRole("alert")).toContainText("No se pudo cargar el catálogo por categorías");
+  await catalog.getByRole("button", { name: "Reintentar catálogo" }).click();
+  await expect(catalog.getByText("51 de 51", { exact: true })).toBeVisible();
+  await catalog.getByText("Prueba", { exact: true }).click();
+  await expect(catalog.getByText("Partida 1", { exact: true })).toBeVisible();
+  await expect(catalog.getByText("Partida 51", { exact: true })).toBeVisible();
+});
+
+test("clearing a search discards a late catalog response", async ({ page }) => {
+  let release!: () => void;
+  const state = { fail: false, items: [item], searchGate: new Promise<void>(resolve => { release = resolve; }) };
+  await setup(page, state);
+  const catalog = await openCatalogPicker(page);
+  const search = catalog.getByRole("searchbox", { name: "Buscar partida" });
+  await search.fill(item.reference);
+  await page.waitForTimeout(300);
+  await search.fill("");
+  release();
+  await expect(catalog.getByText("Escribe para buscar o utiliza una plantilla rápida.")).toBeVisible();
+  await expect(catalog.getByText(item.description, { exact: true })).toHaveCount(0);
 });
 
 for (const fail of [false, true]) test("estimate never falls back to static prices: failure=" + fail, async ({ page }) => {
@@ -177,7 +227,10 @@ for (const fail of [false, true]) test("estimate never falls back to static pric
   if (await line.getByRole("button", { name: "Editar", exact: true }).isVisible()) await line.getByRole("button", { name: "Editar", exact: true }).click();
   await line.getByText(/Añadir observación para el cliente/).click();
   await line.getByLabel("Observación de la partida").fill("Acabado mate confirmado con el cliente");
-  await line.getByLabel("Marcar como estimación pendiente de confirmación").check();
+  const pendingConfirmation = line.getByLabel("Marcar como estimación pendiente de confirmación");
+  await expect(pendingConfirmation).toHaveCSS("width", "17px");
+  await expect(pendingConfirmation).toHaveCSS("height", "17px");
+  await pendingConfirmation.check();
   await expect(line.getByText("ESTIMACIÓN PENDIENTE DE CONFIRMACIÓN", { exact: true })).toBeVisible();
   await expect(line.getByText("Se mostrará al cliente y en el PDF del presupuesto.")).toBeVisible();
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Email } from "@reformapro/domain/value-objects";
-import { ForbiddenError } from "@reformapro/domain/errors";
+import { ForbiddenError, ValidationError } from "@reformapro/domain/errors";
 import { InMemoryCatalogRepository, InMemoryUserRepository } from "../../infrastructure/database/inMemoryRepositories.js";
 import { CatalogUseCases } from "./catalog.use-cases.js";
 import type { ICatalogRepository } from "@reformapro/domain/repositories";
@@ -48,6 +48,19 @@ describe("CatalogUseCases — administración exclusiva", () => {
   it("rechaza tipos de IVA fuera de la política fiscal vigente", async () => {
     const { admin, catalog } = await setup();
     await expect(catalog.create(admin.id, { ...input, vatRate: 17 })).rejects.toThrow("IVA");
+  });
+
+  it("rechaza cuerpos con tipos inválidos sin convertirlos en errores internos", async () => {
+    const { admin, catalog } = await setup();
+    await expect(catalog.create(admin.id, { ...input, reference: 1 })).rejects.toBeInstanceOf(ValidationError);
+    await expect(catalog.create(admin.id, { ...input, searchTerms: "ducha" })).rejects.toBeInstanceOf(ValidationError);
+    await expect(catalog.create(admin.id, { ...input, costComposition: { labor: [{}], materials: [], auxiliaries: [] } })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("usa reviewStatus como único contrato para activar o archivar", async () => {
+    const { admin, catalog } = await setup();
+    const item = await catalog.create(admin.id, traceable);
+    await expect(catalog.update(admin.id, item.id, { active: true })).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("rechaza costes sin fuente y fecha de contraste", async () => {
@@ -123,5 +136,11 @@ describe("CatalogUseCases — administración exclusiva", () => {
 
     expect(result.total).toBe(1);
     expect(result.items.map(item => item.reference)).toEqual(["FON-901"]);
+  });
+
+  it("rechaza paginación no segura y referencias mal formadas", async () => {
+    const { admin, catalog } = await setup();
+    await expect(catalog.search(admin.id, { search: "", page: Number.MAX_SAFE_INTEGER, limit: 50 })).rejects.toBeInstanceOf(ValidationError);
+    await expect(catalog.search(admin.id, { search: "", page: 0, limit: 12, references: ["../../etc"] })).rejects.toBeInstanceOf(ValidationError);
   });
 });

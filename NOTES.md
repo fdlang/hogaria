@@ -1,15 +1,15 @@
-- Estado: mejoras pendientes del flujo rápido de presupuestos implementadas y validadas localmente.
-- Hecho: catálogo search-first con búsqueda normalizada, paginación y máximo de 12 resultados.
-- Hecho: plantillas contextuales de baño, cocina y armarios; cada una pide solo sus medidas aplicables.
-- Hecho: cocina separa suelo, muebles bajos, muebles altos opcionales y encimera; admite coma o punto decimal.
-- Hecho: buscador y plantillas están separados; las partidas válidas se resumen y solo se despliegan al editar.
-- Hecho: las partidas conservan referencia, versión, precio base y motivo de cualquier modificación.
-- Hecho: las estimaciones pendientes muestran aviso en editor, revisión, propuesta y PDF.
-- Hecho: hasta 6 partidas favoritas se guardan como preferencias del dispositivo.
-- Hecho: hasta 6 partidas usadas recientemente aparecen como accesos rápidos.
-- Hecho: favoritos y recientes cargan solo sus referencias, nunca el catálogo completo.
-- Hecho: duplicar crea un borrador independiente con nueva referencia, versión e IDs de partida.
-- Hecho: la copia no hereda firma, histórico ni referencia personalizada del cliente.
-- Decisión: no se requiere migración; preferencias locales y borrador JSONB existente.
-- Validado: typecheck, build, 359 pruebas y 128 recorridos Playwright correctos.
-- Producción actual: commit 218fa36; este nuevo lote está pendiente de commit y despliegue.
+- Estado: flujo rápido de presupuestos auditado y listo para revisión previa a commit/despliegue.
+- Hecho: catálogo con búsqueda de 12 resultados, exploración paginada por categorías y plantillas contextuales.
+- Hecho: plantillas cargan todas sus referencias verificadas, sin el antiguo corte de 12 partidas.
+- Hecho: baño, cocina y armarios solicitan solo las mediciones aplicables y aceptan coma o punto decimal.
+- Hecho: partidas válidas aparecen plegadas; errores abren la partida y eliminar exige confirmación.
+- Hecho: reintento de paginación conserva lo cargado y repite exactamente la página fallida.
+- Hecho: respuestas tardías del buscador y de plantillas no sobrescriben el estado actual.
+- Hecho: pestañas del selector tienen asociación ARIA y navegación por flechas, Inicio y Fin.
+- Hecho: referencias, versión, precio base, observaciones y estimación pendiente se conservan en cada partida.
+- Hecho: el estado de revisión es la única fuente para activar, verificar o archivar catálogo.
+- Hecho: cuerpos de catálogo mal tipados devuelven validación controlada y la paginación rechaza valores inseguros.
+- Hecho: rutas protegidas autentican antes de leer o validar el cuerpo JSON.
+- Decisión: no se requiere migración; el contrato vigente usa reviewStatus y DELETE para archivar.
+- Validado: typecheck y build raíz/API/web; 365 pruebas y 132 recorridos Playwright correctos.
+- Pendiente: commit atómico y despliegue solo cuando el usuario lo solicite.

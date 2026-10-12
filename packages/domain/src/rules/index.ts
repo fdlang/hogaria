@@ -143,8 +143,8 @@ export const BUSINESS_RULES = [
     implementation: ["packages/domain/src/catalog-pricing.ts", "apps/web/src/features/catalog/CatalogPicker.tsx"], tests: ["packages/domain/src/catalog-pricing.test.ts", "apps/web/src/features/catalog/catalog-templates.test.ts", "apps/web/e2e/catalog.browser.ts"],
   },
   {
-    id: "HOG-EST-012", description: "La preparación de partidas separa búsqueda y plantillas, y mantiene contraídas las partidas válidas hasta que el administrador decide editarlas.", origin: "business", owner: "comercial",
-    assumption: "Reducir decisiones simultáneas y desplazamiento vertical disminuye la fatiga sin ocultar errores ni controles necesarios.", validScale: "Presupuestos con decenas de partidas creados por administración; revisar si se incorpora edición masiva o por teclado.", validFrom: "2026-10-12", validUntil: null, nextReview: "2027-01-12",
+    id: "HOG-EST-012", description: "La preparación de partidas separa búsqueda, exploración paginada por categorías y plantillas, y mantiene contraídas las partidas válidas hasta que el administrador decide editarlas.", origin: "business", owner: "comercial",
+    assumption: "Reducir decisiones simultáneas y ofrecer búsqueda o exploración disminuye la fatiga sin obligar a conocer la referencia de una partida.", validScale: "Presupuestos con decenas de partidas y catálogos de miles de registros; revisar si se incorpora edición masiva o por teclado.", validFrom: "2026-10-12", validUntil: null, nextReview: "2027-01-12",
     metrics: [metric("estimate_line_edit_rate", "Partidas importadas que necesitan edición manual", "not_instrumented"), metric("estimate_creation_duration", "Tiempo desde apertura hasta borrador guardado", "not_instrumented")],
     implementation: ["apps/web/src/features/catalog/CatalogPicker.tsx", "apps/web/src/features/sales/components/SalesPipeline.tsx"], tests: ["apps/web/e2e/catalog.browser.ts"],
   },
@@ -181,7 +181,7 @@ export const BUSINESS_RULES = [
     implementation: ["packages/domain/src/work-tracking.ts", "apps/api/src/application/use-cases/work-tracking.use-cases.ts"], tests: ["apps/api/src/application/use-cases/work-tracking.use-cases.test.ts", "apps/api/src/infrastructure/database/postgresWorkStore.test.ts"],
   },
   {
-    id: "HOG-CAT-001", description: "Solo administración mantiene el catálogo y archivar conserva el histórico comercial.", origin: "business", owner: "comercial",
+    id: "HOG-CAT-001", description: "Solo administración mantiene el catálogo; el estado de revisión determina su disponibilidad y archivar conserva el histórico comercial.", origin: "business", owner: "comercial",
     assumption: "Existe un catálogo común de precios de venta para una única unidad de negocio.", validScale: "Un mercado y una tarifa comercial; no cubre delegaciones, zonas o listas por cliente.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("catalog_override_rate", "Partidas presupuestadas con precio distinto al catálogo"), metric("catalog_archive_rate", "Partidas archivadas frente a activas", "database")],
     implementation: ["apps/api/src/application/use-cases/catalog.use-cases.ts"], tests: ["apps/api/src/application/use-cases/catalog.use-cases.test.ts", "apps/web/e2e/catalog.browser.ts"],

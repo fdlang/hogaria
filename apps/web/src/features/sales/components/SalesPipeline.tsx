@@ -12,6 +12,7 @@ import {
 import type { UsersApi } from "@/features/users/api/users.api";
 import {
   SalesApi,
+  type CatalogPickerItemDTO,
   type EstimateDraftDTO,
   type EstimateDTO,
   type OpportunityDTO,
@@ -21,6 +22,19 @@ import { blankOpportunity, mergeCatalogLines, opportunityForSelection } from "..
 import { calculateEstimateTotals, CURRENT_FISCAL_POLICY, DEFAULT_ESTIMATE_OBSERVATIONS, hasAtMostTwoDecimals } from "@reformapro/domain";
 
 const steps = ["Oportunidad", "Alcance", "Partidas", "Revisión"];
+
+const groupCatalogItems = (items: CatalogPickerItemDTO[]): CatalogCategory[] => {
+  const grouped = new Map<string, CatalogItem[]>();
+  items.forEach(item => {
+    const entries = grouped.get(item.category) ?? [];
+    entries.push({
+      id: item.id, ref: item.reference, descripcion: item.description, unidad: item.unit,
+      precio: item.salePrice, iva: item.vatRate, costeUnitario: item.unitCost, priceVersion: item.priceVersion,
+    });
+    grouped.set(item.category, entries);
+  });
+  return [...grouped].map(([categoria, categoryItems]) => ({ categoria, items: categoryItems }));
+};
 
 const newLine = () => ({
   id: crypto.randomUUID(),
@@ -98,20 +112,12 @@ export function SalesPipeline({
     [],
   );
   const loadCatalogItems = useCallback(async (search: string, references: string[] = []): Promise<CatalogCategory[]> => {
-    const result = await api.catalogSearch(search, references);
-    const grouped = new Map<string, CatalogItem[]>();
-    result.items.forEach(item => {
-      const entries = grouped.get(item.category) ?? [];
-      entries.push({
-        id: item.id,
-        ref: item.reference, descripcion: item.description, unidad: item.unit,
-        precio: item.salePrice, iva: item.vatRate,
-        costeUnitario: item.unitCost,
-        priceVersion: item.priceVersion,
-      });
-      grouped.set(item.category, entries);
-    });
-    return [...grouped].map(([categoria, items]) => ({ categoria, items }));
+    const result = await api.catalogSearch(search, references, 0, references.length ? Math.min(50, Math.max(12, references.length)) : 12);
+    return groupCatalogItems(result.items);
+  }, [api]);
+  const browseCatalogItems = useCallback(async (page: number) => {
+    const result = await api.catalogSearch("", [], page, 50);
+    return { categories: groupCatalogItems(result.items), total: result.total, page: result.page, pages: result.pages };
   }, [api]);
   const [step, setStep] = useState(recoveredDraft?.step ?? 0);
   const [saving, setSaving] = useState(false);
@@ -500,11 +506,14 @@ export function SalesPipeline({
       ),
     }));
   };
-  const removeLine = (index: number) =>
+  const removeLine = (index: number) => {
+    const line = draft.partidas[index];
+    if (!line || !window.confirm(`Eliminar la partida «${line.descripcion || `Partida ${index + 1}`}»? Esta acción no se puede deshacer.`)) return;
     setDraft((current) => ({
       ...current,
       partidas: current.partidas.filter((_, itemIndex) => itemIndex !== index),
     }));
+  };
   const addCatalogItem = (item: CatalogItem, category: string) => {
     const addition = lineFromCatalog(item, category);
     setDraft((current) => {
@@ -955,7 +964,7 @@ export function SalesPipeline({
       >
         <p className="catalog-picker-modal__intro">Busca una partida y añádela en un clic. Los precios mostrados no incluyen IVA.</p>
         {catalogNotice && <p className="estimate-catalog-notice" role="status">{catalogNotice}</p>}
-        <CatalogPicker loadItems={loadCatalogItems} onPickItem={addCatalogItem} onImportTemplate={importCatalogTemplate} />
+        <CatalogPicker loadItems={loadCatalogItems} browseItems={browseCatalogItems} onPickItem={addCatalogItem} onImportTemplate={importCatalogTemplate} />
       </Modal>
       <Modal
         open={preview !== null}
@@ -1149,7 +1158,7 @@ function EstimateLineEditor({
   const invalidOverride = priceOverridden && !line.priceOverrideReason?.trim();
   const invalid = invalidDescription || invalidQuantity || invalidPrice || invalidDiscount || invalidVat || invalidOverride;
   const [clientNoteOpen, setClientNoteOpen] = useState(Boolean(line.notaCliente?.trim()));
-  const [expanded, setExpanded] = useState(invalid || !line.catalogReference);
+  const [expanded, setExpanded] = useState(invalid);
   const detailId = `estimate-line-${String(line.id).replace(/[^a-zA-Z0-9_-]/g, "-")}-details`;
   useEffect(() => { if (invalid) setExpanded(true); }, [invalid]);
   const categoryOptions = [...new Set(["General", "Demoliciones", "Albañilería", "Instalaciones", "Carpintería", "Acabados", ...categories])];
@@ -1175,10 +1184,6 @@ function EstimateLineEditor({
           </button>
         </div>
       </header>
-      {!expanded && <div className="estimate-line__collapsed">
-        <span>{line.cantidad} {line.unidad} · {formatMoney(line.precioVentaUnitario)} por {line.unidad}</span>
-        <strong>{formatMoney(sale)}</strong>
-      </div>}
       {expanded && <div id={detailId} className="estimate-line__details">
       <div className="estimate-line__quick">
         <label>
@@ -1230,7 +1235,7 @@ function EstimateLineEditor({
           checked={Boolean(line.pendingConfirmation)}
           onChange={(event) => onChange({ pendingConfirmation: event.target.checked })}
         />
-        Marcar como estimación pendiente de confirmación
+        <span>Marcar como estimación pendiente de confirmación</span>
       </label>
       <details className="estimate-line__client-note" open={clientNoteOpen} onToggle={event => setClientNoteOpen(event.currentTarget.open)}>
         <summary>{line.notaCliente?.trim() ? "Editar observación para el cliente" : "+ Añadir observación para el cliente"}</summary>

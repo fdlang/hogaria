@@ -28,6 +28,7 @@ import { toHttpError } from "./interfaces/http/errorMiddleware.js";
 import { ValidationError } from "@reformapro/domain/errors";
 import { notificationRetryController } from "./interfaces/http/notificationRetryController.js";
 import { userNotificationController } from "./interfaces/http/userNotificationController.js";
+import { authenticateBeforeBody } from "./interfaces/http/requestPipeline.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
@@ -231,21 +232,15 @@ export async function apiHandler(req: IncomingMessage, res: ServerResponse): Pro
     const query: Record<string, string> = {};
     url.searchParams.forEach((v, k) => { query[k] = v; });
 
-    // Parse body
-    const body = (await parseJsonBody(req)) ?? {};
-
     const httpReq: Req = {
-      body, headers: req.headers as Record<string, string>, ip: getClientIP(req),
+      body: {}, headers: req.headers as Record<string, string>, ip: getClientIP(req),
       params, query,
     };
 
-    if (match.protected) {
-      const authResult = await authMiddleware(httpReq);
-      if ("status" in authResult) {
-        res.writeHead(authResult.status, { "Content-Type": "application/json" }).end(JSON.stringify(authResult.body));
-        return;
-      }
-      httpReq.actorId = authResult.actorId;
+    const authFailure = await authenticateBeforeBody(httpReq, Boolean(match.protected), authMiddleware, () => parseJsonBody(req));
+    if (authFailure) {
+      res.writeHead(authFailure.status, { "Content-Type": "application/json" }).end(JSON.stringify(authFailure.body));
+      return;
     }
 
     if (match.protected || pathname.startsWith("/auth/")) res.setHeader("Cache-Control", "private, no-store");

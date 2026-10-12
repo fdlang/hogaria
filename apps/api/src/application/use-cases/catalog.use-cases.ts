@@ -10,13 +10,56 @@ import {
 
 type CatalogBaseInput = Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate">;
 type CatalogInput = CatalogBaseInput & Partial<Pick<CatalogItem, "itemType" | "costBreakdown" | "costComposition" | "pricingMode" | "tariffZone" | "evidence" | "searchTerms" | "replacementReference" | "reviewNote">>;
-type CatalogPatch = Partial<CatalogInput & Pick<CatalogItem, "active" | "reviewStatus">>;
+type CatalogPatch = Partial<CatalogInput & Pick<CatalogItem, "reviewStatus">>;
 
 const emptyCosts = (): CatalogCostBreakdown => ({ laborCost: null, materialCost: null, auxiliaryCost: null, overheadPercent: null, targetMarginPercent: null });
 const emptyComposition = (): CatalogCostComposition => ({ labor: [], materials: [], auxiliaries: [] });
 const emptyEvidence = (): CatalogPriceEvidence => ({ sourceName: null, sourceUrl: null, priceDate: null, validFrom: null, validUntil: null });
 
 function assertAdmin(user: User | null): asserts user is User { if (!user || user.rol !== "admin") throw new ForbiddenError(); }
+
+function assertCatalogPayload(input: unknown): asserts input is CatalogPatch {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new ValidationError("Cuerpo de catálogo inválido");
+  const value = input as Record<string, unknown>;
+  if ("active" in value) throw new ValidationError("Usa el estado de revisión para activar o archivar una partida", "active");
+  for (const field of ["reference", "category", "description", "unit", "itemType", "pricingMode", "tariffZone", "reviewStatus"] as const) {
+    if (value[field] !== undefined && typeof value[field] !== "string") throw new ValidationError("Campo de catálogo inválido", field);
+  }
+  for (const field of ["salePrice", "vatRate"] as const) {
+    if (value[field] !== undefined && typeof value[field] !== "number") throw new ValidationError("Campo de catálogo inválido", field);
+  }
+  for (const field of ["replacementReference", "reviewNote"] as const) {
+    if (value[field] !== undefined && value[field] !== null && typeof value[field] !== "string") throw new ValidationError("Campo de catálogo inválido", field);
+  }
+  if (value.searchTerms !== undefined && (!Array.isArray(value.searchTerms) || value.searchTerms.some(term => typeof term !== "string"))) throw new ValidationError("Sinónimos inválidos", "searchTerms");
+  if (value.costBreakdown !== undefined) {
+    if (!value.costBreakdown || typeof value.costBreakdown !== "object" || Array.isArray(value.costBreakdown)) throw new ValidationError("Desglose de costes inválido", "costBreakdown");
+    const costs = value.costBreakdown as Record<string, unknown>;
+    for (const field of ["laborCost", "materialCost", "auxiliaryCost", "overheadPercent", "targetMarginPercent"] as const) {
+      if (costs[field] !== undefined && costs[field] !== null && typeof costs[field] !== "number") throw new ValidationError("Desglose de costes inválido", `costBreakdown.${field}`);
+    }
+  }
+  if (value.evidence !== undefined) {
+    if (!value.evidence || typeof value.evidence !== "object" || Array.isArray(value.evidence)) throw new ValidationError("Evidencia de precios inválida", "evidence");
+    const evidence = value.evidence as Record<string, unknown>;
+    for (const field of ["sourceName", "sourceUrl", "priceDate", "validFrom", "validUntil"] as const) {
+      if (evidence[field] !== undefined && evidence[field] !== null && typeof evidence[field] !== "string") throw new ValidationError("Evidencia de precios inválida", `evidence.${field}`);
+    }
+  }
+  if (value.costComposition !== undefined) {
+    if (!value.costComposition || typeof value.costComposition !== "object" || Array.isArray(value.costComposition)) throw new ValidationError("Composición de costes inválida", "costComposition");
+    const composition = value.costComposition as Record<string, unknown>;
+    for (const field of ["labor", "materials", "auxiliaries"] as const) {
+      if (!Array.isArray(composition[field]) || composition[field].some(row => !row || typeof row !== "object" || Array.isArray(row))) throw new ValidationError("Composición de costes inválida", "costComposition");
+    }
+    const labor = composition.labor as Record<string, unknown>[];
+    const materials = composition.materials as Record<string, unknown>[];
+    const auxiliaries = composition.auxiliaries as Record<string, unknown>[];
+    if (labor.some(row => typeof row.trade !== "string" || typeof row.performanceHoursPerUnit !== "number" || typeof row.hourlyCost !== "number") ||
+      materials.some(row => typeof row.description !== "string" || typeof row.unit !== "string" || typeof row.quantityPerUnit !== "number" || typeof row.unitCost !== "number") ||
+      auxiliaries.some(row => typeof row.description !== "string" || typeof row.amountPerUnit !== "number")) throw new ValidationError("Composición de costes inválida", "costComposition");
+  }
+}
 
 function normalize(input: CatalogInput): Omit<CatalogItem, "id" | "active" | "reviewStatus" | "createdAt" | "updatedAt"> {
   const reference = input.reference?.trim().toUpperCase();
@@ -86,19 +129,20 @@ export class CatalogUseCases {
   async list(actorId: number, includeInactive = false) { assertAdmin(await this.users.findById(actorId)); return this.catalog.findAll(includeInactive); }
   async search(actorId: number, query: import("@reformapro/domain/repositories").CatalogSearchQuery) {
     assertAdmin(await this.users.findById(actorId));
-    if (!Number.isInteger(query.page) || query.page < 0) throw new ValidationError("Página inválida", "page");
-    if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 50) throw new ValidationError("Límite inválido", "limit");
-    if (query.search.length > 120 || (query.category?.length ?? 0) > 80 || (query.references?.length ?? 0) > 50) throw new ValidationError("Búsqueda inválida", "search");
+    if (!Number.isSafeInteger(query.page) || query.page < 0 || query.page > 100_000) throw new ValidationError("Página inválida", "page");
+    if (!Number.isSafeInteger(query.limit) || query.limit < 1 || query.limit > 50) throw new ValidationError("Límite inválido", "limit");
+    if (!Number.isSafeInteger(query.page * query.limit)) throw new ValidationError("Página inválida", "page");
+    if (query.search.length > 120 || (query.category?.length ?? 0) > 80 || (query.references?.length ?? 0) > 50 || query.references?.some(reference => !/^[A-Za-z0-9][A-Za-z0-9-]{1,39}$/.test(reference))) throw new ValidationError("Búsqueda inválida", "search");
     return this.catalog.search(query);
   }
-  async create(actorId: number, input: CatalogInput) {
-    assertAdmin(await this.users.findById(actorId)); const item = normalize(input);
+  async create(actorId: number, input: unknown) {
+    assertAdmin(await this.users.findById(actorId)); assertCatalogPayload(input); const item = normalize(input as CatalogInput);
     if (await this.catalog.findByReference(item.reference)) throw new ConflictError("Ya existe una partida con esa referencia");
     return this.catalog.save({ ...item, active: false, reviewStatus: "pending_review" });
   }
-  async update(actorId: number, id: number, input: CatalogPatch) {
+  async update(actorId: number, id: number, input: unknown) {
     assertAdmin(await this.users.findById(actorId)); const current = await this.catalog.findById(id); if (!current) throw new NotFoundError("Partida de catálogo");
-    if (input.active !== undefined && typeof input.active !== "boolean") throw new ValidationError("Estado no válido", "active");
+    assertCatalogPayload(input);
     const reviewStatus = input.reviewStatus === undefined ? current.reviewStatus : assertReviewStatus(input.reviewStatus);
     const candidate = normalize({
       reference: input.reference ?? current.reference, category: input.category ?? current.category,
@@ -130,7 +174,7 @@ export class CatalogUseCases {
       changes.priceVersion = (current.priceVersion ?? 1) + 1;
     }
     if (input.reviewStatus !== undefined) changes.reviewStatus = reviewStatus;
-    if (input.reviewStatus !== undefined || input.active !== undefined) changes.active = reviewStatus === "verified";
+    if (input.reviewStatus !== undefined) changes.active = reviewStatus === "verified";
     return this.catalog.update(id, changes);
   }
   async archive(actorId: number, id: number) { assertAdmin(await this.users.findById(actorId)); if (!(await this.catalog.findById(id))) throw new NotFoundError("Partida de catálogo"); return this.catalog.update(id, { active: false, reviewStatus: "archived" }); }
