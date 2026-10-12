@@ -1,4 +1,4 @@
-import type { OpportunityStatus } from "./entities/index.js";
+import type { EstimateStatus, OpportunityStatus, Project } from "./entities/index.js";
 
 export type OpportunityTransitionReason = "manual" | "signed_conversion";
 
@@ -53,4 +53,16 @@ export function projectStateViolation(
   progress: number,
 ): "finalized_progress" | null {
   return state === "finalizado" && progress !== 100 ? "finalized_progress" : null;
+}
+
+export function canPermanentlyDeleteEstimate(status: EstimateStatus, publishedVersions: number): boolean {
+  return ["borrador", "en_revision"].includes(status) && publishedVersions === 0;
+}
+
+export function canAdministrativelyCancelEstimate(status: EstimateStatus, publishedVersions = 0): boolean {
+  return ["enviado", "rechazado", "caducado"].includes(status) || (status === "en_revision" && publishedVersions > 0);
+}
+
+export function canArchiveProject(project: Pick<Project, "archivedAt">): boolean {
+  return !project.archivedAt;
 }

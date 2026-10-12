@@ -25,7 +25,7 @@ import {
   CreateUserUseCase, UpdateUserUseCase, DeleteUserUseCase, ListUsersUseCase,
 } from "./application/use-cases/user.use-cases.js";
 import {
-  AssignProjectProfessionalUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase,
+  ArchiveProjectUseCase, AssignProjectProfessionalUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase,
 } from "./application/use-cases/project.use-cases.js";
 import { QueryAuditLogUseCase } from "./application/use-cases/audit.use-cases.js";
 import {
@@ -143,6 +143,7 @@ interface AppDependencies {
     getProject:                GetProjectUseCase;
     assignProjectProfessional: AssignProjectProfessionalUseCase;
     unassignProjectProfessional: UnassignProjectProfessionalUseCase;
+    archiveProject:             ArchiveProjectUseCase;
     queryAuditLog:             QueryAuditLogUseCase;
     submitSolicitud:           SubmitSolicitudUseCase;
     listSolicitudes:           ListSolicitudesUseCase;
@@ -276,6 +277,7 @@ export async function buildApp(): Promise<AppDependencies> {
     getProject:                 new GetProjectUseCase(users, projects),
     assignProjectProfessional:  new AssignProjectProfessionalUseCase(users, projects),
     unassignProjectProfessional:new UnassignProjectProfessionalUseCase(users, projects),
+    archiveProject:             new ArchiveProjectUseCase(users, projects, events),
     queryAuditLog:              new QueryAuditLogUseCase(users, audit),
     submitSolicitud:            new SubmitSolicitudUseCase(solicitudes, cooldown,
       pool

@@ -1,10 +1,10 @@
 import { ApiClient } from "@/shared/lib/api-client";
 import { ApiContractError, isRecord } from "@/shared/lib/contracts";
 
-export type NotificationType="request_submitted"|"estimate_published"|"estimate_signed"|"estimate_rejected"|"project_created"|"project_updated"|"project_assigned"|"project_unassigned"|"document_uploaded"|"change_order_sent"|"change_order_decided"|"work_submitted"|"work_reviewed"|"work_rate_changed";
+export type NotificationType="request_submitted"|"estimate_published"|"estimate_signed"|"estimate_rejected"|"estimate_cancelled"|"project_created"|"project_updated"|"project_archived"|"project_assigned"|"project_unassigned"|"document_uploaded"|"change_order_sent"|"change_order_decided"|"work_submitted"|"work_reviewed"|"work_rate_changed";
 export interface AppNotificationDTO {id:string;type:NotificationType;title:string;summary:string;priority:"normal"|"high";resourceType:string;resourceId:string;projectId?:number;createdAt:string;readAt:string|null;}
 export interface NotificationPage {items:AppNotificationDTO[];nextCursor:string|null;}
-const types=new Set<NotificationType>(["request_submitted","estimate_published","estimate_signed","estimate_rejected","project_created","project_updated","project_assigned","project_unassigned","document_uploaded","change_order_sent","change_order_decided","work_submitted","work_reviewed","work_rate_changed"]);
+const types=new Set<NotificationType>(["request_submitted","estimate_published","estimate_signed","estimate_rejected","estimate_cancelled","project_created","project_updated","project_archived","project_assigned","project_unassigned","document_uploaded","change_order_sent","change_order_decided","work_submitted","work_reviewed","work_rate_changed"]);
 const pageContract=(value:unknown):NotificationPage=>{
   if(!isRecord(value)||!Array.isArray(value.items)||(value.nextCursor!==null&&typeof value.nextCursor!=="string"))throw new ApiContractError("las notificaciones");
   const items=value.items.map(item=>{

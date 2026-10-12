@@ -68,6 +68,17 @@ describe("SalesApi", () => {
     expect(http.post).toHaveBeenNthCalledWith(3, "/estimates/7/accept");
   });
 
+  it("uses separate administrative actions for draft deletion and proposal cancellation", () => {
+    const http = createHttp();
+    const api = new SalesApi(http);
+
+    api.deleteEstimateDraft(7, "2026-10-12T10:00:00.000Z");
+    api.cancelEstimate(8, "El alcance comercial ha quedado sin efecto", "2026-10-12T11:00:00.000Z");
+
+    expect(http.delete).toHaveBeenCalledWith("/estimates/7?expectedUpdatedAt=2026-10-12T10%3A00%3A00.000Z");
+    expect(http.post).toHaveBeenCalledWith("/estimates/8/cancel", { motivo: "El alcance comercial ha quedado sin efecto", expectedUpdatedAt: "2026-10-12T11:00:00.000Z" });
+  });
+
   it("reuses a PDF while its estimate revision remains unchanged", async () => {
     const http = createHttp();
     const blob = new Blob(["pdf"], { type: "application/pdf" });

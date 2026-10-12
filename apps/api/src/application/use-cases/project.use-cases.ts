@@ -11,7 +11,7 @@ import { ValidationError, ForbiddenError, NotFoundError, ConflictError } from "@
 import { PermissionPolicy } from "@reformapro/domain/services";
 import { ClientContext } from "./auth.use-cases.js";
 import { projectChanges } from "./project-validation.js";
-import { canStartProject, projectStateViolation } from "@reformapro/domain";
+import { canArchiveProject, canStartProject, projectStateViolation } from "@reformapro/domain";
 
 // Direct creation is intentionally absent: projects originate from signed estimates.
 
@@ -32,6 +32,7 @@ export class UpdateProjectUseCase {
     if (!actor?.activo) throw new ForbiddenError();
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
+    if (project.archivedAt) throw new ConflictError("La obra está archivada y es de solo lectura");
 
     const built: Record<string, unknown> = {};
     const raw = cmd.changes as Record<string, unknown> | null;
@@ -132,6 +133,36 @@ export class GetProjectUseCase {
   }
 }
 
+export class ArchiveProjectUseCase {
+  constructor(
+    private readonly users: IUserRepository,
+    private readonly projects: IProjectRepository,
+    private readonly events: IEventEmitter,
+  ) {}
+  async execute(cmd: { actorId: number; projectId: number; reason: string; revision: number; ctx: ClientContext }): Promise<Project> {
+    const actor = await this.users.findById(cmd.actorId);
+    if (!actor?.activo || actor.rol !== "admin") throw new ForbiddenError();
+    const project = await this.projects.findById(cmd.projectId);
+    if (!project) throw new NotFoundError("Proyecto");
+    if (!canArchiveProject(project)) throw new ConflictError("La obra ya está archivada");
+    if (!Number.isSafeInteger(cmd.revision) || cmd.revision !== (project.revision ?? 0))
+      throw new ConflictError("La obra ha cambiado. Actualiza los datos antes de archivarla.");
+    const reason = typeof cmd.reason === "string" ? cmd.reason.trim() : "";
+    if (reason.length < 10 || reason.length > 1_000)
+      throw new ValidationError("Explica el motivo del archivo (entre 10 y 1.000 caracteres)", "reason");
+    const previousProfessionalIds = project.profesionalesAsignados.map(item => item.userId);
+    const archived = await this.projects.update(project.id, {
+      archivedAt: new Date(), archiveReason: reason, profesionalesAsignados: [],
+    }, project.revision ?? 0);
+    await this.events.emit({
+      type: "ProjectArchived", eventId: crypto.randomUUID(), occurredAt: new Date(),
+      actorId: actor.id, actorName: actor.nombre, ip: cmd.ctx.ip, userAgent: cmd.ctx.userAgent,
+      projectId: project.id, previousProfessionalIds, motivo: reason,
+    });
+    return archived;
+  }
+}
+
 export class AssignProjectProfessionalUseCase {
   constructor(private readonly users: IUserRepository, private readonly projects: IProjectRepository) {}
   async execute(cmd: { actorId: number; projectId: number; userId: number; profesion?: ProjectProfessional["profesion"] }): Promise<Project> {
@@ -139,6 +170,7 @@ export class AssignProjectProfessionalUseCase {
     if (!actor || actor.rol !== "admin") throw new ForbiddenError();
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
+    if (project.archivedAt) throw new ConflictError("No se puede asignar equipo a una obra archivada");
     const professional = await this.users.findById(cmd.userId);
     if (!professional || professional.rol !== "profesional" || !professional.activo) {
       throw new ValidationError("Profesional inválido", "userId");
@@ -161,6 +193,7 @@ export class UnassignProjectProfessionalUseCase {
     if (!actor || actor.rol !== "admin") throw new ForbiddenError();
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
+    if (project.archivedAt) throw new ConflictError("La obra está archivada");
     const remaining = project.profesionalesAsignados.filter(p => p.userId !== cmd.userId);
     if (remaining.length === project.profesionalesAsignados.length) throw new NotFoundError("Asignación");
     return this.projects.update(project.id, { profesionalesAsignados: remaining }, project.revision ?? 0);
@@ -180,7 +213,7 @@ export class ListProjectsUseCase {
     if (actor.rol === "profesional")  return this.projects.findByProfesional(actor.id);
     return [];
   }
-  async executePage(cmd: { actorId: number; page: number; limit: number; search: string; status?: Project["estado"] | "all" }) {
+  async executePage(cmd: { actorId: number; page: number; limit: number; search: string; status?: Project["estado"] | "archivado" | "all" }) {
     const actor = await this.users.findById(cmd.actorId);
     if (!actor?.activo || actor.rol !== "admin") throw new ForbiddenError();
     return this.projects.findPage(cmd);

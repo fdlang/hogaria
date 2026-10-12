@@ -8,6 +8,7 @@ export const estimateStatus = (state: string) =>
     aceptado: "Convertido en proyecto",
     rechazado: "Cambios solicitados",
     caducado: "Caducado",
+    anulado: "Anulado por administración",
   })[state] ?? state;
 const normalize = (value: string) =>
   value

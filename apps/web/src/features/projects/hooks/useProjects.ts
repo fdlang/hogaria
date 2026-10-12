@@ -24,7 +24,7 @@ export function useProjects(api: ProjectsApi) {
   return resource;
 }
 
-export function useProjectPage(api: ProjectsApi, page: number, search: string, status: ProjectDTO["estado"] | "all") {
+export function useProjectPage(api: ProjectsApi, page: number, search: string, status: ProjectDTO["estado"] | "archivado" | "all") {
   return useResource(() => api.page({ page, search, status }), [api, page, search, status]);
 }
 

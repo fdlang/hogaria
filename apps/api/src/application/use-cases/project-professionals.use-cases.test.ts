@@ -3,7 +3,7 @@ import { Email, Money, Percentage } from "@reformapro/domain/value-objects";
 import { ForbiddenError, NotFoundError, ValidationError } from "@reformapro/domain/errors";
 import { InMemoryProjectRepository, InMemoryUserRepository } from "../../infrastructure/database/inMemoryRepositories.js";
 import { InMemoryEventEmitter } from "../../infrastructure/events/inMemoryEventEmitter.js";
-import { AssignProjectProfessionalUseCase, GetProjectUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "./project.use-cases.js";
+import { ArchiveProjectUseCase, AssignProjectProfessionalUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "./project.use-cases.js";
 
 const hasher = { hash: async () => "hash", verify: async () => true };
 
@@ -70,5 +70,25 @@ describe("project professional assignments", () => {
     const update = new UpdateProjectUseCase(users, projects, new InMemoryEventEmitter());
 
     await expect(update.execute({ actorId: admin.id, projectId: project.id, changes: { estado: "en_curso", revision: 0 }, ctx: { ip: "test", userAgent: "test" } })).rejects.toThrow("planificación");
+  });
+
+  it("archives a project, revokes operational access and keeps it available to administration", async () => {
+    const users = new InMemoryUserRepository(hasher);
+    const projects = new InMemoryProjectRepository();
+    const admin = await users.save({ id: 0, email: Email.of("archive-admin@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() });
+    const client = await users.save({ id: 0, email: Email.of("archive-client@hogaria.test"), nombre: "Cliente", rol: "cliente", activo: true, createdAt: new Date() });
+    const professional = await users.save({ id: 0, email: Email.of("archive-worker@hogaria.test"), nombre: "Worker", rol: "profesional", profesion: "reformista", activo: true, createdAt: new Date() });
+    const saved = await projects.save({ id: 0, estimateId: 99, nombre: "Obra", descripcion: "", clienteId: client.id, direccion: "Calle", tipo: "Reforma", estado: "en_curso", progreso: Percentage.of(20), presupuesto: Money.of(100), fechaInicio: new Date("2026-09-01"), fechaFinPrevista: new Date("2026-11-01"), profesionalesAsignados: [{ userId: professional.id, profesion: "reformista" }], hitos: [], createdAt: new Date() });
+    const archive = new ArchiveProjectUseCase(users, projects, new InMemoryEventEmitter());
+
+    const result = await archive.execute({ actorId: admin.id, projectId: saved.id, reason: "Cancelación acordada y cierre administrativo", revision: 0, ctx: { ip: "test", userAgent: "vitest" } });
+
+    expect(result.archivedAt).toBeInstanceOf(Date);
+    expect(result.profesionalesAsignados).toEqual([]);
+    expect(await new ListProjectsUseCase(users, projects).execute({ actorId: client.id })).toEqual([]);
+    expect(await new ListProjectsUseCase(users, projects).execute({ actorId: professional.id })).toEqual([]);
+    expect((await new ListProjectsUseCase(users, projects).execute({ actorId: admin.id }))[0]?.archiveReason).toContain("Cancelación");
+    await expect(new GetProjectUseCase(users, projects).execute({ actorId: client.id, projectId: saved.id })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(archive.execute({ actorId: admin.id, projectId: saved.id, reason: "Intento de archivo repetido", revision: result.revision ?? 1, ctx: { ip: "test", userAgent: "vitest" } })).rejects.toThrow("archivada");
   });
 });

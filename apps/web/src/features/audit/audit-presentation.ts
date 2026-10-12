@@ -9,11 +9,14 @@ export const BUSINESS_ACTIONS = [
   "PRESUPUESTO_CREADO",
   "PRESUPUESTO_ENVIADO",
   "PRESUPUESTO_RECHAZADO",
+  "PRESUPUESTO_ANULADO",
+  "BORRADOR_PRESUPUESTO_ELIMINADO",
   "DOCUMENTO_FIRMADO",
   "PRESUPUESTO_ACEPTADO",
   "PROYECTO_CREADO",
   "PROYECTO_ACTUALIZADO",
   "PROYECTO_FINALIZADO",
+  "PROYECTO_ARCHIVADO",
   "ARCHIVO_SUBIDO",
   "ORDEN_CAMBIO_PUBLICADA",
 ] as const;
@@ -27,11 +30,14 @@ const TITLES: Record<string, string> = {
   PRESUPUESTO_CREADO: "Presupuesto creado",
   PRESUPUESTO_ENVIADO: "Presupuesto publicado",
   PRESUPUESTO_RECHAZADO: "Cambios solicitados en el presupuesto",
+  PRESUPUESTO_ANULADO: "Propuesta anulada por administración",
+  BORRADOR_PRESUPUESTO_ELIMINADO: "Borrador de presupuesto eliminado",
   DOCUMENTO_FIRMADO: "Presupuesto firmado",
   PRESUPUESTO_ACEPTADO: "Presupuesto convertido en proyecto",
   PROYECTO_CREADO: "Proyecto creado",
   PROYECTO_ACTUALIZADO: "Proyecto actualizado",
   PROYECTO_FINALIZADO: "Proyecto finalizado",
+  PROYECTO_ARCHIVADO: "Proyecto archivado",
   ARCHIVO_SUBIDO: "Documento añadido",
   ORDEN_CAMBIO_PUBLICADA: "Orden de cambio publicada",
 };
@@ -96,6 +102,8 @@ export function auditDescription(entry: AuditEntryDTO) {
     case "PRESUPUESTO_CREADO": return `Se preparó ${reference(details, "estimateId", "el presupuesto")}.`;
     case "PRESUPUESTO_ENVIADO": return `Se publicó la versión ${value(details, "version") || "actual"} de ${reference(details, "estimateId", "el presupuesto")}.`;
     case "PRESUPUESTO_RECHAZADO": return `El cliente solicitó cambios en ${reference(details, "estimateId", "el presupuesto")}.`;
+    case "PRESUPUESTO_ANULADO": return `Administración anuló ${reference(details, "estimateId", "el presupuesto")}.`;
+    case "BORRADOR_PRESUPUESTO_ELIMINADO": return `Se eliminó definitivamente ${reference(details, "estimateId", "un borrador inédito")}.`;
     case "DOCUMENTO_FIRMADO": return `El cliente firmó ${reference(details, "estimateId", "el presupuesto")}.`;
     case "PRESUPUESTO_ACEPTADO": return `${reference(details, "estimateId", "El presupuesto")} se convirtió en ${reference(details, "projectId", "el proyecto")}.`;
     case "PROYECTO_CREADO": return `Se creó ${reference(details, "projectId", "el proyecto")} desde ${reference(details, "estimateId", "el presupuesto")}.`;
@@ -104,6 +112,7 @@ export function auditDescription(entry: AuditEntryDTO) {
       return `Se actualizó ${reference(details, "projectId", "el proyecto")}${fields.length ? `: ${fields.join(", ")}` : ""}.`;
     }
     case "PROYECTO_FINALIZADO": return `Se marcó como finalizado ${reference(details, "projectId", "el proyecto")}.`;
+    case "PROYECTO_ARCHIVADO": return `Se cerró y archivó ${reference(details, "projectId", "el proyecto")}.`;
     case "ARCHIVO_SUBIDO": return `Se añadió un documento a ${reference(details, "projectId", "el proyecto")}.`;
     case "ORDEN_CAMBIO_PUBLICADA": return `Se publicó ${reference(details, "changeOrderId", "una orden de cambio")} para ${reference(details, "projectId", "el proyecto")}.`;
     default: return technicalDescription(entry);
@@ -120,7 +129,7 @@ function technicalDescription(entry: AuditEntryDTO) {
 }
 
 export function auditTone(action: string) {
-  if (/DESACTIVADO|RECHAZADO|INVALIDO|INCORRECTO|DELETE/.test(action)) return "danger";
+  if (/DESACTIVADO|RECHAZADO|ANULADO|ARCHIVADO|ELIMINADO|INVALIDO|INCORRECTO|DELETE/.test(action)) return "danger";
   if (/CREADO|FIRMADO|ACEPTADO|FINALIZADO|CORRECTO/.test(action)) return "success";
   if (/ENVIADO|SUBIDO|ACTUALIZADO/.test(action)) return "info";
   return "neutral";

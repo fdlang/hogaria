@@ -25,6 +25,16 @@ describe("notification audience policy", () => {
     expect(buildNotificationIntents(source({ kind: "estimate_published", resourceType: "estimate" }))).toEqual([expect.objectContaining({ recipientId: 2, type: "estimate_published" })]);
     expect(buildNotificationIntents(source({ kind: "work_reviewed", resourceType: "work_entry", professionalId: 3 }))).toEqual([expect.objectContaining({ recipientId: 3, type: "work_reviewed" })]);
   });
+  it("notifies affected users when administration retires a record", () => {
+    expect(buildNotificationIntents(source({ kind: "estimate_cancelled", resourceType: "estimate" }))).toEqual([
+      expect.objectContaining({ recipientId: 2, type: "estimate_cancelled", priority: "high" }),
+    ]);
+    expect(buildNotificationIntents(source({ kind: "project_archived", professionalIds: [3, 4] }))).toEqual([
+      expect.objectContaining({ recipientId: 2, type: "project_archived" }),
+      expect.objectContaining({ recipientId: 3, type: "project_archived" }),
+      expect.objectContaining({ recipientId: 4, type: "project_archived" }),
+    ]);
+  });
   it("uses closed, non-sensitive copy for every notification type", () => {
     for (const copy of Object.values(NOTIFICATION_COPY)) {
       expect(copy.title).not.toMatch(/[<>]/);

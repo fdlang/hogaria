@@ -1,15 +1,14 @@
-- Estado: flujo rápido de presupuestos auditado y listo para revisión previa a commit/despliegue.
-- Hecho: catálogo con búsqueda de 12 resultados, exploración paginada por categorías y plantillas contextuales.
-- Hecho: plantillas cargan todas sus referencias verificadas, sin el antiguo corte de 12 partidas.
-- Hecho: baño, cocina y armarios solicitan solo las mediciones aplicables y aceptan coma o punto decimal.
-- Hecho: partidas válidas aparecen plegadas; errores abren la partida y eliminar exige confirmación.
-- Hecho: reintento de paginación conserva lo cargado y repite exactamente la página fallida.
-- Hecho: respuestas tardías del buscador y de plantillas no sobrescriben el estado actual.
-- Hecho: pestañas del selector tienen asociación ARIA y navegación por flechas, Inicio y Fin.
-- Hecho: referencias, versión, precio base, observaciones y estimación pendiente se conservan en cada partida.
-- Hecho: el estado de revisión es la única fuente para activar, verificar o archivar catálogo.
-- Hecho: cuerpos de catálogo mal tipados devuelven validación controlada y la paginación rechaza valores inseguros.
-- Hecho: rutas protegidas autentican antes de leer o validar el cuerpo JSON.
-- Decisión: no se requiere migración; el contrato vigente usa reviewStatus y DELETE para archivar.
-- Validado: typecheck y build raíz/API/web; 365 pruebas y 132 recorridos Playwright correctos.
+- Estado: retirada administrativa de presupuestos y obras implementada y validada.
+- Hecho: solo los borradores nunca publicados pueden eliminarse físicamente.
+- Hecho: propuestas publicadas se anulan con motivo visible y conservan versiones e histórico.
+- Hecho: propuestas firmadas o aceptadas no pueden anularse desde el flujo comercial.
+- Hecho: obras se archivan con motivo, fecha y retirada de asignaciones profesionales.
+- Hecho: clientes y profesionales pierden acceso a obras archivadas; administración conserva consulta histórica.
+- Hecho: archivos, fichajes, cambios, firmas y trazabilidad no se borran al archivar una obra.
+- Hecho: acciones protegidas por rol, recurso, revisión optimista y confirmación explícita.
+- Hecho: auditoría y notificaciones registran borrado de borrador, anulación y archivo.
+- Hecho: interfaz muestra estados archivado/anulado y bloquea edición posterior.
+- Hecho: migración administrativa preparada; no se ha ejecutado contra producción.
+- Validado: typecheck, tests y build raíz; pruebas de navegador Chromium y WebKit correctas.
+- Pendiente: aplicar `administrative-retirement.sql` mediante el runner versionado antes del despliegue.
 - Pendiente: commit atómico y despliegue solo cuando el usuario lo solicite.

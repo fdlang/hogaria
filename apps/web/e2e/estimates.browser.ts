@@ -8,6 +8,7 @@ const proposal = {
   estado: "enviado",
   versionActual: 1,
   motivoRechazo: null,
+  motivoAnulacion: null,
   createdAt: "2026-09-01",
   updatedAt: "2026-09-01",
   propuesta: {
@@ -237,6 +238,50 @@ test("admin sees search first and opens the creation wizard explicitly", async (
   await expect(page.getByRole("heading", { name: "Nueva oportunidad" })).toBeHidden();
   await page.getByRole("button", { name: "Nuevo presupuesto" }).click();
   await expect(page.getByRole("heading", { name: "Nueva oportunidad" })).toBeVisible();
+});
+
+test("admin annuls a published proposal with a visible reason and preserved record", async ({ page }) => {
+  await fixture(page, "admin");
+  let current = { ...proposal };
+  let cancellation: Record<string, unknown> | null = null;
+  await page.route("**/api/estimates?*", route => route.fulfill({ json: [current] }));
+  await page.route("**/api/estimates/1/cancel", route => {
+    cancellation = route.request().postDataJSON();
+    current = { ...current, estado: "anulado", motivoAnulacion: String(cancellation?.motivo ?? ""), updatedAt: "2026-10-13T00:00:00.000Z" };
+    return route.fulfill({ json: current });
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Mostrar propuestas" }).click();
+  await page.getByRole("button", { name: "Anular propuesta" }).click();
+  const dialog = page.getByRole("dialog", { name: "Anular propuesta" });
+  await dialog.getByLabel("Motivo visible para el cliente").fill("El alcance comercial ha quedado sin efecto");
+  await dialog.getByRole("button", { name: "Anular propuesta" }).click();
+
+  await expect(dialog).toBeHidden();
+  expect(cancellation).toMatchObject({ motivo: "El alcance comercial ha quedado sin efecto", expectedUpdatedAt: proposal.updatedAt });
+  await expect(page.getByText(/v1 · Anulado por administración/)).toBeVisible();
+});
+
+test("admin permanently deletes only an unpublished draft after confirmation", async ({ page }) => {
+  await fixture(page, "admin");
+  let deleted = false;
+  const unpublished = { ...proposal, estado: "borrador", propuesta: null };
+  await page.route("**/api/estimates?*", route => route.fulfill({ json: deleted ? [] : [unpublished] }));
+  await page.route("**/api/estimates/1?expectedUpdatedAt=*", route => {
+    expect(route.request().method()).toBe("DELETE");
+    deleted = true;
+    return route.fulfill({ status: 204 });
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Mostrar propuestas" }).click();
+  await page.getByRole("button", { name: "Eliminar borrador" }).click();
+  const dialog = page.getByRole("dialog", { name: "Eliminar borrador" });
+  await expect(dialog).toContainText("nunca se publicó");
+  await dialog.getByRole("button", { name: "Eliminar definitivamente" }).click();
+
+  await expect(dialog).toBeHidden();
+  expect(deleted).toBe(true);
+  await expect(page.getByText("0 propuestas en esta página")).toBeVisible();
 });
 
 test("search stays visible and opens results independently of recent estimates", async ({ page }) => {

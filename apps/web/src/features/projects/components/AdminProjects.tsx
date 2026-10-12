@@ -21,7 +21,7 @@ interface Props {
 
 export function AdminProjects({ api, onOpenProject }: Props) {
   const [searchTerm, setSearchTerm]     = useState("");
-  const [statusFilter, setStatusFilter] = useState<ProjectDTO["estado"] | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<ProjectDTO["estado"] | "archivado" | "all">("all");
   const deferredSearch = useDeferredValue(searchTerm);
   const [page, setPage] = useState(1);
   const projects = useProjectPage(api, page, deferredSearch, statusFilter);
@@ -35,7 +35,7 @@ export function AdminProjects({ api, onOpenProject }: Props) {
         </div>
       )
     },
-    { key: "estado",      header: "Estado",   sortBy: p => p.estado, render: p => <ProjectStatusBadge estado={p.estado} /> },
+    { key: "estado",      header: "Estado",   sortBy: p => p.archivedAt ? "archivado" : p.estado, render: p => p.archivedAt ? <span className="badge" style={{ color: "#71685e" }}>Archivado</span> : <ProjectStatusBadge estado={p.estado} /> },
     { key: "progreso",    header: "Progreso", sortBy: p => p.progreso, align: "right",
       render: p => (
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 120 }}>
@@ -75,6 +75,7 @@ export function AdminProjects({ api, onOpenProject }: Props) {
           <option value="en_curso">En curso</option>
           <option value="pausado">Pausado</option>
           <option value="finalizado">Finalizado</option>
+          <option value="archivado">Archivado</option>
         </select>
       </div>
 

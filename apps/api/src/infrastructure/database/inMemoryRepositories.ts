@@ -131,15 +131,15 @@ export class InMemoryProjectRepository implements IProjectRepository {
     return this.projects.find(p => p.id === id) ?? null;
   }
   async findByClient(clienteId: number): Promise<Project[]> {
-    return this.projects.filter(p => p.clienteId === clienteId);
+    return this.projects.filter(p => p.clienteId === clienteId && !p.archivedAt);
   }
   async findByProfesional(userId: number): Promise<Project[]> {
-    return this.projects.filter(p => p.profesionalesAsignados.some(a => a.userId === userId));
+    return this.projects.filter(p => !p.archivedAt && p.profesionalesAsignados.some(a => a.userId === userId));
   }
   async findAll(): Promise<Project[]> { return [...this.projects]; }
   async findPage(query: import("@reformapro/domain/repositories").ProjectPageQuery) {
     const search = query.search.toLocaleLowerCase("es");
-    const filtered = this.projects.filter(project => (!query.status || query.status === "all" || project.estado === query.status) && (!search || project.nombre.toLocaleLowerCase("es").includes(search) || project.direccion.toLocaleLowerCase("es").includes(search))).sort((left, right) => right.id - left.id);
+    const filtered = this.projects.filter(project => (!query.status || query.status === "all" || (query.status === "archivado" ? Boolean(project.archivedAt) : !project.archivedAt && project.estado === query.status)) && (!search || project.nombre.toLocaleLowerCase("es").includes(search) || project.direccion.toLocaleLowerCase("es").includes(search))).sort((left, right) => right.id - left.id);
     const start = (query.page - 1) * query.limit;
     return { items: filtered.slice(start, start + query.limit), total: filtered.length, page: query.page, limit: query.limit, pages: Math.max(1, Math.ceil(filtered.length / query.limit)) };
   }
@@ -213,7 +213,7 @@ export class InMemoryEstimateRepository implements IEstimateRepository {
     return (await this.findAll()).filter(item => {
       const version = this.versions.find(v => v.estimateId === item.id && v.enviadoAt && v.version === item.versionActual);
       const state = item.estado === "enviado" && version?.enviadoAt && version.enviadoAt.getTime()+version.snapshot.validezDias*86400000<Date.now() ? "caducado" : item.estado;
-      const labels: Record<string,string> = { en_revision:"En revisión",aceptado:"Convertido en proyecto",rechazado:"Cambios solicitados" };
+      const labels: Record<string,string> = { en_revision:"En revisión",aceptado:"Convertido en proyecto",rechazado:"Cambios solicitados",anulado:"Anulado por administración" };
       const title = item.titulo;
       const text = normalize(`${item.numero} ${title} ${version?.snapshot.referencia ?? ""} ${labels[state] ?? state}`);
       return (query.clientId === undefined || (item.clienteId === query.clientId && !["borrador", "en_revision"].includes(item.estado))) && (!query.status || state === query.status) && normalize(query.search).trim().split(/\s+/).every(word => text.includes(word));
@@ -224,7 +224,8 @@ export class InMemoryEstimateRepository implements IEstimateRepository {
   async findById(id: number) { return this.items.find(item => item.id === id) ?? null; }
   async findAll() { return [...this.items].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); }
   async save(item: Omit<Estimate, "id" | "createdAt" | "updatedAt">) { const now = new Date(); const saved: Estimate = { ...item, id: this.nextId++, createdAt: now, updatedAt: now }; this.items.push(saved); return saved; }
-  async update(id: number, changes: Partial<Pick<Estimate, "titulo" | "estado" | "versionActual" | "borrador" | "motivoRechazo">>, expectedUpdatedAt?: Date) { const old = await this.findById(id); if (!old) throw new NotFoundError("Presupuesto"); if (expectedUpdatedAt && old.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw new ConflictError("El presupuesto ha cambiado. Actualiza los datos antes de guardar."); const next = { ...old, ...changes, updatedAt: new Date(Math.max(Date.now(), old.updatedAt.getTime() + 1)) }; this.items[this.items.indexOf(old)] = next; return next; }
+  async update(id: number, changes: Partial<Pick<Estimate, "titulo" | "estado" | "versionActual" | "borrador" | "motivoRechazo" | "motivoAnulacion">>, expectedUpdatedAt?: Date) { const old = await this.findById(id); if (!old) throw new NotFoundError("Presupuesto"); if (expectedUpdatedAt && old.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw new ConflictError("El presupuesto ha cambiado. Actualiza los datos antes de guardar."); const next = { ...old, ...changes, updatedAt: new Date(Math.max(Date.now(), old.updatedAt.getTime() + 1)) }; this.items[this.items.indexOf(old)] = next; return next; }
+  async deleteDraft(id: number, expectedUpdatedAt: Date) { const item = await this.findById(id); if (!item) throw new NotFoundError("Presupuesto"); if (item.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw new ConflictError("El presupuesto ha cambiado. Actualiza los datos antes de eliminarlo."); if (!["borrador", "en_revision"].includes(item.estado) || this.versions.some(version => version.estimateId === id)) throw new ConflictError("Solo se puede eliminar un borrador nunca publicado"); this.items.splice(this.items.indexOf(item), 1); }
   async saveVersion(item: Omit<EstimateVersion, "id" | "createdAt">) { const saved: EstimateVersion = { ...item, id: this.nextVersionId++, createdAt: new Date() }; this.versions.push(saved); return saved; }
   async findVersions(estimateId: number) { return this.versions.filter(item => item.estimateId === estimateId).sort((a, b) => b.version - a.version); }
   async signVersion(estimateId: number, version: number, firma: Record<string, unknown>, firmadoAt: Date) { const old = this.versions.find(item => item.estimateId === estimateId && item.version === version && !item.firmadoAt); if (!old) throw new NotFoundError("Versión firmable"); const next = { ...old, firma, firmadoAt }; this.versions[this.versions.indexOf(old)] = next; return next; }

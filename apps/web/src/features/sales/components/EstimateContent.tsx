@@ -10,7 +10,7 @@ export function EstimateSearch({
   status,
   onQuery,
   onStatus,
-  statuses = ["borrador", "en_revision", "enviado", "firmado", "aceptado", "rechazado", "caducado"],
+  statuses = ["borrador", "en_revision", "enviado", "firmado", "aceptado", "rechazado", "caducado", "anulado"],
 }: {
   query: string;
   status: string;

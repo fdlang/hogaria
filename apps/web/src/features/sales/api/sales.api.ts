@@ -7,7 +7,7 @@ export type EstimateLineDTO = { id: string; categoria: string; descripcion: stri
 export type EstimateDraftDTO = { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; notasInternas: string; partidas: EstimateLineDTO[] };
 export type PublicEstimateLineDTO = Pick<EstimateLineDTO, "id" | "categoria" | "descripcion" | "cantidad" | "unidad" | "precioVentaUnitario" | "descuento" | "iva" | "notaCliente" | "pendingConfirmation">;
 export type PublicProposalDTO = { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; partidas: PublicEstimateLineDTO[]; totalSinIva: number; totalIva: number; totalConIva: number; enviadoAt: string | null; expiresAt: string | null; firmadoAt: string | null; hash: string | null };
-export type EstimateDTO = { id: number; numero: string; clienteNombre: string; titulo: string; estado: string; versionActual: number; motivoRechazo: string | null; propuesta: PublicProposalDTO | null; createdAt: string; updatedAt: string };
+export type EstimateDTO = { id: number; numero: string; clienteNombre: string; titulo: string; estado: string; versionActual: number; motivoRechazo: string | null; motivoAnulacion: string | null; propuesta: PublicProposalDTO | null; createdAt: string; updatedAt: string };
 export type CatalogItemDTO = {
   id: number; reference: string; category: string; description: string; unit: "m²" | "ml" | "ud" | "h" | "global";
   salePrice: number; vatRate: number; active: boolean; itemType: "simple" | "composite";
@@ -35,10 +35,11 @@ export const parseEstimateList = (value: unknown): EstimateDTO[] => {
     typeof item.clienteNombre !== "string" || typeof item.titulo !== "string" ||
     typeof item.estado !== "string" || !Number.isSafeInteger(item.versionActual) ||
     !(item.motivoRechazo === null || typeof item.motivoRechazo === "string") ||
+    !(item.motivoAnulacion === undefined || item.motivoAnulacion === null || typeof item.motivoAnulacion === "string") ||
     !(item.propuesta === null || isRecord(item.propuesta)) ||
     typeof item.createdAt !== "string" || typeof item.updatedAt !== "string"
   )) throw new ApiContractError("los presupuestos");
-  return value as EstimateDTO[];
+  return value.map(item => ({ ...item, motivoAnulacion: item.motivoAnulacion ?? null })) as EstimateDTO[];
 };
 
 const ensurePdf = (blob: Blob): Blob => {
@@ -134,5 +135,7 @@ export class SalesApi {
   sendEstimate(id: number) { return this.http.post<EstimateDTO>(`/estimates/${id}/send`); }
   signEstimate(id: number, input: { password: string; canvasSignature: string; consentimiento: string; version: number }) { return this.http.post<{ estimate: EstimateDTO; hash: string; fechaFirma: string }>(`/estimates/${id}/sign`, input); }
   rejectEstimate(id: number, motivo: string) { return this.http.post<EstimateDTO>(`/estimates/${id}/reject`, { motivo }); }
+  cancelEstimate(id: number, motivo: string, expectedUpdatedAt: string) { return this.http.post<EstimateDTO>(`/estimates/${id}/cancel`, { motivo, expectedUpdatedAt }); }
+  deleteEstimateDraft(id: number, expectedUpdatedAt: string) { return this.http.delete<void>(`/estimates/${id}?expectedUpdatedAt=${encodeURIComponent(expectedUpdatedAt)}`); }
   convertToProject(id: number) { return this.http.post<{ id: number; estimateId: number }>(`/estimates/${id}/accept`); }
 }

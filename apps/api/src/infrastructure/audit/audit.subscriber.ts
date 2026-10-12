@@ -24,6 +24,7 @@ const ACTION_CODES: Record<DomainEvent["type"], string> = {
   ProjectCreated:              "PROYECTO_CREADO",
   ProjectCompleted:            "PROYECTO_FINALIZADO",
   ProjectUpdated:              "PROYECTO_ACTUALIZADO",
+  ProjectArchived:             "PROYECTO_ARCHIVADO",
   FileUploaded:                "ARCHIVO_SUBIDO",
   OpportunityCreated:          "OPORTUNIDAD_CREADA",
   EstimateCreated:             "PRESUPUESTO_CREADO",
@@ -31,6 +32,8 @@ const ACTION_CODES: Record<DomainEvent["type"], string> = {
   EstimateSigned:              "DOCUMENTO_FIRMADO",
   EstimateAccepted:            "PRESUPUESTO_ACEPTADO",
   EstimateRejected:            "PRESUPUESTO_RECHAZADO",
+  EstimateCancelled:           "PRESUPUESTO_ANULADO",
+  EstimateDeleted:             "BORRADOR_PRESUPUESTO_ELIMINADO",
   ChangeOrderSent:             "ORDEN_CAMBIO_PUBLICADA",
 };
 

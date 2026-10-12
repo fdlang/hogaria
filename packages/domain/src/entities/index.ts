@@ -9,16 +9,16 @@ export interface User { id: number; email: Email; nombre: string; rol: UserRole;
 export type ProjectStatus = "planificacion" | "en_curso" | "pausado" | "finalizado";
 export interface ProjectProfessional { userId: number; profesion?: Profesion; }
 export interface ProjectMilestone { id: string; nombre: string; completado: boolean; fecha: Date; }
-export interface Project { id: number; revision?: number; estimateId: number; nombre: string; descripcion: string; clienteId: number; direccion: string; tipo: string; estado: ProjectStatus; progreso: Percentage; presupuesto: Money; fiscalSnapshots?: FiscalSnapshot[]; fechaInicio: Date; fechaFinPrevista: Date; profesionalesAsignados: ProjectProfessional[]; hitos: ProjectMilestone[]; createdAt: Date; }
+export interface Project { id: number; revision?: number; estimateId: number; nombre: string; descripcion: string; clienteId: number; direccion: string; tipo: string; estado: ProjectStatus; progreso: Percentage; presupuesto: Money; fiscalSnapshots?: FiscalSnapshot[]; fechaInicio: Date; fechaFinPrevista: Date; profesionalesAsignados: ProjectProfessional[]; hitos: ProjectMilestone[]; archivedAt?: Date | null; archiveReason?: string | null; createdAt: Date; }
 
 export type OpportunityStatus = "nueva" | "contactada" | "visita_agendada" | "en_estudio" | "ganada" | "descartada";
 export interface Opportunity { id: number; clienteId: number | null; nombre: string; email: string | null; telefono: string | null; direccion: string; tipo: string; descripcion: string; estado: OpportunityStatus; fechaVisita: Date | null; notasInternas: string; createdAt: Date; updatedAt: Date; }
 
-export type EstimateStatus = "borrador" | "en_revision" | "enviado" | "firmado" | "aceptado" | "rechazado" | "caducado" | "sustituido";
+export type EstimateStatus = "borrador" | "en_revision" | "enviado" | "firmado" | "aceptado" | "rechazado" | "caducado" | "sustituido" | "anulado";
 export type ChangeOrderStatus = "borrador" | "enviado" | "aprobado" | "rechazado";
 export interface EstimateLine { id: string; categoria: string; descripcion: string; cantidad: number; unidad: string; precioVentaUnitario: number; costeUnitario: number | null; descuento: number; iva: number; notaCliente?: string; notaInterna?: string; pendingConfirmation?: boolean; catalogItemId?: number; catalogReference?: string; catalogPriceVersion?: number; catalogBasePrice?: number; priceOverrideReason?: string; }
 export interface EstimateDraft { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; notasInternas: string; partidas: EstimateLine[]; }
-export interface Estimate { id: number; oportunidadId: number; clienteId: number; numero: string; titulo: string; estado: EstimateStatus; versionActual: number; borrador: EstimateDraft; motivoRechazo: string | null; createdAt: Date; updatedAt: Date; }
+export interface Estimate { id: number; oportunidadId: number; clienteId: number; numero: string; titulo: string; estado: EstimateStatus; versionActual: number; borrador: EstimateDraft; motivoRechazo: string | null; motivoAnulacion?: string | null; createdAt: Date; updatedAt: Date; }
 export interface EstimateVersion { id: number; estimateId: number; version: number; snapshot: EstimateDraft; enviadoAt: Date | null; firmadoAt: Date | null; firma: Record<string, unknown> | null; createdAt: Date; }
 export interface ChangeOrder { id: number; projectId: number; numero: string; estado: ChangeOrderStatus; payload: EstimateDraft; aprobadoAt: Date | null; createdAt: Date; }
 export interface CatalogItem {

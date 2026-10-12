@@ -78,6 +78,7 @@ function getRuntime(): Promise<Runtime> {
       get: app.useCases.getProject,
       assign: app.useCases.assignProjectProfessional,
       unassign: app.useCases.unassignProjectProfessional,
+      archive: app.useCases.archiveProject,
     });
     const audit = auditController({ query: app.useCases.queryAuditLog });
     const solicitudes = solicitudController({ submit: app.useCases.submitSolicitud, list: app.useCases.listSolicitudes, updateStatus: app.useCases.updateSolicitudStatus });
@@ -145,6 +146,8 @@ function getRuntime(): Promise<Runtime> {
   route("POST",  "/estimates/:id/send",  req => sales.sendEstimate(req as never),      { protected: true }),
   route("POST",  "/estimates/:id/sign",  req => sales.signEstimate(req as never),      { protected: true }),
   route("POST",  "/estimates/:id/reject",req => sales.rejectEstimate(req as never),    { protected: true }),
+  route("POST",  "/estimates/:id/cancel",req => sales.cancelEstimate(req as never),   { protected: true }),
+  route("DELETE","/estimates/:id",       req => sales.deleteEstimateDraft(req as never), { protected: true }),
   route("POST",  "/estimates/:id/revise",req => sales.reviseEstimate(req as never),    { protected: true }),
   route("POST",  "/estimates/:id/accept",req => sales.acceptEstimate(req as never),    { protected: true }),
   route("GET",   "/projects/:projectId/change-orders", req => sales.listChanges(req as never), { protected: true }),
@@ -166,6 +169,7 @@ function getRuntime(): Promise<Runtime> {
   route("GET",    "/projects",          req => projects.list(req   as never), { protected: true }),
   route("GET",    "/projects/:id",      req => projects.get(req    as never), { protected: true }),
   route("PATCH",  "/projects/:id",      req => projects.update(req as never), { protected: true }),
+  route("POST",   "/projects/:id/archive", req => projects.archive(req as never), { protected: true }),
   route("POST",   "/projects/:id/professionals", req => projects.assign(req as never), { protected: true }),
   route("DELETE", "/projects/:id/professionals/:userId", req => projects.unassign(req as never), { protected: true }),
 

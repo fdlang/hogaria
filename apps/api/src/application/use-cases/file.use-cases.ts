@@ -69,6 +69,10 @@ export class UploadFileUseCase {
     if (!actor?.activo) throw new ForbiddenError();
     const project = await this.projects.findById(cmd.projectId);
     if (!project) throw new NotFoundError("Proyecto");
+    if (project.archivedAt) {
+      if (actor.rol === "admin") throw new ValidationError("La obra archivada es de solo lectura");
+      throw new NotFoundError("Proyecto");
+    }
     if(typeof cmd.sensitive!=="boolean")throw new ValidationError("Indica la privacidad del documento");
     let classification=cmd.classification??(cmd.sensitive?"reservado":"publico");
     if(!["publico","tecnico","contrato","factura","reservado"].includes(classification))throw new ValidationError("Clasificación de documento no válida");

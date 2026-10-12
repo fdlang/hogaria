@@ -218,7 +218,7 @@ export function ClientEstimates({
         <EstimateSearch
           query={query}
           status={status}
-          statuses={["enviado", "firmado", "aceptado", "rechazado", "caducado"]}
+          statuses={["enviado", "firmado", "aceptado", "rechazado", "caducado", "anulado"]}
         onQuery={value => { setPage(0); setQuery(value); }}
         onStatus={value => { setPage(0); setStatus(value); }}
         />
@@ -429,6 +429,11 @@ function ProposalCard({
         {item.motivoRechazo && (
           <p style={{ color: "#71685e" }}>
             Cambios solicitados: {item.motivoRechazo}
+          </p>
+        )}
+        {item.motivoAnulacion && (
+          <p style={{ color: "#9b3d32" }} role="status">
+            Anulada por administración: {item.motivoAnulacion}
           </p>
         )}
         {item.estado === "firmado" && (

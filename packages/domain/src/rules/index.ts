@@ -303,4 +303,10 @@ export const BUSINESS_RULES = [
     metrics: [metric("unowned_metric_count", "Metricas sin fuente instrumentada")],
     implementation: ["packages/domain/src/rules/index.ts"], tests: ["packages/domain/src/rules/rules.test.ts"],
   },
+  {
+    id: "HOG-RET-002", description: "Administración solo elimina definitivamente borradores inéditos; las propuestas publicadas y las obras se anulan o archivan conservando su histórico.", origin: "business", owner: "administracion",
+    assumption: "La trazabilidad contractual, fiscal y laboral prevalece sobre retirar un registro de los flujos operativos.", validScale: "Todo presupuesto y obra, con conservación de versiones, firmas, documentos, órdenes y jornadas.", validFrom: "2026-10-12", validUntil: null, nextReview: "2027-01-12",
+    metrics: [metric("draft_delete_count", "Borradores inéditos eliminados", "audit_log"), metric("administrative_cancellation_count", "Propuestas anuladas y obras archivadas", "audit_log")],
+    implementation: ["packages/domain/src/workflows.ts", "apps/api/src/application/use-cases/sales.use-cases.ts", "apps/api/src/application/use-cases/project.use-cases.ts"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/api/src/application/use-cases/project-professionals.use-cases.test.ts"],
+  },
 ] as const satisfies readonly BusinessRuleMetadata[];

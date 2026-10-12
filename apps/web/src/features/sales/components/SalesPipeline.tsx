@@ -88,6 +88,7 @@ const statusLabel = (status: string) =>
     aceptado: "Convertido en proyecto",
     rechazado: "Cambios solicitados",
     caducado: "Caducado",
+    anulado: "Anulado por administración",
   })[status] ?? status;
 
 export function SalesPipeline({
@@ -125,6 +126,9 @@ export function SalesPipeline({
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
   const [converting, setConverting] = useState<number | null>(null);
   const [sending, setSending] = useState<number | null>(null);
+  const [retiring, setRetiring] = useState<{ estimate: EstimateDTO; mode: "delete" | "cancel" } | null>(null);
+  const [retirementReason, setRetirementReason] = useState("");
+  const [retiringId, setRetiringId] = useState<number | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const [catalogNotice, setCatalogNotice] = useState("");
   const [error, setError] = useState("");
@@ -495,6 +499,29 @@ export function SalesPipeline({
     }
   };
 
+  const retireEstimate = async () => {
+    if (!retiring) return;
+    if (editingId === retiring.estimate.id) {
+      setError("Cierra el editor antes de eliminar este borrador.");
+      setRetiring(null);
+      return;
+    }
+    try {
+      setRetiringId(retiring.estimate.id);
+      setError("");
+      if (retiring.mode === "delete") await api.deleteEstimateDraft(retiring.estimate.id, retiring.estimate.updatedAt);
+      else await api.cancelEstimate(retiring.estimate.id, retirementReason, retiring.estimate.updatedAt);
+      setPreview(current => current?.id === retiring.estimate.id ? null : current);
+      setRetiring(null);
+      setRetirementReason("");
+      await refresh();
+    } catch (cause) {
+      setError((cause as { message?: string }).message ?? (retiring.mode === "delete" ? "No se pudo eliminar el borrador" : "No se pudo anular la propuesta"));
+    } finally {
+      setRetiringId(null);
+    }
+  };
+
   const updateLine = (
     index: number,
     changes: Partial<EstimateDraftDTO["partidas"][number]>,
@@ -612,6 +639,9 @@ export function SalesPipeline({
         onConvert={convert}
         onEdit={editEstimate}
         onDuplicate={duplicateEstimate}
+        onRetire={(estimate, mode) => { setRetirementReason(""); setRetiring({ estimate, mode }); }}
+        retiringId={retiringId}
+        editingId={editingId}
         editing={saving}
       />
 
@@ -967,6 +997,27 @@ export function SalesPipeline({
         <CatalogPicker loadItems={loadCatalogItems} browseItems={browseCatalogItems} onPickItem={addCatalogItem} onImportTemplate={importCatalogTemplate} />
       </Modal>
       <Modal
+        open={retiring !== null}
+        onClose={() => { if (retiringId === null) { setRetiring(null); setRetirementReason(""); } }}
+        title={retiring?.mode === "delete" ? "Eliminar borrador" : "Anular propuesta"}
+        width={560}
+      >
+        {retiring && <div className="estimate-retirement-dialog">
+          <p>{retiring.mode === "delete"
+            ? <>Se eliminará definitivamente <strong>{retiring.estimate.titulo}</strong>. Esta opción solo está disponible porque nunca se publicó.</>
+            : <>La propuesta <strong>{retiring.estimate.titulo}</strong> dejará de estar vigente. Sus versiones permanecerán en el histórico.</>}</p>
+          {retiring.mode === "cancel" && <label>Motivo visible para el cliente *
+            <textarea value={retirementReason} minLength={10} maxLength={1000} rows={4} onChange={event => setRetirementReason(event.target.value)} placeholder="Explica de forma clara por qué se anula la propuesta" />
+          </label>}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
+            <Button variant="ghost" disabled={retiringId !== null} onClick={() => { setRetiring(null); setRetirementReason(""); }}>Volver</Button>
+            <Button variant="danger" loading={retiringId !== null} disabled={retiring.mode === "cancel" && retirementReason.trim().length < 10} onClick={() => void retireEstimate()}>
+              {retiring.mode === "delete" ? "Eliminar definitivamente" : "Anular propuesta"}
+            </Button>
+          </div>
+        </div>}
+      </Modal>
+      <Modal
         open={preview !== null}
         onClose={() => setPreview(null)}
         title={preview ? `Presupuesto de ${preview.clienteNombre}` : "Presupuesto"}
@@ -998,6 +1049,9 @@ function RecentEstimates({
   onConvert,
   onEdit,
   onDuplicate,
+  onRetire,
+  retiringId,
+  editingId,
   editing,
 }: {
   api: SalesApi;
@@ -1011,6 +1065,9 @@ function RecentEstimates({
   onConvert: (estimate: EstimateDTO) => void;
   onEdit: (estimate: EstimateDTO) => void;
   onDuplicate: (estimate: EstimateDTO) => void;
+  onRetire: (estimate: EstimateDTO, mode: "delete" | "cancel") => void;
+  retiringId: number | null;
+  editingId: number | null;
   editing: boolean;
 }) {
   const [query, setQuery] = useState("");
@@ -1115,6 +1172,12 @@ function RecentEstimates({
                 >
                   Crear proyecto
                 </Button>
+              )}
+              {estimate.estado === "borrador" && (
+                <Button small variant="danger" loading={retiringId === estimate.id} disabled={editing || editingId === estimate.id || retiringId !== null} onClick={() => onRetire(estimate, "delete")}>Eliminar borrador</Button>
+              )}
+              {["enviado", "en_revision", "rechazado", "caducado"].includes(estimate.estado) && (
+                <Button small variant="danger" loading={retiringId === estimate.id} disabled={retiringId !== null} onClick={() => onRetire(estimate, "cancel")}>Anular propuesta</Button>
               )}
             </div>
           </article>

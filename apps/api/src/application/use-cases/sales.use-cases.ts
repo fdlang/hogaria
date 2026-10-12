@@ -27,7 +27,7 @@ import {
 import { validateDraft } from "./estimate-validation.js";
 import type { ClientContext } from "./auth.use-cases.js";
 import type { ISolicitudRepository, ICooldownGate } from "./solicitud.use-cases.js";
-import { ABUSE_LIMITS, canTransitionOpportunity, createEstimateReference, duplicateEstimateDraft, isOpenOpportunity } from "@reformapro/domain";
+import { ABUSE_LIMITS, canAdministrativelyCancelEstimate, canPermanentlyDeleteEstimate, canTransitionOpportunity, createEstimateReference, duplicateEstimateDraft, isOpenOpportunity } from "@reformapro/domain";
 import type { ISignatureCrypto } from "../../infrastructure/crypto/crypto.service.js";
 import { calculateEstimateTotals, createFiscalSnapshot, isValidSpanishPhone } from "@reformapro/domain";
 
@@ -463,6 +463,7 @@ export class EstimateUseCases {
         versionActual: 1,
         borrador: draft,
         motivoRechazo: null,
+        motivoAnulacion: null,
       });
       if (opportunity.estado !== "en_estudio")
         await opportunities.update(opportunity.id, { estado: "en_estudio" });
@@ -601,6 +602,42 @@ export class EstimateUseCases {
       userAgent: ctx.userAgent,
       estimateId: id,
       motivo: text,
+    });
+    return saved;
+  }
+  async deleteDraft(actorId: number, id: number, expectedUpdatedAt: Date, ctx: ClientContext): Promise<void> {
+    if (!this.locked) return this.mutate(id, service => service.deleteDraft(actorId, id, expectedUpdatedAt, ctx));
+    const actor = await this.users.findById(actorId);
+    assertAdmin(actor);
+    const estimate = await this.require(id);
+    const versions = await this.estimates.findVersions(id);
+    if (!canPermanentlyDeleteEstimate(estimate.estado, versions.length))
+      throw new ConflictError("Solo se puede eliminar definitivamente un borrador que nunca se ha publicado");
+    await this.estimates.deleteDraft(id, expectedUpdatedAt);
+    await this.events.emit({
+      type: "EstimateDeleted", eventId: crypto.randomUUID(), occurredAt: new Date(),
+      actorId: actor.id, actorName: actor.nombre, ip: ctx.ip, userAgent: ctx.userAgent,
+      estimateId: id, opportunityId: estimate.oportunidadId,
+    });
+  }
+  async cancel(actorId: number, id: number, motivo: string, expectedUpdatedAt: Date, ctx: ClientContext): Promise<Estimate> {
+    if (!this.locked) return this.mutate(id, service => service.cancel(actorId, id, motivo, expectedUpdatedAt, ctx));
+    const actor = await this.users.findById(actorId);
+    assertAdmin(actor);
+    const estimate = await this.require(id);
+    const versions = await this.estimates.findVersions(id);
+    if (!canAdministrativelyCancelEstimate(estimate.estado, versions.length))
+      throw new ConflictError("Solo se puede anular una propuesta publicada que no esté firmada ni convertida en obra");
+    const reason = typeof motivo === "string" ? motivo.trim() : "";
+    if (reason.length < 10 || reason.length > 1_000)
+      throw new ValidationError("Explica el motivo de la anulación (entre 10 y 1.000 caracteres)", "motivo");
+    const saved = await this.estimates.update(id, {
+      estado: "anulado", motivoAnulacion: reason,
+    }, expectedUpdatedAt);
+    await this.events.emit({
+      type: "EstimateCancelled", eventId: crypto.randomUUID(), occurredAt: new Date(),
+      actorId: actor.id, actorName: actor.nombre, ip: ctx.ip, userAgent: ctx.userAgent,
+      estimateId: id, motivo: reason,
     });
     return saved;
   }
@@ -825,6 +862,7 @@ export class EstimateUseCases {
         expired && estimate.estado === "enviado" ? "caducado" : estimate.estado,
       versionActual: version?.version ?? estimate.versionActual,
       motivoRechazo: estimate.motivoRechazo,
+      motivoAnulacion: estimate.motivoAnulacion ?? null,
       createdAt: estimate.createdAt,
       updatedAt: estimate.updatedAt,
       propuesta: snapshot
@@ -857,6 +895,7 @@ export class EstimateUseCases {
       estado: estimate.estado,
       versionActual: estimate.versionActual,
       motivoRechazo: estimate.motivoRechazo,
+      motivoAnulacion: estimate.motivoAnulacion ?? null,
       createdAt: estimate.createdAt,
       updatedAt: estimate.updatedAt,
       propuesta: {
@@ -888,6 +927,9 @@ export class ChangeOrderUseCases {
   ) {}
   async edit(actorId: number, projectId: number, id: number, payload: EstimateDraft) {
     assertAdmin(await this.users.findById(actorId));
+    const project = await this.projects.findById(projectId);
+    if (!project) throw new NotFoundError("Proyecto");
+    if (project.archivedAt) throw new ConflictError("La obra está archivada y es de solo lectura");
     validateDraft(payload);
     const order = (await this.changes.findByProject(projectId)).find(item => item.id === id);
     if (!order) throw new NotFoundError("Orden de cambio");
@@ -899,6 +941,7 @@ export class ChangeOrderUseCases {
     if (!actor?.activo) throw new ForbiddenError();
     const project = await this.projects.findById(projectId);
     if (!project) throw new NotFoundError("Proyecto");
+    if (project.archivedAt) throw new ConflictError("La obra está archivada y es de solo lectura");
     const order = (await this.changes.findByProject(projectId)).find(item => item.id === id);
     if (!order) throw new NotFoundError("Orden de cambio");
     if (next === "enviado") {
@@ -922,7 +965,7 @@ export class ChangeOrderUseCases {
     const actor = await this.users.findById(actorId);
     if (!actor?.activo) throw new ForbiddenError();
     const project = await this.projects.findById(projectId);
-    if (!project || (actor.rol !== "admin" && project.clienteId !== actor.id))
+    if (!project || (actor.rol !== "admin" && (project.clienteId !== actor.id || Boolean(project.archivedAt))))
       throw new NotFoundError("Proyecto");
 
     const orders = await this.changes.findByProject(projectId);
@@ -946,8 +989,10 @@ export class ChangeOrderUseCases {
   }
   async create(actorId: number, projectId: number, payload: EstimateDraft) {
     assertAdmin(await this.users.findById(actorId));
-    if (!(await this.projects.findById(projectId)))
+    const project = await this.projects.findById(projectId);
+    if (!project)
       throw new NotFoundError("Proyecto");
+    if (project.archivedAt) throw new ConflictError("La obra está archivada y es de solo lectura");
     validateDraft(payload);
     return this.changes.save({
       projectId,

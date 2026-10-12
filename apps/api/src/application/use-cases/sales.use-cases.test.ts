@@ -60,6 +60,31 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     await expect(estimateUseCases.update(admin.id, shell.id, { ...draft, titulo: "Edición obsoleta" }, shell.updatedAt)).rejects.toBeInstanceOf(ConflictError);
   });
 
+  it("lets only administration delete an unpublished draft", async () => {
+    const { users, clientA, opportunityA, estimates, estimateUseCases } = await setup();
+    const admin = await users.save({ id: 0, email: Email.of("delete-draft@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    const pending = await estimates.save({ oportunidadId: opportunityA.id, clienteId: clientA.id, numero: "HOG-DELETE", titulo: draft.titulo, estado: "borrador", versionActual: 1, borrador: draft, motivoRechazo: null, motivoAnulacion: null });
+
+    await expect(estimateUseCases.deleteDraft(clientA.id, pending.id, pending.updatedAt, { ip: "test", userAgent: "vitest" })).rejects.toBeInstanceOf(ForbiddenError);
+    await estimateUseCases.deleteDraft(admin.id, pending.id, pending.updatedAt, { ip: "test", userAgent: "vitest" });
+
+    expect(await estimates.findById(pending.id)).toBeNull();
+    await expect(estimateUseCases.deleteDraft(admin.id, pending.id, pending.updatedAt, { ip: "test", userAgent: "vitest" })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("annuls a published proposal without deleting its immutable version", async () => {
+    const { users, clientA, estimateA, estimates, estimateUseCases } = await setup();
+    const admin = await users.save({ id: 0, email: Email.of("cancel-estimate@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+    await expect(estimateUseCases.cancel(clientA.id, estimateA.id, "Cambio administrativo justificado", estimateA.updatedAt, { ip: "test", userAgent: "vitest" })).rejects.toBeInstanceOf(ForbiddenError);
+
+    const cancelled = await estimateUseCases.cancel(admin.id, estimateA.id, "El alcance comercial ha quedado sin efecto", estimateA.updatedAt, { ip: "test", userAgent: "vitest" });
+
+    expect(cancelled).toMatchObject({ estado: "anulado", motivoAnulacion: "El alcance comercial ha quedado sin efecto" });
+    expect(await estimates.findVersions(estimateA.id)).toHaveLength(1);
+    expect((await estimateUseCases.publicGet(clientA.id, estimateA.id)).motivoAnulacion).toContain("alcance comercial");
+    await expect(estimateUseCases.createRevision(admin.id, estimateA.id)).rejects.toBeInstanceOf(ConflictError);
+  });
+
   it("lets an administrator preview a draft without exposing internal fields to the client", async () => {
     const { users, clientA, opportunityA, estimates, estimateUseCases } = await setup();
     const admin = await users.save({ id: 0, email: Email.of("preview-admin@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");

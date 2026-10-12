@@ -93,6 +93,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
       "notification-outbox.sql",
       "commercial-workflow.sql",
       "durable-audit.sql",
+      "administrative-retirement.sql",
     ])
       await db.exec(
         await readFile(

@@ -5,8 +5,10 @@ export type AppNotificationType =
   | "estimate_published"
   | "estimate_signed"
   | "estimate_rejected"
+  | "estimate_cancelled"
   | "project_created"
   | "project_updated"
+  | "project_archived"
   | "project_assigned"
   | "project_unassigned"
   | "document_uploaded"
@@ -48,7 +50,7 @@ export interface NotificationIntent {
   occurredAt: string;
 }
 
-const highPriority = new Set<AppNotificationType>(["estimate_published", "estimate_signed", "estimate_rejected", "change_order_sent", "change_order_decided", "work_reviewed"]);
+const highPriority = new Set<AppNotificationType>(["estimate_published", "estimate_signed", "estimate_rejected", "estimate_cancelled", "project_archived", "change_order_sent", "change_order_decided", "work_reviewed"]);
 const uniqueRecipients = (ids: Array<number | null | undefined>, actorId: number) => [...new Set(ids.filter((id): id is number => Number.isSafeInteger(id) && id! > 0 && id !== actorId))];
 
 export function buildNotificationIntents(event: NotificationSourceEvent): NotificationIntent[] {
@@ -63,6 +65,7 @@ export function buildNotificationIntents(event: NotificationSourceEvent): Notifi
     case "estimate_published": add([event.clientId], event.kind); break;
     case "estimate_signed":
     case "estimate_rejected": add(admins, event.kind); break;
+    case "estimate_cancelled": add([event.clientId], event.kind); break;
     case "project_created": add([event.clientId], event.kind); break;
     case "project_updated":
       add([event.clientId], event.kind);
@@ -70,6 +73,10 @@ export function buildNotificationIntents(event: NotificationSourceEvent): Notifi
       if (event.actorRole === "profesional") add(admins, event.kind);
       add(added, "project_assigned");
       add(removed, "project_unassigned");
+      break;
+    case "project_archived":
+      add([event.clientId], event.kind);
+      add(professionals, event.kind);
       break;
     case "project_assigned": add([event.professionalId], event.kind); break;
     case "project_unassigned": add([event.professionalId], event.kind); break;
@@ -100,8 +107,10 @@ export const NOTIFICATION_COPY: Record<AppNotificationType, { title: string; sum
   estimate_published: { title: "Nueva propuesta disponible", summary: "Tienes una propuesta disponible en tu área privada." },
   estimate_signed: { title: "Propuesta firmada", summary: "Un cliente ha firmado una propuesta." },
   estimate_rejected: { title: "Cambios solicitados", summary: "Un cliente ha solicitado cambios en una propuesta." },
+  estimate_cancelled: { title: "Propuesta anulada", summary: "Administración ha anulado una propuesta. Consulta el área privada para ver su estado." },
   project_created: { title: "Obra disponible", summary: "Tu obra ya está disponible en el área privada." },
   project_updated: { title: "Novedades en una obra", summary: "Se ha actualizado información relevante de una obra." },
+  project_archived: { title: "Obra archivada", summary: "Administración ha cerrado y archivado una obra. Su histórico se conserva." },
   project_assigned: { title: "Nueva obra asignada", summary: "Se te ha asignado una obra." },
   project_unassigned: { title: "Asignación finalizada", summary: "Ha finalizado una de tus asignaciones de obra." },
   document_uploaded: { title: "Nuevo documento", summary: "Se ha añadido documentación que puedes consultar." },

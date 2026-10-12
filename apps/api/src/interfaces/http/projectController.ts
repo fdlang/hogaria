@@ -4,7 +4,7 @@
  * are enforced inside the use cases via PermissionPolicy.
  */
 
-import { AssignProjectProfessionalUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "../../application/use-cases/project.use-cases.js";
+import { ArchiveProjectUseCase, AssignProjectProfessionalUseCase, GetProjectUseCase, ListProjectsUseCase, UnassignProjectProfessionalUseCase, UpdateProjectUseCase } from "../../application/use-cases/project.use-cases.js";
 import { Project } from "@reformapro/domain/entities";
 import { aggregateFiscalSnapshots } from "@reformapro/domain";
 import type { IUserRepository } from "@reformapro/domain/repositories";
@@ -34,6 +34,7 @@ export function toProjectDTO(p: Project, audience: "full" | "professional" | "cl
     clienteId: p.clienteId,
     presupuesto: p.presupuesto.amount,
     financialSummary: p.fiscalSnapshots?.length ? aggregateFiscalSnapshots(p.fiscalSnapshots) : null,
+    ...(audience === "full" ? { archivedAt: p.archivedAt?.toISOString() ?? null, archiveReason: p.archiveReason ?? null } : {}),
   };
   return commercial;
 }
@@ -45,6 +46,7 @@ export function projectController(deps: {
   get: GetProjectUseCase;
   assign: AssignProjectProfessionalUseCase;
   unassign: UnassignProjectProfessionalUseCase;
+  archive: ArchiveProjectUseCase;
 }) {
   const positiveId = (value: unknown, field = "id") => {
     const id = typeof value === "number" ? value : Number(value);
@@ -97,13 +99,21 @@ export function projectController(deps: {
       } catch (e) { return toHttpError(e); }
     },
 
+    async archive(req: HttpRequest & { actorId: number; params: { id: string } }): Promise<HttpResponse> {
+      try {
+        const body = (req.body ?? {}) as { reason?: string; revision?: number };
+        const project = await deps.archive.execute({ actorId: req.actorId, projectId: positiveId(req.params.id), reason: body.reason ?? "", revision: Number(body.revision), ctx: ctxOf(req) });
+        return { status: 200, body: await dtoFor(req.actorId, project) };
+      } catch (e) { return toHttpError(e); }
+    },
+
     // GET /projects
     async list(req: HttpRequest & { actorId: number; query: { page?: string; limit?: string; search?: string; status?: string } }): Promise<HttpResponse> {
       try {
         if (wantsPagination(req.query)) {
           const status = req.query.status ?? "all";
-          if (!["all","planificacion","en_curso","pausado","finalizado"].includes(status)) throw new ValidationError("Estado no válido", "status");
-          const page = await deps.list.executePage({ actorId: req.actorId, ...parsePagination(req.query), search: (req.query.search ?? "").trim().slice(0, 100), status: status as Project["estado"] | "all" });
+          if (!["all","planificacion","en_curso","pausado","finalizado","archivado"].includes(status)) throw new ValidationError("Estado no válido", "status");
+          const page = await deps.list.executePage({ actorId: req.actorId, ...parsePagination(req.query), search: (req.query.search ?? "").trim().slice(0, 100), status: status as Project["estado"] | "archivado" | "all" });
           return { status: 200, body: { ...page, items: await Promise.all(page.items.map(project => dtoFor(req.actorId, project))) } };
         }
         const projects = await deps.list.execute({ actorId: req.actorId });

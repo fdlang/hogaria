@@ -18,7 +18,7 @@ import { FilesApi, useProjectFiles } from "@/features/files/api/files.api";
 import { usePermissions } from "@/shared/hooks/usePermissions";
 import { useNotifications } from "@/shared/ui/notifications";
 import { useConfirm } from "@/shared/ui/confirm";
-import { Button, Spinner, Badge, EmptyState } from "@/shared/ui";
+import { Button, Spinner, Badge, EmptyState, Modal } from "@/shared/ui";
 import { PageHeader } from "@/shared/ui/page-header";
 import { ProjectStatusBadge, ProfesionBadge } from "@/shared/ui/badges";
 import { formatMoney, formatDate, formatBytes } from "@/shared/lib/formatters";
@@ -48,6 +48,9 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const projectAction = useRef(new ExclusiveAction());
   const [projectSaving, setProjectSaving] = useState(false);
   const [planningSaving, setPlanningSaving] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [archiveReason, setArchiveReason] = useState("");
+  const [archiving, setArchiving] = useState(false);
 
   const runProjectAction = (action: () => Promise<unknown>) => projectAction.current.run(async () => {
     setProjectSaving(true);
@@ -126,6 +129,20 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
     }
   };
 
+  const handleArchive = async () => {
+    if (!project.data || archiveReason.trim().length < 10) return;
+    try {
+      setArchiving(true);
+      await apis.projects.archive(projectId, archiveReason.trim(), project.data.revision ?? 0);
+      await project.refresh();
+      setShowArchive(false);
+      setArchiveReason("");
+      push("Obra archivada. El histórico se conserva.", "success");
+    } catch (cause) {
+      push((cause as { message?: string }).message ?? "No se pudo archivar la obra", "error");
+    } finally { setArchiving(false); }
+  };
+
   const handleFileUpload = async (file: File, sensitive: boolean, classification?: "publico" | "tecnico" | "contrato" | "factura" | "reservado") => {
     try { await files.upload(file, sensitive, classification); push(`${file.name} subido`, "success"); }
     catch (e) { push((e as { message?: string }).message ?? "Error", "error"); }
@@ -161,10 +178,10 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   }
 
   const p = project.data;
-  const canUpdateProgress = can("project.update.progress",   { project: p as never });
-  const canEditMilestones = can("project.update.milestones", { project: p as never });
-  const canManageProject  = can("project.update");
-  const canUploadFiles    = can("project.read", { project: p as never });
+  const canUpdateProgress = !p.archivedAt && can("project.update.progress",   { project: p as never });
+  const canEditMilestones = !p.archivedAt && can("project.update.milestones", { project: p as never });
+  const canManageProject  = !p.archivedAt && can("project.update");
+  const canUploadFiles    = !p.archivedAt && can("project.read", { project: p as never });
   const projectAssignments = p.profesionalesAsignados ?? [];
   const assignableProfessionals = (professionals.data ?? []).filter(item => item.activo && item.profesion && !projectAssignments.some(assignment => assignment.userId === item.id));
   const nextStates: Record<ProjectDTO["estado"], ProjectDTO["estado"][]> = { planificacion: ["en_curso"], en_curso: ["pausado", "finalizado"], pausado: ["en_curso", "finalizado"], finalizado: [] };
@@ -181,6 +198,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
         subtitle={`${p.direccion} · ${p.tipo}`}
         actions={<>
           <ProjectStatusBadge estado={p.estado} />
+          {p.archivedAt && <Badge color="#71685e">ARCHIVADO</Badge>}
           {isProfesional && ["planificacion", "en_curso"].includes(p.estado) && (
             <a className="professional-work-link" href={`#/profesional/work?projectId=${p.id}`}>
               Registrar trabajo
@@ -188,6 +206,13 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           )}
         </>}
       />
+      {isAdmin && !p.archivedAt && <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+        <Button small variant="danger" onClick={() => setShowArchive(true)}>{p.estado === "finalizado" ? "Archivar obra" : "Cancelar y archivar obra"}</Button>
+      </div>}
+      {p.archivedAt && <div className="project-detail__section" role="status" style={{ marginBottom: 20, padding: 16 }}>
+        <strong>Obra archivada el {formatDate(p.archivedAt)}</strong>
+        {p.archiveReason && <p style={{ marginTop: 6 }}>{p.archiveReason}</p>}
+      </div>}
       {isAdmin && nextStates[p.estado].length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
         {nextStates[p.estado].map(estado => <Button key={estado} small variant="ghost" loading={transitioning === estado} disabled={transitioning !== null || (estado === "en_curso" && p.estado === "planificacion" && !startReady) || (estado === "finalizado" && p.progreso !== 100)} onClick={() => void handleTransition(estado)}>{estado === "en_curso" ? "Iniciar/Reanudar obra" : estado === "pausado" ? "Pausar obra" : "Finalizar obra"}</Button>)}
         {p.estado === "planificacion" && !startReady && <p style={{ width: "100%", color: "#71685e", fontSize: 12 }}>Completa las fechas, asigna un profesional y crea al menos un hito para iniciar la obra.</p>}
@@ -331,7 +356,15 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           )}
         </aside>
       </div>
-      {(isAdmin || isCliente) && <ChangeOrders api={apis.projects} projectId={projectId} admin={isAdmin} onChanged={project.refresh} />}
+      {(isAdmin || isCliente) && <ChangeOrders api={apis.projects} projectId={projectId} admin={isAdmin && !p.archivedAt} onChanged={project.refresh} />}
+      <Modal open={showArchive} onClose={() => { if (!archiving) { setShowArchive(false); setArchiveReason(""); } }} title={p.estado === "finalizado" ? "Archivar obra" : "Cancelar y archivar obra"} width={560}>
+        <p>La obra desaparecerá de las áreas operativas del cliente y los profesionales. Se conservarán presupuesto, firma, documentos, órdenes y jornadas.</p>
+        <label>Motivo *<textarea rows={4} minLength={10} maxLength={1000} value={archiveReason} onChange={event => setArchiveReason(event.target.value)} placeholder="Explica el motivo del cierre administrativo" /></label>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
+          <Button variant="ghost" disabled={archiving} onClick={() => { setShowArchive(false); setArchiveReason(""); }}>Volver</Button>
+          <Button variant="danger" loading={archiving} disabled={archiveReason.trim().length < 10} onClick={() => void handleArchive()}>{p.estado === "finalizado" ? "Archivar" : "Cancelar y archivar"}</Button>
+        </div>
+      </Modal>
     </section>
   );
 }

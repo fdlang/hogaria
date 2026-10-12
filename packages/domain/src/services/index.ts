@@ -13,6 +13,7 @@ export class PermissionPolicy {
 
   static can(user: User, action: Action, context: { project?: Project } = {}) {
     if (user.rol === "admin") return true;
+    if (context.project?.archivedAt) return false;
     if (action === "project.read" && user.rol === "cliente") return context.project?.clienteId === user.id;
     if (user.rol !== "profesional" || !user.profesion || !context.project?.profesionalesAsignados.some(professional => professional.userId === user.id)) return false;
     return action === "project.read" || action === "project.update.progress" || action === "project.update.milestones";

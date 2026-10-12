@@ -101,7 +101,9 @@ export class UserNotifications {
       if (!project) throw new NotFoundError("Proyecto");
       event.projectId = project.id;
       if (raw.payload.clientVisible !== false) event.clientId = project.clienteId;
-      event.professionalIds = project.profesionalesAsignados.map(item => item.userId);
+      event.professionalIds = raw.kind === "project_archived"
+        ? integerArray(raw.payload.professionalIds)
+        : project.profesionalesAsignados.map(item => item.userId);
       event.addedProfessionalIds = integerArray(raw.payload.addedProfessionalIds);
       event.removedProfessionalIds = integerArray(raw.payload.removedProfessionalIds);
       return event;
