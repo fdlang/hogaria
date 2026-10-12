@@ -11,4 +11,5 @@
 - Validación: typecheck, 272 pruebas API, 80 web, 37 dominio y builds correctos.
 - Validación navegador: 138 escenarios Chromium/WebKit correctos.
 - Auditorías finales frontend, backend y seguridad sin bloqueos de código confirmados.
-- Pendiente: commit, migrar producción con el runner versionado y desplegar el mismo commit.
+- Commit validado: 5adefd4 (`fix: harden private workflows and retained history`).
+- Pendiente: migrar producción con el runner versionado y desplegar el mismo commit.

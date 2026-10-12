@@ -68,8 +68,9 @@ npm run db:migrate --workspace @reformapro/api
 ```
 
 El comando principal aplica de forma idempotente el esquema base y las
-ampliaciones de jornadas, notificaciones, flujo comercial y auditoría. Debe
-ejecutarse una vez contra cada base tras desplegar cambios de esquema.
+ampliaciones de jornadas, notificaciones, flujo comercial, auditoría,
+retención histórica y limpieza durable de archivos. Debe ejecutarse una vez
+contra cada base antes de publicar código que dependa de cambios de esquema.
 
 La primera ejecución puede crear un administrador usando las variables
 `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME` de `apps/api/.env`.
@@ -157,7 +158,9 @@ ruta concreta; no debe reutilizarse el destino de otra obra.
 - Los binarios se guardan en Vercel Blob privado (`BLOB_READ_WRITE_TOKEN`).
   PostgreSQL conserva sus metadatos y clasificación; la API comprueba permisos
   específicos de contrato/factura antes de servir cada descarga. Los documentos
-  sensibles antiguos sin clasificar no se muestran a profesionales.
+  sensibles antiguos sin clasificar no se muestran a profesionales. Las cargas
+  se registran antes de escribirse y una cola con periodo de gracia, referencias
+  y backoff recupera eliminaciones incompletas sin borrar archivos válidos.
 
 ## Jornadas y costes
 

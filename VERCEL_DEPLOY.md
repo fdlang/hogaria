@@ -6,14 +6,18 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
 ## Configuración
 
 1. Importa el repositorio en Vercel con la raíz del repositorio, no `apps/web`.
-2. Vercel leerá `vercel.json`, instalará los workspaces y ejecutará el build de
-   `@reformapro/web`. En Production, el build valida las variables críticas y
-   falla antes de sustituir la versión estable si falta alguna.
-3. Crea una base PostgreSQL gestionada y aplica la migración antes de publicar:
+2. Vercel leerá `vercel.json`, instalará los workspaces, generará el bundle
+   serverless de la API y construirá `@reformapro/web`. En Production, el build
+   valida las variables críticas y falla antes de sustituir la versión estable
+   si falta alguna.
+3. Crea una base PostgreSQL gestionada y aplica las migraciones incrementales antes de publicar:
    `npm run db:migrate --workspace @reformapro/api`.
 
    El runner principal aplica de forma idempotente el esquema base y todas las
-   ampliaciones incluidas en el repositorio.
+   ampliaciones incluidas en el repositorio. El lote actual protege el histórico
+   laboral y contractual, añade revisión optimista a órdenes de cambio y crea la
+   cola durable de limpieza Blob. La migración es compatible con la versión
+   anterior mientras Vercel construye el nuevo artefacto.
    A continuación ejecuta `npm run preflight:production`: esta comprobación es
    de solo lectura y bloquea el despliegue si faltan migraciones, las sumas de
    control no coinciden o hay firmas históricas sin una clave verificable.
@@ -58,13 +62,16 @@ repetir la migración.
 Antes de activar el correo de los avisos, configura Resend, `APP_URL` con HTTPS y
 el secreto del cron; después establece `CLIENT_NOTIFICATIONS_ENABLED=true`.
 Los presupuestos solo se descargan: los avisos no adjuntan PDF. El cron
-reintenta de forma independiente los eventos y correos pendientes.
+reintenta de forma independiente los eventos y correos pendientes y completa
+las eliminaciones Blob registradas en la cola durable.
 
 ## Publicación y verificación
 
 La integración Git de Vercel publica `main` en Production. Antes del push deben
 pasar `npm run typecheck`, `npm run test`, `npm run build` y las pruebas de
-navegador del frontend. Tras el push, comprueba que el despliegue esté `Ready`,
+navegador del frontend. Aplica primero las migraciones y ejecuta
+`npm run preflight:database`; solo entonces publica el mismo commit. Tras el
+push, comprueba que el despliegue esté `Ready`,
 que los alias `hogaria.design` y `www.hogaria.design` apunten a esa versión y
 realiza una comprobación funcional de landing, acceso y una ruta `/api`.
 

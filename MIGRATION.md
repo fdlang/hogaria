@@ -29,7 +29,7 @@ api/             Entrypoints serverless de Vercel
 | Presupuestos y versiones | `sales.use-cases.ts`, `estimate-document.use-cases.ts` y `features/sales/` |
 | Obras y asignaciones | `project.use-cases.ts`, `project-professionals.use-cases.test.ts` y `features/projects/` |
 | Jornadas, tarifas y costes | `work-tracking.use-cases.ts`, `postgresWorkStore.ts` y `features/work/` |
-| Documentos privados | `file.use-cases.ts`, `professional-document.use-cases.ts` y Vercel Blob |
+| Documentos privados | `file.use-cases.ts`, `professional-document.use-cases.ts`, `blobCleanupQueue.ts` y Vercel Blob |
 | Solicitudes comerciales | `solicitud.use-cases.ts` y `features/solicitudes/` |
 | Auditoría | `infrastructure/audit/`, repositorios PostgreSQL y `features/audit/` |
 | Reglas puras | `packages/domain/src/*.ts` y `packages/domain/src/rules/` |
@@ -45,6 +45,12 @@ punto de entrada operativo es:
 ```bash
 npm run db:migrate --workspace @reformapro/api
 ```
+
+Las migraciones incrementales actuales preservan el histórico de obras y
+jornadas, añaden revisión optimista a las órdenes de cambio y mantienen una
+cola durable para reconciliar objetos Blob sin metadatos. Son compatibles con
+la versión anterior durante el despliegue y deben aplicarse antes de activar el
+nuevo artefacto.
 
 No se deben ejecutar migraciones de producción desde una sesión de desarrollo
 sin copia verificada, ventana de cambio y autorización explícita.
@@ -70,9 +76,9 @@ npm run build
 npm run test:browser --workspace @reformapro/web
 ```
 
-La referencia validada el 03/10/2026 ejecuta 299 tests unitarios y 122 pruebas
-de navegador. El build de Production comprueba además la configuración crítica
-antes de sustituir la versión estable.
+La referencia validada el 13/10/2026 ejecuta 389 pruebas unitarias y 138 pruebas
+de navegador en Chromium y WebKit. El build de Production comprueba además la
+configuración crítica antes de sustituir la versión estable.
 
 ## Criterio para cambios nuevos
 
