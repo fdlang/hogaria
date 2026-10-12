@@ -152,7 +152,7 @@ export class ArchiveProjectUseCase {
       throw new ValidationError("Explica el motivo del archivo (entre 10 y 1.000 caracteres)", "reason");
     const previousProfessionalIds = project.profesionalesAsignados.map(item => item.userId);
     const archived = await this.projects.update(project.id, {
-      archivedAt: new Date(), archiveReason: reason, profesionalesAsignados: [],
+      archivedAt: new Date(), archiveReason: reason,
     }, project.revision ?? 0);
     await this.events.emit({
       type: "ProjectArchived", eventId: crypto.randomUUID(), occurredAt: new Date(),

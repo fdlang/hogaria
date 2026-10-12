@@ -121,11 +121,13 @@ export function WorkProjectSummary({
   id,
   revision,
   onSaved,
+  readOnly = false,
 }: {
   api: WorkApi;
   id: number;
   revision: number;
   onSaved: () => void;
+  readOnly?: boolean;
 }) {
   const query = useWorkQuery(() => api.summary(id), [api, id, revision]);
   const s = query.value;
@@ -164,7 +166,7 @@ export function WorkProjectSummary({
               </li>
             ))}
           </ul>
-          <details>
+          {!readOnly && <details>
             <summary>Editar previsión de mano de obra</summary>
             <WorkForm
               onSubmit={async (d) => {
@@ -194,7 +196,7 @@ export function WorkProjectSummary({
               />
               <Field name="reason" label="Motivo del cambio" />
             </WorkForm>
-          </details>
+          </details>}
         </>
       )}
     </section>

@@ -18,7 +18,7 @@ test("admin archives a project without erasing its history", async ({ page }) =>
     if (path === "/auth/me") return route.fulfill({ json: { id: 1, nombre: "Admin", rol: "admin", activo: true, email: "admin@test.es" } });
     if (path === "/projects/7/archive") {
       requestBody = route.request().postDataJSON();
-      project = { ...project, revision: 4, profesionalesAsignados: [], archivedAt: "2026-10-13T00:00:00.000Z", archiveReason: String(requestBody?.reason ?? "") };
+      project = { ...project, revision: 4, archivedAt: "2026-10-13T00:00:00.000Z", archiveReason: String(requestBody?.reason ?? "") };
       return route.fulfill({ json: project });
     }
     if (path === "/projects/7") return route.fulfill({ json: project });
@@ -38,4 +38,8 @@ test("admin archives a project without erasing its history", async ({ page }) =>
   await expect(page.getByText("ARCHIVADO")).toBeVisible();
   await expect(page.getByText("Cancelación acordada y cierre administrativo")).toBeVisible();
   await expect(page.getByRole("button", { name: "Cancelar y archivar obra" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Pausar obra" })).toHaveCount(0);
+  await expect(page.getByText("Reformista")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Quitar" })).toHaveCount(0);
+  await expect(page.getByText("No hay documentos conservados")).toBeVisible();
 });

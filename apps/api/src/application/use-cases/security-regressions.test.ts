@@ -142,6 +142,23 @@ describe("Security and integrity regressions", () => {
     expect(markDeleting).toHaveBeenCalledWith(1);
     expect(removeFile).not.toHaveBeenCalled();
   });
+  it("preserves every document after its project is archived", async () => {
+    const { users, admin } = await setup();
+    const projects = new InMemoryProjectRepository();
+    const project = await projects.save({ id: 0, estimateId: 1, nombre: "Obra archivada", descripcion: "", clienteId: 2, direccion: "Madrid", tipo: "Reforma", estado: "pausado", progreso: { value: 20 }, presupuesto: { amount: 100 }, fechaInicio: new Date(), fechaFinPrevista: new Date(), profesionalesAsignados: [], hitos: [], archivedAt: new Date(), archiveReason: "Cierre administrativo", createdAt: new Date() } as never);
+    const markDeleting = vi.fn(), removeMetadata = vi.fn(), removeBlob = vi.fn();
+    const files = {
+      findById: async () => ({ id: 1, projectId: project.id, uploadedBy: admin.id, sensitive: false, storageKey: "file" }),
+      markDeleting,
+      delete: removeMetadata,
+    };
+    const deletion = new DeleteFileUseCase(users, projects, files as never, { delete: removeBlob } as never);
+
+    await expect(deletion.execute({ actorId: admin.id, fileId: 1 })).rejects.toThrow("archivada");
+    expect(markDeleting).not.toHaveBeenCalled();
+    expect(removeBlob).not.toHaveBeenCalled();
+    expect(removeMetadata).not.toHaveBeenCalled();
+  });
   it("keeps a failed metadata deletion hidden and retryable after removing the blob", async () => {
     const { users, admin } = await setup();
     const projects = new InMemoryProjectRepository();

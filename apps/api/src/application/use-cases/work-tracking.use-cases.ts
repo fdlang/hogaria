@@ -106,6 +106,7 @@ export class WorkTrackingUseCases {
     const project = await this.projects.findById(positiveId(projectId));
     if (
       !project ||
+      project.archivedAt ||
       !project.profesionalesAsignados.some((p) => p.userId === actorId)
     )
       throw new ForbiddenError();
@@ -295,6 +296,10 @@ export class WorkTrackingUseCases {
       (actor.rol !== "admin" && original.professionalId !== actorId)
     )
       throw new NotFoundError("Registro");
+    const project = await this.projects.findById(original.projectId);
+    if (!project) throw new NotFoundError("Proyecto");
+    if (project.archivedAt && actor.rol === "profesional" && input.action !== "salida")
+      throw new ConflictError("La obra está archivada; solo puedes cerrar una jornada que ya estaba abierta");
     return this.store.transaction(original.professionalId, async (repo) => {
       const entry = await repo.entry(entryId);
       if (!entry) throw new NotFoundError("Registro");
@@ -543,8 +548,9 @@ export class WorkTrackingUseCases {
   ) {
     await this.actor(actorId, true);
     positiveId(projectId);
-    if (!(await this.projects.findById(projectId)))
-      throw new NotFoundError("Proyecto");
+    const project = await this.projects.findById(projectId);
+    if (!project) throw new NotFoundError("Proyecto");
+    if (project.archivedAt) throw new ConflictError("La obra está archivada y su previsión laboral es inmutable");
     const plannedHours = number(input.plannedHours, "Horas"),
       plannedCostCents = number(input.plannedCostCents, "Coste", 1_000_000_000);
     if (!Number.isInteger(plannedCostCents))

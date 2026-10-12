@@ -56,6 +56,9 @@ export function WorkPage({
     () => projects.list(),
     [projects, revision],
   );
+  const selectedProject = projectQuery.value?.find(
+    (project) => project.id === filters.projectId,
+  );
   const people = useWorkQuery(
     () => (isAdmin ? users.list("profesional") : Promise.resolve([])),
     [users, isAdmin],
@@ -110,7 +113,7 @@ export function WorkPage({
               <option value="">Todas las obras</option>
               {projectQuery.value?.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.nombre}
+                  {p.nombre}{p.archivedAt ? " (archivada)" : ""}
                 </option>
               ))}
             </select>
@@ -245,6 +248,7 @@ export function WorkPage({
               id={filters.projectId}
               revision={revision}
               onSaved={saved}
+              readOnly={Boolean(selectedProject?.archivedAt)}
             />
           ) : (
             <p>Selecciona una obra para ver sus estadísticas y previsión.</p>

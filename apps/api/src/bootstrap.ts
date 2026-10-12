@@ -297,7 +297,7 @@ export async function buildApp(): Promise<AppDependencies> {
     activation,
     work: new WorkTrackingUseCases(users, projects, workStore),
     professionalDocuments: new ProfessionalDocumentUseCases(users, professionalDocuments, fileStorage),
-    retryPendingDeletions: new RetryPendingDeletionsUseCase(files, professionalDocuments, fileStorage),
+    retryPendingDeletions: new RetryPendingDeletionsUseCase(files, professionalDocuments, fileStorage, projects),
   };
 
   return { users, tokens, useCases };

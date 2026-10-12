@@ -5,7 +5,7 @@ import type { ChangeOrderDTO } from "../api/sales.api";
 import { formatMoney } from "@/shared/lib/formatters";
 import { CURRENT_FISCAL_POLICY } from "@reformapro/domain";
 
-export function ChangeOrders({ api, projectId, admin, onChanged }: { api: ProjectsApi; projectId: number; admin: boolean; onChanged: () => Promise<unknown> }) {
+export function ChangeOrders({ api, projectId, admin, readOnly = false, onChanged }: { api: ProjectsApi; projectId: number; admin: boolean; readOnly?: boolean; onChanged: () => Promise<unknown> }) {
   const [items, setItems] = useState<ChangeOrderDTO[]>([]);
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -35,7 +35,7 @@ export function ChangeOrders({ api, projectId, admin, onChanged }: { api: Projec
     </header>
     {error && <p className="project-change-orders__alert" role="alert">{error}</p>}
     {loading && <p role="status">Cargando órdenes de cambio…</p>}
-    {admin && <form className="project-change-orders__form" onSubmit={event => { event.preventDefault(); void run(async () => {
+    {admin && !readOnly && <form className="project-change-orders__form" onSubmit={event => { event.preventDefault(); void run(async () => {
       const draft = { titulo: description.trim(), validezDias: 30, condicionesPago: conditions, garantia: "", notasCliente: "", notasInternas: "", partidas: [{ id: crypto.randomUUID(), categoria: "Ampliación", descripcion: description.trim(), cantidad: 1, unidad: "global", precioVentaUnitario: Number(price), costeUnitario: null, descuento: 0, iva: vat }] };
       if (editing) await api.editChange(projectId, editing.id, draft); else await api.createChange(projectId, draft);
       setDescription(""); setPrice(""); setConditions(""); setEditing(null);
@@ -56,14 +56,14 @@ export function ChangeOrders({ api, projectId, admin, onChanged }: { api: Projec
         {proposal?.partidas.map(line => <p key={line.id}>{line.descripcion} · {formatMoney(line.cantidad * line.precioVentaUnitario * (1-line.descuento/100))} sin IVA · IVA {line.iva}%{line.pendingConfirmation && <strong className="estimate-pending-confirmation"> · ESTIMACIÓN PENDIENTE DE CONFIRMACIÓN</strong>}</p>)}
         <p>{proposal?.condicionesPago}</p>
         <p><strong>Total de la ampliación con IVA: {formatMoney(total)}</strong></p>
-        {admin && item.estado === "borrador" && <div className="project-change-order__actions">
+        {admin && !readOnly && item.estado === "borrador" && <div className="project-change-order__actions">
           {item.payload?.partidas.length === 1 && <Button variant="ghost" disabled={busy} onClick={() => {
             const payload = item.payload!; const line = payload.partidas[0]!;
             setEditing(item); setDescription(payload.titulo); setPrice(String(line.cantidad*line.precioVentaUnitario*(1-line.descuento/100))); setConditions(payload.condicionesPago); setVat(line.iva);
           }}>Editar borrador</Button>}
           <Button disabled={busy || editing?.id === item.id} onClick={() => void run(() => api.decideChange(projectId, item.id, "enviado"))}>Publicar para aprobación</Button>
         </div>}
-        {!admin && item.estado === "enviado" && <div className="project-change-order__actions">
+        {!admin && !readOnly && item.estado === "enviado" && <div className="project-change-order__actions">
           <Button small variant="ghost" disabled={busy} onClick={() => { setSelected(item.id); setPassword(""); }}>Revisar decisión</Button>
           {selected === item.id && <div className="project-change-order__decision"><label>Confirma tu contraseña<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></label>
             <p>Al aprobar aceptas el alcance y el importe indicado, que se añadirá a tu obra.</p>

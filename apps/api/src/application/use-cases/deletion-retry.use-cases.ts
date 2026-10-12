@@ -1,5 +1,6 @@
 import type { IFileRepository, IFileStorage } from "./file.use-cases.js";
 import type { IProfessionalDocumentRepository } from "./professional-document.use-cases.js";
+import type { IProjectRepository } from "@reformapro/domain/repositories";
 
 export interface PendingDeletionRepository {
   findDeleting(limit: number): Promise<Array<{ id: number; storageKey: string }>>;
@@ -12,6 +13,7 @@ export class RetryPendingDeletionsUseCase {
     private readonly files: Pick<IFileRepository, "findDeleting" | "delete">,
     private readonly documents: Pick<IProfessionalDocumentRepository, "findDeleting" | "delete">,
     private readonly storage: Pick<IFileStorage, "delete">,
+    private readonly projects: Pick<IProjectRepository, "findById">,
   ) {}
 
   async execute(requestedLimit = 50): Promise<{ processed: number; deleted: number; failed: number }> {
@@ -22,15 +24,27 @@ export class RetryPendingDeletionsUseCase {
     ]);
     let deleted = 0;
     let failed = 0;
-    for (const [repository, records] of [[this.files, files], [this.documents, documents]] as const) {
-      for (const record of records) {
-        try {
-          await this.storage.delete(record.storageKey);
-          await repository.delete(record.id);
-          deleted += 1;
-        } catch {
+    for (const record of files) {
+      try {
+        const project = await this.projects.findById(record.projectId);
+        if (!project || project.archivedAt) {
           failed += 1;
+          continue;
         }
+        await this.storage.delete(record.storageKey);
+        await this.files.delete(record.id);
+        deleted += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    for (const record of documents) {
+      try {
+        await this.storage.delete(record.storageKey);
+        await this.documents.delete(record.id);
+        deleted += 1;
+      } catch {
+        failed += 1;
       }
     }
     return { processed: files.length + documents.length, deleted, failed };

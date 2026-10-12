@@ -89,11 +89,13 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   beforeAll(async () => {
     for (const file of [
       "schema.sql",
+      "work-tracking.sql",
       "client-notifications.sql",
       "notification-outbox.sql",
       "commercial-workflow.sql",
       "durable-audit.sql",
       "administrative-retirement.sql",
+      "project-retention-hardening.sql",
     ])
       await db.exec(
         await readFile(
@@ -105,7 +107,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   afterAll(() => db.close());
   beforeEach(async () => {
     await db.exec(
-      "ALTER TABLE budget_versions DISABLE TRIGGER budget_version_no_truncate; TRUNCATE users CASCADE; ALTER TABLE budget_versions ENABLE TRIGGER budget_version_no_truncate; TRUNCATE client_email_notifications; TRUNCATE rate_limit_windows; DROP TRIGGER IF EXISTS test_failure ON estimates; DROP TRIGGER IF EXISTS activation_failure ON users;",
+      "ALTER TABLE budget_versions DISABLE TRIGGER budget_version_no_truncate; ALTER TABLE projects DISABLE TRIGGER project_history_no_truncate; ALTER TABLE project_files DISABLE TRIGGER project_files_no_truncate; ALTER TABLE work_budgets DISABLE TRIGGER work_budgets_no_truncate; TRUNCATE users CASCADE; ALTER TABLE work_budgets ENABLE TRIGGER work_budgets_no_truncate; ALTER TABLE project_files ENABLE TRIGGER project_files_no_truncate; ALTER TABLE projects ENABLE TRIGGER project_history_no_truncate; ALTER TABLE budget_versions ENABLE TRIGGER budget_version_no_truncate; TRUNCATE client_email_notifications; TRUNCATE rate_limit_windows; DROP TRIGGER IF EXISTS test_failure ON estimates; DROP TRIGGER IF EXISTS activation_failure ON users;",
     );
     adminId = (
       await users.save({
@@ -206,6 +208,33 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     expect((await projects.findById(project.id))?.presupuesto.amount).toBe(200);
     await expect(query("DELETE FROM projects WHERE id=$1",[project.id])).rejects.toThrow("histórico");
     await expect(query("UPDATE change_orders SET payload=$2 WHERE id=$1",[order.id,{...draft,titulo:"Changed"}])).rejects.toThrow("inmutable");
+  });
+  it("blocks physical project deletion even without published change orders", async () => {
+    const project = await projects.save({ id:0,estimateId,clienteId:clientId,nombre:"Obra protegida",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"planificacion",progreso:Percentage.zero(),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date() });
+
+    await expect(query("DELETE FROM projects WHERE id=$1", [project.id])).rejects.toThrow("histórico");
+    expect(await projects.findById(project.id)).not.toBeNull();
+  });
+  it("protects archived project files, labour forecasts and project truncation in the database", async () => {
+    const project = await projects.save({ id:0,estimateId,clienteId:clientId,nombre:"Obra archivada",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"pausado",progreso:Percentage.of(20),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date() });
+    const file = (await query("INSERT INTO project_files(project_id,payload) VALUES($1,$2) RETURNING id", [project.id, { deleting: false }])).rows[0] as { id: number };
+    await query("INSERT INTO work_budgets(project_id,payload) VALUES($1,$2)", [project.id, { plannedHours: 10, plannedCostCents: 10000 }]);
+    await projects.update(project.id, { archivedAt: new Date(), archiveReason: "Cierre administrativo" }, project.revision ?? 0);
+
+    await expect(query("DELETE FROM project_files WHERE id=$1", [file.id])).rejects.toThrow("archivada");
+    await expect(query("UPDATE project_files SET payload=jsonb_set(payload,'{deleting}','true') WHERE id=$1", [file.id])).rejects.toThrow("archivada");
+    await expect(query("UPDATE work_budgets SET payload=$2 WHERE project_id=$1", [project.id, { plannedHours: 20, plannedCostCents: 20000 }])).rejects.toThrow("archivada");
+    await expect(query("UPDATE projects SET payload=jsonb_set(payload,'{nombre}',to_jsonb('Alterada'::text)) WHERE id=$1", [project.id])).rejects.toThrow("archivada");
+    await expect(query("TRUNCATE projects CASCADE")).rejects.toThrow("histórico");
+    await expect(query("TRUNCATE project_files")).rejects.toThrow("historico");
+    await expect(query("TRUNCATE work_budgets")).rejects.toThrow("historico");
+  });
+  it("does not archive a project while a file deletion is pending", async () => {
+    const project = await projects.save({ id:0,estimateId,clienteId:clientId,nombre:"Obra con borrado pendiente",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"pausado",progreso:Percentage.of(20),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date() });
+    await query("INSERT INTO project_files(project_id,payload) VALUES($1,$2)", [project.id, { deleting: true }]);
+
+    await expect(projects.update(project.id, { archivedAt: new Date(), archiveReason: "Cierre administrativo" }, project.revision ?? 0)).rejects.toThrow("eliminaciones de archivos pendientes");
+    expect((await projects.findById(project.id))?.archivedAt).toBeNull();
   });
   it("returns bounded pages filtered by owner", async () => {
     await users.update(clientId, { activo: true });

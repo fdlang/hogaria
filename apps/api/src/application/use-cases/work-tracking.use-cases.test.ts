@@ -88,6 +88,42 @@ describe("work tracking isolation and lifecycle", () => {
     await s.projects.update(s.project.id, { estado: "planificacion" }, s.project.revision ?? 0);
     await expect(s.start()).rejects.toThrow("no está abierta");
   });
+  it("blocks new work in an archived project but lets an open shift be closed", async () => {
+    const s = await setup();
+    const entry = await s.start();
+    await s.projects.update(1, { archivedAt: new Date(), archiveReason: "Cierre administrativo" });
+
+    await expect(s.start()).rejects.toThrow();
+    await expect(s.work.part(3, {
+      projectId: 1,
+      operationId: crypto.randomUUID(),
+      startedAt: "2026-09-19T07:00:00.000Z",
+      endedAt: "2026-09-19T08:00:00.000Z",
+      units: 1,
+      breakMinutes: 0,
+    })).rejects.toThrow();
+    await expect(s.work.action(2, entry.id, { action: "pausa", revision: entry.revision })).rejects.toThrow("archivada");
+    s.at("2026-09-19T09:00:00Z");
+    await expect(s.work.action(2, entry.id, { action: "salida", revision: entry.revision })).resolves.toMatchObject({ status: "enviado" });
+  });
+  it("blocks new work in an archived project but lets an open shift be closed", async () => {
+    const s = await setup();
+    const entry = await s.start();
+    await s.projects.update(1, { archivedAt: new Date(), archiveReason: "Cierre administrativo" });
+
+    await expect(s.start()).rejects.toThrow();
+    await expect(s.work.part(3, {
+      projectId: 1,
+      operationId: crypto.randomUUID(),
+      startedAt: "2026-09-19T07:00:00.000Z",
+      endedAt: "2026-09-19T08:00:00.000Z",
+      units: 1,
+      breakMinutes: 0,
+    })).rejects.toThrow();
+    await expect(s.work.action(2, entry.id, { action: "pausa", revision: entry.revision })).rejects.toThrow("archivada");
+    s.at("2026-09-19T09:00:00Z");
+    await expect(s.work.action(2, entry.id, { action: "salida", revision: entry.revision })).resolves.toMatchObject({ status: "enviado" });
+  });
 
   it("subtracts pauses, freezes the cost and audits each transition", async () => {
     const s = await setup();
@@ -323,6 +359,16 @@ describe("work tracking isolation and lifecycle", () => {
       action: "prevision_actualizada",
       reason: "Previsión inicial",
     });
+  });
+  it("keeps labour forecasts immutable after the project is archived", async () => {
+    const s = await setup();
+    await s.projects.update(1, { archivedAt: new Date(), archiveReason: "Cierre administrativo" });
+
+    await expect(s.work.budget(1, 1, {
+      plannedHours: 10,
+      plannedCostCents: 20000,
+      reason: "Cambio posterior al archivo",
+    })).rejects.toThrow("archivada");
   });
   it("validates IDs, dates, quantities and monetary precision", async () => {
     const s = await setup();

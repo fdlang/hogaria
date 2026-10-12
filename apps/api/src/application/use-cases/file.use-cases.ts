@@ -10,7 +10,7 @@
 
 import { IProjectRepository, IUserRepository } from "@reformapro/domain/repositories";
 import { IEventEmitter } from "@reformapro/domain/events";
-import { ForbiddenError, NotFoundError, ValidationError } from "@reformapro/domain/errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@reformapro/domain/errors";
 import { PermissionPolicy, Profesion } from "@reformapro/domain/services";
 import type { UserRole } from "@reformapro/domain/entities";
 import { ClientContext } from "./auth.use-cases.js";
@@ -152,6 +152,7 @@ export class DeleteFileUseCase {
     const project = await this.projects.findById(file.projectId);
     if (!project) throw new NotFoundError("Proyecto");
     if (!PermissionPolicy.can(actor, "project.read", { project })) throw new NotFoundError("Proyecto");
+    if (project.archivedAt) throw new ConflictError("La obra está archivada y su documentación forma parte del histórico");
     if (file.sensitive && actor.rol !== "admin") throw new ForbiddenError();
     if (!file.sensitive && actor.rol !== "admin" && file.uploadedBy !== actor.id) throw new ForbiddenError();
 

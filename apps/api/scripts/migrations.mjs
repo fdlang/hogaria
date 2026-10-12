@@ -25,6 +25,7 @@ export const MIGRATIONS = [
   "work-tracking-hardening.sql",
   "catalog-cost-composition.sql",
   "administrative-retirement.sql",
+  "project-retention-hardening.sql",
 ];
 
 const sha256 = (sql) => createHash("sha256").update(sql).digest("hex");

@@ -1,14 +1,15 @@
-- Estado: retirada administrativa de presupuestos y obras implementada y validada.
-- Hecho: solo los borradores nunca publicados pueden eliminarse físicamente.
-- Hecho: propuestas publicadas se anulan con motivo visible y conservan versiones e histórico.
-- Hecho: propuestas firmadas o aceptadas no pueden anularse desde el flujo comercial.
-- Hecho: obras se archivan con motivo, fecha y retirada de asignaciones profesionales.
-- Hecho: clientes y profesionales pierden acceso a obras archivadas; administración conserva consulta histórica.
-- Hecho: archivos, fichajes, cambios, firmas y trazabilidad no se borran al archivar una obra.
-- Hecho: acciones protegidas por rol, recurso, revisión optimista y confirmación explícita.
-- Hecho: auditoría y notificaciones registran borrado de borrador, anulación y archivo.
-- Hecho: interfaz muestra estados archivado/anulado y bloquea edición posterior.
-- Hecho: migración administrativa preparada; no se ha ejecutado contra producción.
-- Validado: typecheck, tests y build raíz; pruebas de navegador Chromium y WebKit correctas.
-- Pendiente: aplicar `administrative-retirement.sql` mediante el runner versionado antes del despliegue.
-- Pendiente: commit atómico y despliegue solo cuando el usuario lo solicite.
+- Estado: lote crítico HOG-RET-002 implementado y en validación final.
+- Hecho: las obras se archivan sin borrar el equipo asignado ni su trazabilidad.
+- Hecho: clientes y profesionales pierden acceso operativo tras el archivo; administración conserva la consulta histórica.
+- Hecho: documentos, previsión laboral y datos de la obra archivada quedan inmutables en API y PostgreSQL.
+- Hecho: se bloquean DELETE/TRUNCATE físicos y el archivo mientras haya eliminaciones de ficheros pendientes.
+- Hecho: una jornada abierta puede cerrarse tras archivar; no se permite iniciar, pausar ni reanudar trabajo.
+- Hecho: la interfaz oculta acciones y muestra equipo, documentos y órdenes archivadas en modo lectura.
+- Hecho: HOG-RET-002 actualizada con alcance, supuesto, implementaciones, pruebas y métrica no instrumentada.
+- Compatibilidad: las obras archivadas antes de esta corrección no pueden recuperar automáticamente asignaciones ya borradas.
+- Pendiente alto: IVA, textos contractuales y órdenes de cambio, a validar por gestor/asesoría.
+- Pendiente alto: retención y anonimización, a validar por gestor y DPD.
+- Pendiente alto: segregación de funciones y MFA antes de ampliar administradores.
+- Pendiente alto: jornada y descansos, a validar por gestor laboral.
+- Despliegue: aplicar project-retention-hardening.sql con el runner versionado antes de publicar esta versión.
+- Próxima revisión global: 20/12/2026; HOG-RET-002: 13/01/2027.

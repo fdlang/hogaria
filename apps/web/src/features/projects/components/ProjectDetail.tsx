@@ -199,7 +199,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
         actions={<>
           <ProjectStatusBadge estado={p.estado} />
           {p.archivedAt && <Badge color="#71685e">ARCHIVADO</Badge>}
-          {isProfesional && ["planificacion", "en_curso"].includes(p.estado) && (
+          {isProfesional && !p.archivedAt && ["planificacion", "en_curso"].includes(p.estado) && (
             <a className="professional-work-link" href={`#/profesional/work?projectId=${p.id}`}>
               Registrar trabajo
             </a>
@@ -213,7 +213,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
         <strong>Obra archivada el {formatDate(p.archivedAt)}</strong>
         {p.archiveReason && <p style={{ marginTop: 6 }}>{p.archiveReason}</p>}
       </div>}
-      {isAdmin && nextStates[p.estado].length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+      {isAdmin && !p.archivedAt && nextStates[p.estado].length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
         {nextStates[p.estado].map(estado => <Button key={estado} small variant="ghost" loading={transitioning === estado} disabled={transitioning !== null || (estado === "en_curso" && p.estado === "planificacion" && !startReady) || (estado === "finalizado" && p.progreso !== 100)} onClick={() => void handleTransition(estado)}>{estado === "en_curso" ? "Iniciar/Reanudar obra" : estado === "pausado" ? "Pausar obra" : "Finalizar obra"}</Button>)}
         {p.estado === "planificacion" && !startReady && <p style={{ width: "100%", color: "#71685e", fontSize: 12 }}>Completa las fechas, asigna un profesional y crea al menos un hito para iniciar la obra.</p>}
         {nextStates[p.estado].includes("finalizado") && p.progreso !== 100 && <p style={{ width: "100%", color: "#71685e", fontSize: 12 }}>Completa el progreso al 100 % para finalizar la obra.</p>}
@@ -222,7 +222,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
       <div className="project-detail-layout" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24, alignItems: "flex-start" }}>
         {/* ─── MAIN ──────────────────────────────────── */}
         <div className="project-detail__main">
-          {isAdmin && p.estado === "planificacion" && (
+          {isAdmin && !p.archivedAt && p.estado === "planificacion" && (
             <section className="project-detail__section" style={{ marginBottom: 30 }}>
               <h2 style={sectionTitle}>Planificacion de inicio</h2>
               <form className="private-filter-bar" onSubmit={handlePlanningSave}>
@@ -294,7 +294,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
               : files.error
                 ? <div role="alert" style={{ color: "#b5483f" }}><p>{files.error}</p><Button small variant="ghost" onClick={() => void files.refresh()}>Reintentar</Button></div>
               : files.data.length === 0
-              ? <EmptyState icon="📄" title="Sin documentos" hint={isAdmin ? "Sube planos, fotos, contratos o facturas" : isCliente ? "Comparte fotos o documentos generales" : "Sube fotos o documentación técnica"} />
+              ? <EmptyState icon="📄" title="Sin documentos" hint={p.archivedAt ? "No hay documentos conservados" : isAdmin ? "Sube planos, fotos, contratos o facturas" : isCliente ? "Comparte fotos o documentos generales" : "Sube fotos o documentación técnica"} />
               : <ul className="project-file-list" style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
                   {files.data.map(f => (
                     <li className="project-file-item" key={f.id}
@@ -332,7 +332,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
             </dl>
           </div>
 
-          {canManageProject && (
+          {isAdmin && (canManageProject || Boolean(p.archivedAt)) && (
             <div className="project-detail__aside-card" style={{ padding: 18, background: "#f8efe4", border: "1px solid #d8c4ad", borderRadius: 10 }}>
               <h3 style={{ ...sectionTitle, marginBottom: 10 }}>Equipo ({projectAssignments.length})</h3>
               <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
@@ -356,7 +356,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
           )}
         </aside>
       </div>
-      {(isAdmin || isCliente) && <ChangeOrders api={apis.projects} projectId={projectId} admin={isAdmin && !p.archivedAt} onChanged={project.refresh} />}
+      {(isAdmin || isCliente) && <ChangeOrders api={apis.projects} projectId={projectId} admin={isAdmin} readOnly={Boolean(p.archivedAt)} onChanged={project.refresh} />}
       <Modal open={showArchive} onClose={() => { if (!archiving) { setShowArchive(false); setArchiveReason(""); } }} title={p.estado === "finalizado" ? "Archivar obra" : "Cancelar y archivar obra"} width={560}>
         <p>La obra desaparecerá de las áreas operativas del cliente y los profesionales. Se conservarán presupuesto, firma, documentos, órdenes y jornadas.</p>
         <label>Motivo *<textarea rows={4} minLength={10} maxLength={1000} value={archiveReason} onChange={event => setArchiveReason(event.target.value)} placeholder="Explica el motivo del cierre administrativo" /></label>

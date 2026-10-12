@@ -84,7 +84,7 @@ describe("project professional assignments", () => {
     const result = await archive.execute({ actorId: admin.id, projectId: saved.id, reason: "Cancelación acordada y cierre administrativo", revision: 0, ctx: { ip: "test", userAgent: "vitest" } });
 
     expect(result.archivedAt).toBeInstanceOf(Date);
-    expect(result.profesionalesAsignados).toEqual([]);
+    expect(result.profesionalesAsignados).toEqual([{ userId: professional.id, profesion: "reformista" }]);
     expect(await new ListProjectsUseCase(users, projects).execute({ actorId: client.id })).toEqual([]);
     expect(await new ListProjectsUseCase(users, projects).execute({ actorId: professional.id })).toEqual([]);
     expect((await new ListProjectsUseCase(users, projects).execute({ actorId: admin.id }))[0]?.archiveReason).toContain("Cancelación");

@@ -10,6 +10,7 @@ describe("versioned migration runner", () => {
       "migrate-account-activation.sql",
       "migrate-catalog.sql",
       "app-notifications.sql",
+      "project-retention-hardening.sql",
     ]));
   });
 
