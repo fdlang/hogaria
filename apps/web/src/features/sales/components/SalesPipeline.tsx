@@ -116,6 +116,7 @@ export function SalesPipeline({
   const [step, setStep] = useState(recoveredDraft?.step ?? 0);
   const [saving, setSaving] = useState(false);
   const [openingId, setOpeningId] = useState<number | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
   const [converting, setConverting] = useState<number | null>(null);
   const [sending, setSending] = useState<number | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
@@ -190,6 +191,28 @@ export function SalesPipeline({
       void refresh().catch(() => setError("El borrador está abierto, pero no se pudieron actualizar los listados."));
     } catch (cause) { setError((cause as Error).message || "No se pudo recuperar el presupuesto"); }
     finally { setOpeningId(null); }
+  };
+
+  const duplicateEstimate = async (estimate: EstimateDTO) => {
+    if (saving || openingId !== null || duplicatingId !== null) return;
+    if ((editingId !== null || draft.partidas.length > 0) && !window.confirm("Se cerrará el editor actual para abrir la copia. ¿Continuar?")) return;
+    setDuplicatingId(estimate.id);
+    setError("");
+    try {
+      const copy = await api.duplicateEstimate(estimate.id);
+      setEditingId(copy.id);
+      rememberServerDraft(copy.borrador, copy.updatedAt);
+      setSelected(copy.oportunidadId);
+      setExistingOpportunity(String(copy.oportunidadId));
+      setDraft(copy.borrador);
+      setStep(1);
+      setShowEditor(true);
+      await refresh();
+    } catch (cause) {
+      setError((cause as Error).message || "No se pudo duplicar el presupuesto");
+    } finally {
+      setDuplicatingId(null);
+    }
   };
 
   const refreshOpportunities = async () => {
@@ -573,10 +596,12 @@ export function SalesPipeline({
         sending={sending}
         converting={converting}
         openingId={openingId}
+        duplicatingId={duplicatingId}
         onPreview={setPreview}
         onSend={send}
         onConvert={convert}
         onEdit={editEstimate}
+        onDuplicate={duplicateEstimate}
         editing={saving}
       />
 
@@ -957,10 +982,12 @@ function RecentEstimates({
   sending,
   converting,
   openingId,
+  duplicatingId,
   onPreview,
   onSend,
   onConvert,
   onEdit,
+  onDuplicate,
   editing,
 }: {
   api: SalesApi;
@@ -968,10 +995,12 @@ function RecentEstimates({
   sending: number | null;
   converting: number | null;
   openingId: number | null;
+  duplicatingId: number | null;
   onPreview: (estimate: EstimateDTO) => void;
   onSend: (estimate: EstimateDTO) => void;
   onConvert: (estimate: EstimateDTO) => void;
   onEdit: (estimate: EstimateDTO) => void;
+  onDuplicate: (estimate: EstimateDTO) => void;
   editing: boolean;
 }) {
   const [query, setQuery] = useState("");
@@ -1049,6 +1078,15 @@ function RecentEstimates({
               >
                 Ver presupuesto
               </Button>
+              {estimate.estado !== "aceptado" && <Button
+                small
+                variant="ghost"
+                loading={duplicatingId === estimate.id}
+                disabled={editing || openingId !== null || duplicatingId !== null}
+                onClick={() => void onDuplicate(estimate)}
+              >
+                Duplicar
+              </Button>}
               {(estimate.estado === "borrador" ||
                 estimate.estado === "en_revision") && (
                 <Button

@@ -47,6 +47,15 @@ describe("SalesApi", () => {
     expect(http.patch).toHaveBeenCalledWith("/estimates/7", { borrador: draft, expectedUpdatedAt: "2026-10-11T10:00:00.000Z" });
   });
 
+  it("duplicates an estimate through an explicit server action", () => {
+    const http = createHttp();
+    const api = new SalesApi(http);
+
+    api.duplicateEstimate(7);
+
+    expect(http.post).toHaveBeenCalledWith("/estimates/7/duplicate");
+  });
+
   it("keeps signing, rejection and conversion as explicit estimate actions", () => {
     const http = createHttp();
     const api = new SalesApi(http);

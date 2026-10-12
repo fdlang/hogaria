@@ -8,7 +8,7 @@ const item = {
   evidence: { sourceName: null, sourceUrl: null, priceDate: null, validFrom: null, validUntil: null },
   searchTerms: [], updatedAt: "2026-09-19",
 };
-async function setup(page: Page, state: { fail: boolean; items: typeof item[]; gate?: Promise<void> }) {
+async function setup(page: Page, state: { fail: boolean; items: typeof item[]; gate?: Promise<void>; estimates?: unknown[] }) {
   await page.addInitScript(() => sessionStorage.setItem("rp_token", "test-token"));
   await page.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
@@ -27,14 +27,31 @@ async function setup(page: Page, state: { fail: boolean; items: typeof item[]; g
     if (path === "/api/estimates/1" && route.request().method() === "PATCH") {
       return route.fulfill({ json: { id: 1, numero: "HOG-2026-TEST", clienteNombre: "Cliente", titulo: "Propuesta de prueba", estado: "borrador", versionActual: 1, motivoRechazo: null, propuesta: null, createdAt: "2026-10-11T10:00:00.000Z", updatedAt: "2026-10-11T10:00:00.001Z" } });
     }
+    if (path === "/api/estimates/8/duplicate" && route.request().method() === "POST") {
+      return route.fulfill({ status: 201, json: { id: 9, oportunidadId: 1, clienteId: 2, numero: "HOG-2026-COPY", titulo: "Copia de Propuesta base", estado: "borrador", versionActual: 1, motivoRechazo: null, borrador: { titulo: "Copia de Propuesta base", validezDias: 30, condicionesPago: "Observaciones", garantia: "", notasCliente: "", notasInternas: "", partidas: [] }, createdAt: "2026-10-12T10:00:00.000Z", updatedAt: "2026-10-12T10:00:00.000Z" } });
+    }
     return route.fulfill({ json: path === "/api/auth/me"
       ? { id: 1, nombre: "Admin", rol: "admin", activo: true, email: "admin@test.invalid" }
       : path === "/api/users" ? [{ id: 2, nombre: "Cliente", rol: "cliente", activo: true }]
       : path === "/api/opportunities" && route.request().method() === "POST" ? { id: 1, clienteId: 2, nombre: "Reforma prueba", direccion: "Dirección de prueba", tipo: "Reforma", descripcion: "", estado: "nueva", email: null, telefono: null, fechaVisita: null, notasInternas: "", createdAt: "2026-10-11T10:00:00.000Z", updatedAt: "2026-10-11T10:00:00.000Z" }
       : path === "/api/opportunities" ? { items: [{ id: 1, clienteId: 2, nombre: "Reforma prueba", direccion: "Dirección de prueba", tipo: "Reforma", descripcion: "", estado: "nueva", email: null, telefono: null, fechaVisita: null, notasInternas: "", createdAt: "2026-10-07T09:00:00.000Z", updatedAt: "2026-10-07T10:00:00.000Z" }], total: 1, page: 1, limit: 20, pages: 1 }
+      : path === "/api/estimates" ? state.estimates ?? []
       : [] });
   });
 }
+
+test("an administrator duplicates a proposal into an independent editable draft", async ({ page }) => {
+  const estimate = { id: 8, numero: "HOG-2026-BASE", clienteNombre: "Cliente", titulo: "Propuesta base", estado: "enviado", versionActual: 1, motivoRechazo: null, propuesta: null, createdAt: "2026-10-11T10:00:00.000Z", updatedAt: "2026-10-11T10:00:00.000Z" };
+  await setup(page, { fail: false, items: [], estimates: [estimate] });
+
+  await page.goto("/admin/budgets");
+  await page.getByRole("button", { name: "Mostrar propuestas" }).click();
+  await page.getByRole("button", { name: "Duplicar" }).click();
+
+  await expect(page.getByRole("region", { name: "Editor de presupuesto" })).toBeVisible();
+  await expect(page.getByLabel("Título visible al cliente")).toHaveValue("Copia de Propuesta base");
+  await expect(page.getByText("Cambios guardados")).toBeVisible();
+});
 
 test("catalog distinguishes loading, empty and unmatched filters", async ({ page }) => {
   let release!: () => void;
@@ -69,6 +86,40 @@ test("catalog clears errors on retry and distinguishes archived items", async ({
   await expect(page.getByText(item.description, { exact: true })).toBeVisible();
 });
 
+test("a kitchen template requests contextual measurements and imports the right quantities", async ({ page }) => {
+  const kitchenItems = ["PRE-001", "DEM-003", "FON-004", "REV-003", "COC-001", "COC-002", "COC-003", "COC-005", "PRE-004"]
+    .map((reference, index) => ({ ...item, id: index + 10, reference, description: `Partida ${reference}`, unit: reference === "COC-001" || reference === "COC-002" || reference === "COC-003" ? "ml" : "ud" }));
+  await setup(page, { fail: false, items: kitchenItems });
+  await page.goto("/admin/budgets");
+  await page.getByRole("button", { name: "Nuevo presupuesto" }).click();
+  await page.getByLabel("Cliente existente").selectOption("2");
+  await page.getByLabel("Nombre de la oportunidad").fill("Reforma cocina");
+  await page.getByRole("textbox", { name: "Dirección *", exact: true }).fill("Dirección de prueba");
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await page.getByLabel("Título visible al cliente").fill("Cocina completa");
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await page.getByRole("button", { name: "Añadir desde catálogo" }).click();
+
+  const catalog = page.locator(".catalog-picker-modal");
+  await catalog.getByRole("button", { name: /Cocina completa/ }).click();
+  await expect(catalog.getByLabel("Longitud de muebles bajos *")).toBeVisible();
+  await expect(catalog.getByLabel("Longitud de muebles altos (opcional)")).toBeVisible();
+  await expect(catalog.getByText("Frente (ml)", { exact: true })).toHaveCount(0);
+  await catalog.getByRole("button", { name: "Añadir plantilla al presupuesto" }).click();
+  await expect(catalog.getByText(/Introduce una medida mayor que cero/)).toHaveCount(3);
+
+  await catalog.getByLabel("Superficie de suelo *").fill("8,5");
+  await catalog.getByLabel("Longitud de muebles bajos *").fill("4,2");
+  await catalog.getByLabel("Longitud de encimera *").fill("3,8");
+  await expect(catalog.getByText("8 de 8 partidas verificadas disponibles")).toBeVisible();
+  await catalog.getByRole("button", { name: "Añadir plantilla al presupuesto" }).click();
+
+  await expect(page.locator(".estimate-line")).toHaveCount(8);
+  await expect(page.locator(".estimate-line").filter({ hasText: "COC-001" }).getByLabel("Cantidad")).toHaveValue("4.2");
+  await expect(page.locator(".estimate-line").filter({ hasText: "COC-003" }).getByLabel("Cantidad")).toHaveValue("3.8");
+  await expect(page.locator(".estimate-line").filter({ hasText: "COC-002" })).toHaveCount(0);
+});
+
 for (const fail of [false, true]) test("estimate never falls back to static prices: failure=" + fail, async ({ page }) => {
   const state = { fail, items: [] as typeof item[] };
   await setup(page, state);
@@ -92,6 +143,7 @@ for (const fail of [false, true]) test("estimate never falls back to static pric
     await catalog.getByRole("searchbox", { name: "Buscar partida" }).fill(item.reference);
     await expect(catalog.getByText(item.description, { exact: true })).toBeVisible();
     await expect(catalog.getByRole("alert")).toHaveCount(0);
+    await catalog.getByRole("button", { name: `Añadir a favoritas: ${item.reference}` }).click();
     await catalog.getByRole("button", { name: `Añadir ${item.reference}: ${item.description}`, exact: true }).click();
     await expect(page.locator(".estimate-line")).toHaveCount(1);
   } else {
@@ -102,6 +154,14 @@ for (const fail of [false, true]) test("estimate never falls back to static pric
     await expect(page.locator(".estimate-line")).toHaveCount(1);
   }
   if (await catalog.isVisible()) await catalog.getByRole("button", { name: "Cerrar modal" }).click();
+  if (fail) {
+    await page.getByRole("button", { name: "Añadir desde catálogo" }).click();
+    await expect(catalog.getByText("Favoritas", { exact: true })).toBeVisible();
+    await expect(catalog.getByRole("button", { name: `+ ${item.reference}`, exact: true })).toBeVisible();
+    await catalog.getByRole("button", { name: `Quitar de favoritas: ${item.reference}` }).click();
+    await expect(catalog.getByText("Usadas recientemente", { exact: true })).toBeVisible();
+    await catalog.getByRole("button", { name: "Cerrar modal" }).click();
+  }
   const line = page.locator(".estimate-line").first();
   await line.getByText(/Añadir observación para el cliente/).click();
   await line.getByLabel("Observación de la partida").fill("Acabado mate confirmado con el cliente");

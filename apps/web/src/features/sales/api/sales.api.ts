@@ -85,6 +85,7 @@ export class SalesApi {
   async history(id: number) { return parseEstimateList(await this.http.get<unknown>(`/estimates/${id}/history`)); }
   draft(id: number) { return this.http.get<AdminEstimateDTO>(`/estimates/${id}/draft`); }
   createEstimateDraft(oportunidadId: number, borrador: EstimateDraftDTO) { return this.http.post<AdminEstimateDTO>("/estimate-drafts", { oportunidadId, borrador }); }
+  duplicateEstimate(id: number) { return this.http.post<AdminEstimateDTO>(`/estimates/${id}/duplicate`); }
   updateEstimate(id: number, borrador: EstimateDraftDTO, expectedUpdatedAt: string) { return this.http.patch<EstimateDTO>(`/estimates/${id}`, { borrador, expectedUpdatedAt }); }
   reviseEstimate(id: number) { return this.http.post<AdminEstimateDTO>(`/estimates/${id}/revise`); }
   downloadPdf(

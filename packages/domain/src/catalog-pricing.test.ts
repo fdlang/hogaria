@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateCatalogComposition, calculateCatalogPrice, catalogActivationIssues, isValidCatalogCostBreakdown } from "./catalog-pricing.js";
+import { calculateCatalogComposition, calculateCatalogPrice, catalogActivationIssues, ESTIMATE_TEMPLATES, isValidCatalogCostBreakdown } from "./catalog-pricing.js";
 
 describe("catalog pricing", () => {
   it("keeps evidence costs separate until commercial rates are known", () => {
@@ -39,5 +39,16 @@ describe("catalog pricing", () => {
     expect(catalogActivationIssues(candidate, "2026-10-10")).toEqual([]);
     expect(catalogActivationIssues({ ...candidate, salePrice: 0 }, "2026-10-10")).toContain("sale_price");
     expect(catalogActivationIssues({ ...candidate, evidence: { ...candidate.evidence, validUntil: "2026-10-09" } }, "2026-10-10")).toContain("expired");
+  });
+
+  it("defines contextual measurements for each quick estimate template", () => {
+    const bathroom = ESTIMATE_TEMPLATES.find(template => template.id === "bathroom")!;
+    const kitchen = ESTIMATE_TEMPLATES.find(template => template.id === "kitchen")!;
+    const wardrobes = ESTIMATE_TEMPLATES.find(template => template.id === "wardrobes")!;
+
+    expect(bathroom.measurements.map(field => field.key)).toEqual(["floorArea", "wallArea"]);
+    expect(kitchen.measurements.map(field => field.key)).toEqual(["floorArea", "baseCabinetMetres", "wallCabinetMetres", "worktopMetres"]);
+    expect(kitchen.items.find(item => item.reference === "COC-002")).toMatchObject({ measurement: "wallCabinetMetres", optional: true });
+    expect(wardrobes.measurements.map(field => field.key)).toEqual(["wardrobeMetres"]);
   });
 });

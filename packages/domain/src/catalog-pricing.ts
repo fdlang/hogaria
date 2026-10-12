@@ -139,11 +139,14 @@ export function catalogActivationIssues(value: CatalogActivationCandidate, today
   return issues;
 }
 
+export type EstimateTemplateMeasurement = "floorArea" | "wallArea" | "baseCabinetMetres" | "wallCabinetMetres" | "worktopMetres" | "wardrobeMetres";
+
 export interface EstimateTemplate {
   id: "bathroom" | "kitchen" | "wardrobes";
   name: string;
   description: string;
-  items: readonly { reference: string; quantity: number; measurement?: "floorArea" | "wallArea" | "linearMetres" }[];
+  measurements: readonly { key: EstimateTemplateMeasurement; label: string; unit: "m²" | "ml"; help: string; required: boolean }[];
+  items: readonly { reference: string; quantity: number; measurement?: EstimateTemplateMeasurement; optional?: boolean }[];
 }
 
 export const ESTIMATE_TEMPLATES: readonly EstimateTemplate[] = [
@@ -151,6 +154,10 @@ export const ESTIMATE_TEMPLATES: readonly EstimateTemplate[] = [
     id: "bathroom",
     name: "Baño completo",
     description: "Demolición, instalaciones, revestimientos y equipamiento esencial.",
+    measurements: [
+      { key: "floorArea", label: "Superficie de suelo", unit: "m²", help: "Superficie real del pavimento del baño.", required: true },
+      { key: "wallArea", label: "Superficie de paredes a revestir", unit: "m²", help: "Suma únicamente las paredes que se demolerán y alicatarán.", required: true },
+    ],
     items: [
       { reference: "PRE-001", quantity: 1 },
       { reference: "DEM-003", quantity: 1, measurement: "floorArea" },
@@ -172,14 +179,20 @@ export const ESTIMATE_TEMPLATES: readonly EstimateTemplate[] = [
     id: "kitchen",
     name: "Cocina completa",
     description: "Desmontaje, instalaciones, revestimientos y mobiliario base.",
+    measurements: [
+      { key: "floorArea", label: "Superficie de suelo", unit: "m²", help: "Superficie real del pavimento de la cocina.", required: true },
+      { key: "baseCabinetMetres", label: "Longitud de muebles bajos", unit: "ml", help: "Suma de los tramos de mobiliario bajo medidos en planta.", required: true },
+      { key: "wallCabinetMetres", label: "Longitud de muebles altos", unit: "ml", help: "Déjalo vacío si el diseño no incluye muebles altos.", required: false },
+      { key: "worktopMetres", label: "Longitud de encimera", unit: "ml", help: "Longitud total de encimera, sin confundirla con el frente de pared.", required: true },
+    ],
     items: [
       { reference: "PRE-001", quantity: 1 },
       { reference: "DEM-003", quantity: 1, measurement: "floorArea" },
       { reference: "FON-004", quantity: 1 },
       { reference: "REV-003", quantity: 1, measurement: "floorArea" },
-      { reference: "COC-001", quantity: 1, measurement: "linearMetres" },
-      { reference: "COC-002", quantity: 1, measurement: "linearMetres" },
-      { reference: "COC-003", quantity: 1, measurement: "linearMetres" },
+      { reference: "COC-001", quantity: 1, measurement: "baseCabinetMetres" },
+      { reference: "COC-002", quantity: 1, measurement: "wallCabinetMetres", optional: true },
+      { reference: "COC-003", quantity: 1, measurement: "worktopMetres" },
       { reference: "COC-005", quantity: 1 },
       { reference: "PRE-004", quantity: 1 },
     ],
@@ -188,8 +201,11 @@ export const ESTIMATE_TEMPLATES: readonly EstimateTemplate[] = [
     id: "wardrobes",
     name: "Armarios a medida",
     description: "Fabricación y montaje medidos por longitud de frente.",
+    measurements: [
+      { key: "wardrobeMetres", label: "Longitud total de armarios", unit: "ml", help: "Suma el ancho frontal de todos los módulos incluidos.", required: true },
+    ],
     items: [
-      { reference: "CAR-003", quantity: 1, measurement: "linearMetres" },
+      { reference: "CAR-003", quantity: 1, measurement: "wardrobeMetres" },
     ],
   },
 ] as const;

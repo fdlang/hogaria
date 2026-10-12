@@ -7,11 +7,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogCategory, CatalogItem } from "./catalog";
 import { Input, Button, Badge } from "@/shared/ui";
 import { formatMoney } from "@/shared/lib/formatters";
-import { ESTIMATE_TEMPLATES, type EstimateTemplate } from "@reformapro/domain";
+import { ESTIMATE_TEMPLATES, type EstimateTemplate, type EstimateTemplateMeasurement } from "@reformapro/domain";
 import { CatalogLoadState } from "./CatalogLoadState";
+import { catalogItemsForReferences, parseCatalogReferences, rememberCatalogReference, toggleCatalogFavorite } from "./catalog-preferences";
 
-export type TemplateMeasurements = { floorArea: number; wallArea: number; linearMetres: number };
+export type TemplateMeasurements = Record<EstimateTemplateMeasurement, number>;
 export type TemplateCatalogItem = { categoria: string; item: CatalogItem; cantidad: number };
+
+const emptyMeasurements = (): Record<EstimateTemplateMeasurement, string> => ({
+  floorArea: "", wallArea: "", baseCabinetMetres: "", wallCabinetMetres: "", worktopMetres: "", wardrobeMetres: "",
+});
 
 export function resolveCatalogTemplate(template: EstimateTemplate, catalog: CatalogCategory[], measurements: TemplateMeasurements): TemplateCatalogItem[] {
   const items = new Map(catalog.flatMap(category => category.items.map(item => [item.ref, { categoria: category.categoria, item }] as const)));
@@ -23,6 +28,10 @@ export function resolveCatalogTemplate(template: EstimateTemplate, catalog: Cata
   });
 }
 
+export function expectedTemplateItems(template: EstimateTemplate, measurements: TemplateMeasurements) {
+  return template.items.filter(entry => !(entry.optional && entry.measurement && measurements[entry.measurement] <= 0));
+}
+
 interface Props {
   onPickItem: (item: CatalogItem, category: string) => void;
   onImportTemplate: (items: TemplateCatalogItem[]) => void;
@@ -30,6 +39,14 @@ interface Props {
 }
 
 const templateReferences = [...new Set(ESTIMATE_TEMPLATES.flatMap(template => template.items.map(item => item.reference)))];
+const FAVORITES_KEY = "hogaria_catalog_favorites";
+const RECENT_KEY = "hogaria_catalog_recent";
+const readPreference = (key: string) => {
+  try { return parseCatalogReferences(localStorage.getItem(key)); } catch { return []; }
+};
+const savePreference = (key: string, references: string[]) => {
+  try { localStorage.setItem(key, JSON.stringify(references)); } catch { /* Preferences remain available for this session. */ }
+};
 
 export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props) {
   const [search, setSearch] = useState("");
@@ -38,17 +55,20 @@ export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const request = useRef(0);
-  const [measurements, setMeasurements] = useState({ floorArea: "", wallArea: "", linearMetres: "" });
-  const numericMeasurements = useMemo<TemplateMeasurements>(() => ({
-    floorArea: Number(measurements.floorArea) || 0,
-    wallArea: Number(measurements.wallArea) || 0,
-    linearMetres: Number(measurements.linearMetres) || 0,
-  }), [measurements]);
+  const [favoriteRefs, setFavoriteRefs] = useState(() => readPreference(FAVORITES_KEY));
+  const [recentRefs, setRecentRefs] = useState(() => readPreference(RECENT_KEY));
+  const [selectedTemplateId, setSelectedTemplateId] = useState<EstimateTemplate["id"] | null>(null);
+  const [measurements, setMeasurements] = useState(emptyMeasurements);
+  const [templateAttempted, setTemplateAttempted] = useState(false);
+  const numericMeasurements = useMemo<TemplateMeasurements>(() => Object.fromEntries(
+    Object.entries(measurements).map(([key, value]) => [key, Number(value.replace(",", ".")) || 0]),
+  ) as unknown as TemplateMeasurements, [measurements]);
 
   const resultCount = results.reduce((total, category) => total + category.items.length, 0);
 
-  const loadTemplates = useCallback(() => loadItems("", templateReferences).then(setTemplateCatalog).catch(() => setError("No se pudieron cargar las plantillas del catálogo.")), [loadItems]);
-  useEffect(() => { void loadTemplates(); }, [loadItems]);
+  const shortcutReferences = useMemo(() => [...new Set([...templateReferences, ...favoriteRefs, ...recentRefs])], [favoriteRefs, recentRefs]);
+  const loadTemplates = useCallback(() => loadItems("", shortcutReferences).then(setTemplateCatalog).catch(() => setError("No se pudieron cargar las plantillas del catálogo.")), [loadItems, shortcutReferences]);
+  useEffect(() => { void loadTemplates(); }, [loadTemplates]);
   useEffect(() => {
     const query = search.trim();
     if (!query) { setResults([]); setLoading(false); return; }
@@ -61,6 +81,45 @@ export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props
     }, 250);
     return () => window.clearTimeout(timer);
   }, [loadItems, search]);
+
+  const favorites = useMemo(() => catalogItemsForReferences(templateCatalog, favoriteRefs), [favoriteRefs, templateCatalog]);
+  const recent = useMemo(() => catalogItemsForReferences(templateCatalog, recentRefs.filter(reference => !favoriteRefs.includes(reference))), [favoriteRefs, recentRefs, templateCatalog]);
+  const pick = (item: CatalogItem, categoria: string) => {
+    setRecentRefs(current => {
+      const next = rememberCatalogReference(current, item.ref);
+      savePreference(RECENT_KEY, next);
+      return next;
+    });
+    onPickItem(item, categoria);
+  };
+  const toggleFavorite = (reference: string) => {
+    setFavoriteRefs(current => {
+      const next = toggleCatalogFavorite(current, reference);
+      savePreference(FAVORITES_KEY, next);
+      return next;
+    });
+  };
+  const selectedTemplate = ESTIMATE_TEMPLATES.find(template => template.id === selectedTemplateId) ?? null;
+  const selectedResolved = selectedTemplate ? resolveCatalogTemplate(selectedTemplate, templateCatalog, numericMeasurements) : [];
+  const selectedExpected = selectedTemplate ? expectedTemplateItems(selectedTemplate, numericMeasurements) : [];
+  const availableTemplateReferences = new Set(templateCatalog.flatMap(category => category.items.map(item => item.ref)));
+  const missingCatalogItems = selectedExpected.filter(entry => !availableTemplateReferences.has(entry.reference)).length;
+  const invalidMeasurements = selectedTemplate?.measurements.filter(field => {
+    const raw = measurements[field.key].trim();
+    const value = numericMeasurements[field.key];
+    return (field.required && !raw) || (raw !== "" && (!Number.isFinite(value) || value <= 0 || value > 100_000 || !/^\d+(?:[.,]\d{1,2})?$/.test(raw)));
+  }) ?? [];
+  const templateReady = Boolean(selectedTemplate && invalidMeasurements.length === 0 && missingCatalogItems === 0 && selectedResolved.length > 0);
+  const selectTemplate = (template: EstimateTemplate) => {
+    setSelectedTemplateId(template.id);
+    setTemplateAttempted(false);
+    setMeasurements(emptyMeasurements());
+  };
+  const importSelectedTemplate = () => {
+    setTemplateAttempted(true);
+    if (!templateReady) return;
+    onImportTemplate(selectedResolved);
+  };
 
   return (
     <div>
@@ -79,27 +138,55 @@ export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props
       <p className="catalog-search-status" role="status">
         {search.trim() ? `${resultCount} ${resultCount === 1 ? "resultado" : "resultados"}` : "Escribe para buscar o utiliza una plantilla rápida."}
       </p>
+      {!search.trim() && (favorites.length > 0 || recent.length > 0) && <section className="catalog-shortcuts" aria-label="Accesos rápidos del catálogo">
+        {favorites.length > 0 && <CatalogShortcutGroup title="Favoritas" items={favorites} favorites={favoriteRefs} onPick={pick} onToggleFavorite={toggleFavorite} />}
+        {recent.length > 0 && <CatalogShortcutGroup title="Usadas recientemente" items={recent} favorites={favoriteRefs} onPick={pick} onToggleFavorite={toggleFavorite} />}
+        <small>Guardadas únicamente en este dispositivo.</small>
+      </section>}
       <section className="catalog-templates" aria-labelledby="catalog-templates-title">
         <div>
           <strong id="catalog-templates-title">Plantillas rápidas</strong>
-          <p>Indica las medidas disponibles. Podrás revisar todas las cantidades antes de guardar.</p>
+          <p>Elige un tipo de trabajo y completa únicamente las mediciones que necesita.</p>
         </div>
-        <div className="catalog-template-measurements">
-          <label>Suelo (m²)<input type="number" min="0" step="0.01" value={measurements.floorArea} onChange={event => setMeasurements(current => ({ ...current, floorArea: event.target.value }))} /></label>
-          <label>Paredes (m²)<input type="number" min="0" step="0.01" value={measurements.wallArea} onChange={event => setMeasurements(current => ({ ...current, wallArea: event.target.value }))} /></label>
-          <label>Frente (ml)<input type="number" min="0" step="0.01" value={measurements.linearMetres} onChange={event => setMeasurements(current => ({ ...current, linearMetres: event.target.value }))} /></label>
+        <div className="catalog-template-selector" role="group" aria-label="Tipos de plantilla">
+          {ESTIMATE_TEMPLATES.map(template => <button
+            type="button"
+            key={template.id}
+            className={selectedTemplateId === template.id ? "catalog-template-option catalog-template-option--selected" : "catalog-template-option"}
+            aria-pressed={selectedTemplateId === template.id}
+            onClick={() => selectTemplate(template)}
+          >
+            <strong>{template.name}</strong>
+            <span>{template.description}</span>
+            <small>{template.measurements.length} {template.measurements.length === 1 ? "medición" : "mediciones"}</small>
+          </button>)}
         </div>
-        <div className="catalog-template-actions">
-          {ESTIMATE_TEMPLATES.map(template => {
-            const resolved = resolveCatalogTemplate(template, templateCatalog, numericMeasurements);
-            const needsFloor = template.items.some(item => item.measurement === "floorArea") && numericMeasurements.floorArea <= 0;
-            const needsWall = template.items.some(item => item.measurement === "wallArea") && numericMeasurements.wallArea <= 0;
-            const needsLinear = template.items.some(item => item.measurement === "linearMetres") && numericMeasurements.linearMetres <= 0;
-            const incomplete = resolved.length !== template.items.length;
-            const title = incomplete ? `${template.description} Faltan ${template.items.length - resolved.length} partidas verificadas.` : template.description;
-            return <Button key={template.id} small variant="ghost" disabled={needsFloor || needsWall || needsLinear || resolved.length === 0 || incomplete} onClick={() => onImportTemplate(resolved)} title={title}>+ {template.name} ({resolved.length}/{template.items.length})</Button>;
-          })}
-        </div>
+        {selectedTemplate && <div className="catalog-template-form" aria-labelledby="selected-template-title">
+          <header><div><span>Paso 2 · Mediciones</span><strong id="selected-template-title">{selectedTemplate.name}</strong></div><small>Los campos con * son obligatorios. Puedes usar coma o punto decimal.</small></header>
+          <div className="catalog-template-measurements">
+            {selectedTemplate.measurements.map(field => {
+              const invalid = templateAttempted && invalidMeasurements.includes(field);
+              return <label key={field.key}>
+                <span>{field.label}{field.required ? " *" : " (opcional)"}</span>
+                <span className="catalog-template-input"><input
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={measurements[field.key]}
+                  aria-invalid={invalid}
+                  aria-describedby={`template-help-${field.key}`}
+                  onChange={event => setMeasurements(current => ({ ...current, [field.key]: event.target.value }))}
+                /><b>{field.unit}</b></span>
+                <small id={`template-help-${field.key}`}>{invalid ? "Introduce una medida mayor que cero con un máximo de dos decimales." : field.help}</small>
+              </label>;
+            })}
+          </div>
+          <div className="catalog-template-summary" role="status">
+            <span>{selectedResolved.length} de {selectedExpected.length} partidas verificadas disponibles</span>
+            {missingCatalogItems > 0 && <strong>No se puede usar: faltan {missingCatalogItems} partidas verificadas en el catálogo.</strong>}
+          </div>
+          <Button onClick={importSelectedTemplate} disabled={missingCatalogItems > 0}>Añadir plantilla al presupuesto</Button>
+        </div>}
       </section>
 
       <CatalogLoadState loading={loading} error={error} reload={async () => { if (search.trim()) setSearch(value => `${value} `); else await loadTemplates(); }} />
@@ -122,7 +209,8 @@ export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#302d29" }}>
                     {formatMoney(item.precio)} <span style={{ color: "#71685e", fontSize: 12 }}>/ {item.unidad}</span>
                   </span>
-                  <Button small aria-label={`Añadir ${item.ref}: ${item.descripcion}`} onClick={() => onPickItem(item, cat.categoria)}>+ Añadir</Button>
+                  <button type="button" className="catalog-favorite" aria-label={`${favoriteRefs.includes(item.ref) ? "Quitar de" : "Añadir a"} favoritas: ${item.ref}`} aria-pressed={favoriteRefs.includes(item.ref)} onClick={() => toggleFavorite(item.ref)}>{favoriteRefs.includes(item.ref) ? "★" : "☆"}</button>
+                  <Button small aria-label={`Añadir ${item.ref}: ${item.descripcion}`} onClick={() => pick(item, cat.categoria)}>+ Añadir</Button>
                 </div>
               </li>
             ))}
@@ -137,4 +225,20 @@ export function CatalogPicker({ onPickItem, onImportTemplate, loadItems }: Props
       )}
     </div>
   );
+}
+
+function CatalogShortcutGroup({ title, items, favorites, onPick, onToggleFavorite }: {
+  title: string;
+  items: Array<{ categoria: string; item: CatalogItem }>;
+  favorites: string[];
+  onPick: (item: CatalogItem, categoria: string) => void;
+  onToggleFavorite: (reference: string) => void;
+}) {
+  return <div className="catalog-shortcuts__group">
+    <strong>{title}</strong>
+    <div>{items.map(({ categoria, item }) => <span key={item.ref} className="catalog-shortcut">
+      <button type="button" className="catalog-shortcut__add" onClick={() => onPick(item, categoria)} title={item.descripcion}>+ {item.ref}</button>
+      <button type="button" className="catalog-favorite" aria-label={`${favorites.includes(item.ref) ? "Quitar de" : "Añadir a"} favoritas: ${item.ref}`} aria-pressed={favorites.includes(item.ref)} onClick={() => onToggleFavorite(item.ref)}>{favorites.includes(item.ref) ? "★" : "☆"}</button>
+    </span>)}</div>
+  </div>;
 }

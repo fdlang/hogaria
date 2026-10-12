@@ -27,7 +27,7 @@ import {
 import { validateDraft } from "./estimate-validation.js";
 import type { ClientContext } from "./auth.use-cases.js";
 import type { ISolicitudRepository, ICooldownGate } from "./solicitud.use-cases.js";
-import { ABUSE_LIMITS, canTransitionOpportunity, createEstimateReference, isOpenOpportunity } from "@reformapro/domain";
+import { ABUSE_LIMITS, canTransitionOpportunity, createEstimateReference, duplicateEstimateDraft, isOpenOpportunity } from "@reformapro/domain";
 import type { ISignatureCrypto } from "../../infrastructure/crypto/crypto.service.js";
 import { calculateEstimateTotals, createFiscalSnapshot, isValidSpanishPhone } from "@reformapro/domain";
 
@@ -424,12 +424,21 @@ export class EstimateUseCases {
   ) {
     return this.createInternal(actorId, opportunityId, draft, ctx, true);
   }
+  async duplicate(actorId: number, id: number, ctx: ClientContext) {
+    assertAdmin(await this.users.findById(actorId));
+    const source = await this.require(id);
+    if (source.estado === "aceptado")
+      throw new ConflictError("Un presupuesto convertido en obra no se puede duplicar en la oportunidad cerrada");
+    const draft = duplicateEstimateDraft(source.borrador, () => crypto.randomUUID());
+    return this.createInternal(actorId, source.oportunidadId, draft, ctx, true, source.id);
+  }
   private async createInternal(
     actorId: number,
     opportunityId: number,
     draft: EstimateDraft,
     ctx: ClientContext,
     allowEmpty: boolean,
+    sourceEstimateId?: number,
   ) {
     const actor = await this.users.findById(actorId);
     assertAdmin(actor);
@@ -469,6 +478,7 @@ export class EstimateUseCases {
       userAgent: ctx.userAgent,
       estimateId: saved.id,
       opportunityId,
+      ...(sourceEstimateId === undefined ? {} : { sourceEstimateId }),
     });
     return saved;
   }

@@ -138,6 +138,7 @@ function getRuntime(): Promise<Runtime> {
   route("GET",   "/estimates/:id/history", req => sales.history(req as never), { protected: true }),
   route("POST",  "/estimates",           req => sales.createEstimate(req as never),    { protected: true }),
   route("POST",  "/estimate-drafts",     req => sales.createEstimateDraft(req as never), { protected: true }),
+  route("POST",  "/estimates/:id/duplicate", req => sales.duplicateEstimate(req as never), { protected: true }),
   route("GET",   "/estimates/:id",       req => sales.getEstimate(req as never),       { protected: true }),
   route("PATCH", "/estimates/:id",       req => sales.updateEstimate(req as never),    { protected: true }),
   route("POST",  "/estimates/:id/send",  req => sales.sendEstimate(req as never),      { protected: true }),

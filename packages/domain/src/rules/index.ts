@@ -131,6 +131,18 @@ export const BUSINESS_RULES = [
     implementation: ["packages/domain/src/entities/index.ts", "apps/api/src/application/use-cases/sales.use-cases.ts", "apps/api/src/infrastructure/documents/estimatePdf.ts", "apps/web/src/features/sales/components/SalesPipeline.tsx"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/api/src/application/use-cases/audit-regressions.test.ts", "apps/web/e2e/catalog.browser.ts"],
   },
   {
+    id: "HOG-EST-010", description: "Duplicar un presupuesto crea un borrador independiente sin firma, histórico ni referencia de cliente heredados.", origin: "business", owner: "comercial",
+    assumption: "Reutilizar alcance y partidas reduce el tiempo de preparación sin confundir documentos contractuales ni versiones enviadas.", validScale: "Equipos comerciales que reutilizan propuestas dentro de una oportunidad todavía abierta.", validFrom: "2026-10-12", validUntil: null, nextReview: "2027-01-12",
+    metrics: [metric("estimate_duplicate_rate", "Presupuestos iniciados mediante duplicación", "audit_log"), metric("estimate_duplicate_rectification_rate", "Duplicados rectificados por contenido heredado", "not_instrumented")],
+    implementation: ["packages/domain/src/estimate-duplication.ts", "apps/api/src/application/use-cases/sales.use-cases.ts"], tests: ["packages/domain/src/estimate-duplication.test.ts", "apps/api/src/application/use-cases/sales.use-cases.test.ts"],
+  },
+  {
+    id: "HOG-EST-011", description: "Cada plantilla rápida solicita únicamente las mediciones propias de su alcance y asigna cada medida a su partida correspondiente.", origin: "business", owner: "comercial",
+    assumption: "Un formulario contextual reduce errores de medición sin sustituir la revisión profesional de las partidas importadas.", validScale: "Plantillas de baño, cocina y armarios del catálogo vigente en Madrid; revisar al añadir nuevas tipologías o unidades.", validFrom: "2026-10-12", validUntil: null, nextReview: "2027-01-12",
+    metrics: [metric("estimate_template_completion_rate", "Plantillas iniciadas que se añaden al presupuesto", "not_instrumented"), metric("estimate_template_quantity_rectification_rate", "Cantidades importadas que el administrador corrige", "not_instrumented")],
+    implementation: ["packages/domain/src/catalog-pricing.ts", "apps/web/src/features/catalog/CatalogPicker.tsx"], tests: ["packages/domain/src/catalog-pricing.test.ts", "apps/web/src/features/catalog/catalog-templates.test.ts", "apps/web/e2e/catalog.browser.ts"],
+  },
+  {
     id: "HOG-PRJ-001", description: "Los proyectos avanzan por transiciones de estado permitidas y solo finalizan al 100 %.", origin: "business", owner: "operaciones",
     assumption: "Planificación, curso, pausa y finalización describen todo el ciclo de obra.", validScale: "Obras sin fases contractuales independientes ni reapertura posterior al cierre.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("project_transition_denial_rate", "Transiciones de estado rechazadas", "audit_log"), metric("project_reopen_requests", "Solicitudes manuales de reapertura")],

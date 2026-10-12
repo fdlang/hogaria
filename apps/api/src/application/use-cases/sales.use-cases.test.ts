@@ -33,6 +33,21 @@ async function setup() {
 }
 
 describe("EstimateUseCases — client privacy and authorization", () => {
+  it("duplicates a proposal as an independent admin-only draft", async () => {
+    const { users, clientA, estimateA, estimates, estimateUseCases } = await setup();
+    const admin = await users.save({ id: 0, email: Email.of("duplicate-admin@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");
+
+    const copy = await estimateUseCases.duplicate(admin.id, estimateA.id, { ip: "test", userAgent: "vitest" });
+
+    expect(copy).toMatchObject({ estado: "borrador", versionActual: 1, oportunidadId: estimateA.oportunidadId, clienteId: estimateA.clienteId });
+    expect(copy.id).not.toBe(estimateA.id);
+    expect(copy.numero).not.toBe(estimateA.numero);
+    expect(copy.borrador.titulo).toBe(`Copia de ${draft.titulo}`);
+    expect(copy.borrador.partidas[0]?.id).not.toBe(draft.partidas[0]?.id);
+    expect(await estimates.findVersions(copy.id)).toEqual([]);
+    await expect(estimateUseCases.duplicate(clientA.id, estimateA.id, { ip: "test", userAgent: "vitest" })).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
   it("persists an empty working draft and prevents stale autosaves", async () => {
     const { users, opportunityA, estimateUseCases } = await setup();
     const admin = await users.save({ id: 0, email: Email.of("autosave-admin@hogaria.test"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() }, "hash");

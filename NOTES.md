@@ -1,14 +1,15 @@
-- Estado: flujo rápido de creación de presupuestos implementado y validado.
-- Hecho: selector search-first; el catálogo no descarga ni muestra todas las partidas al abrir.
-- Hecho: búsqueda compacta, normalizada y paginada en API; máximo 12 resultados visibles.
-- Hecho: plantillas rápidas, partidas manuales y combinación automática de duplicados.
-- Hecho: editor compacto con detalles avanzados plegados y revisión clara de base, IVA y total.
-- Hecho: cada partida de catálogo conserva ID, referencia, versión y precio base.
-- Hecho: cualquier cambio del precio de catálogo exige indicar el motivo.
-- Hecho: cada presupuesto inicia como borrador persistente antes de editar alcance y partidas.
-- Hecho: autoguardado con estado visible y protección frente a sobrescrituras concurrentes.
-- Hecho: oportunidad existente continúa sin reescribir datos salvo acción explícita.
-- Hecho: borradores locales sensibles se eliminan al cerrar o caducar la sesión.
-- Validado: typecheck y build completos; 348 tests unitarios y 54 recorridos Playwright afectados.
-- Decisión: no se requiere migración; se reutilizan borrador JSONB y updated_at existentes.
-- Pendiente opcional: favoritos, partidas recientes y duplicación de presupuestos.
+- Estado: mejoras pendientes del flujo rápido de presupuestos implementadas y validadas localmente.
+- Hecho: catálogo search-first con búsqueda normalizada, paginación y máximo de 12 resultados.
+- Hecho: plantillas contextuales de baño, cocina y armarios; cada una pide solo sus medidas aplicables.
+- Hecho: cocina separa suelo, muebles bajos, muebles altos opcionales y encimera; admite coma o punto decimal.
+- Hecho: editor compacto con autoguardado, control de concurrencia y observaciones por partida.
+- Hecho: las partidas conservan referencia, versión, precio base y motivo de cualquier modificación.
+- Hecho: las estimaciones pendientes muestran aviso en editor, revisión, propuesta y PDF.
+- Hecho: hasta 6 partidas favoritas se guardan como preferencias del dispositivo.
+- Hecho: hasta 6 partidas usadas recientemente aparecen como accesos rápidos.
+- Hecho: favoritos y recientes cargan solo sus referencias, nunca el catálogo completo.
+- Hecho: duplicar crea un borrador independiente con nueva referencia, versión e IDs de partida.
+- Hecho: la copia no hereda firma, histórico ni referencia personalizada del cliente.
+- Decisión: no se requiere migración; preferencias locales y borrador JSONB existente.
+- Validado: typecheck, build, 359 pruebas y 128 recorridos Playwright correctos.
+- Producción actual: commit 218fa36; este nuevo lote está pendiente de commit y despliegue.
