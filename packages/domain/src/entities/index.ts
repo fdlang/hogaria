@@ -20,7 +20,7 @@ export interface EstimateLine { id: string; categoria: string; descripcion: stri
 export interface EstimateDraft { titulo: string; referencia?: string; validezDias: number; condicionesPago: string; garantia: string; notasCliente: string; notasInternas: string; partidas: EstimateLine[]; }
 export interface Estimate { id: number; oportunidadId: number; clienteId: number; numero: string; titulo: string; estado: EstimateStatus; versionActual: number; borrador: EstimateDraft; motivoRechazo: string | null; motivoAnulacion?: string | null; createdAt: Date; updatedAt: Date; }
 export interface EstimateVersion { id: number; estimateId: number; version: number; snapshot: EstimateDraft; enviadoAt: Date | null; firmadoAt: Date | null; firma: Record<string, unknown> | null; createdAt: Date; }
-export interface ChangeOrder { id: number; projectId: number; numero: string; estado: ChangeOrderStatus; payload: EstimateDraft; aprobadoAt: Date | null; createdAt: Date; }
+export interface ChangeOrder { id: number; revision: number; projectId: number; numero: string; estado: ChangeOrderStatus; payload: EstimateDraft; aprobadoAt: Date | null; createdAt: Date; }
 export interface CatalogItem {
   id: number;
   reference: string;

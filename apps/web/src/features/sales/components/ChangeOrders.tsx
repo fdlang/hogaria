@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/shared/ui";
 import type { ProjectsApi } from "@/features/projects/api/projects.api";
 import type { ChangeOrderDTO } from "../api/sales.api";
@@ -17,17 +17,26 @@ export function ChangeOrders({ api, projectId, admin, readOnly = false, onChange
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const request = useRef(0);
+  const activeProject = useRef(projectId);
+  activeProject.current = projectId;
   const reload = async () => {
+    const targetProject = projectId;
+    const token = ++request.current;
     setLoading(true);
-    try { setItems(await api.changes(projectId)); }
-    finally { setLoading(false); }
+    try { const result = await api.changes(targetProject); if (activeProject.current === targetProject && token === request.current) setItems(result); }
+    finally { if (activeProject.current === targetProject && token === request.current) setLoading(false); }
   };
-  useEffect(() => { void reload().catch(() => setError("No se pudieron cargar las órdenes de cambio")); }, [api, projectId]);
+  useEffect(() => {
+    request.current++; setItems([]); setEditing(null); setSelected(null); setPassword(""); setError(""); setBusy(false);
+    setDescription(""); setPrice(""); setConditions(""); setVat(CURRENT_FISCAL_POLICY.defaultVatRate);
+    void reload().catch(() => { if (activeProject.current === projectId) { setLoading(false); setError("No se pudieron cargar las órdenes de cambio"); } });
+  }, [api, projectId]);
   const run = async (action: () => Promise<unknown>) => {
-    if (busy) return; setBusy(true); setError("");
-    try { await action(); setPassword(""); setSelected(null); await reload(); await onChanged(); }
-    catch (cause) { setError((cause as Error).message || "No se pudo completar la acción"); }
-    finally { setBusy(false); }
+    if (busy) return; const targetProject = projectId; setBusy(true); setError("");
+    try { await action(); if (activeProject.current !== targetProject) return; setPassword(""); setSelected(null); await reload(); await onChanged(); }
+    catch (cause) { if (activeProject.current === targetProject) setError((cause as Error).message || "No se pudo completar la acción"); }
+    finally { if (activeProject.current === targetProject) setBusy(false); }
   };
   return <section className={`sales-card project-change-orders${admin ? " project-change-orders--admin" : " project-change-orders--client"}`} aria-label="Órdenes de cambio">
     <header className="project-change-orders__header"><div><p className="eyebrow">Control de alcance</p><h2>Órdenes de cambio</h2><p>Las ampliaciones no modifican el presupuesto firmado. Solo se suman al importe de la obra tras la aprobación del cliente.</p></div>
@@ -37,7 +46,7 @@ export function ChangeOrders({ api, projectId, admin, readOnly = false, onChange
     {loading && <p role="status">Cargando órdenes de cambio…</p>}
     {admin && !readOnly && <form className="project-change-orders__form" onSubmit={event => { event.preventDefault(); void run(async () => {
       const draft = { titulo: description.trim(), validezDias: 30, condicionesPago: conditions, garantia: "", notasCliente: "", notasInternas: "", partidas: [{ id: crypto.randomUUID(), categoria: "Ampliación", descripcion: description.trim(), cantidad: 1, unidad: "global", precioVentaUnitario: Number(price), costeUnitario: null, descuento: 0, iva: vat }] };
-      if (editing) await api.editChange(projectId, editing.id, draft); else await api.createChange(projectId, draft);
+      if (editing) await api.editChange(projectId, editing.id, draft, editing.revision); else await api.createChange(projectId, draft);
       setDescription(""); setPrice(""); setConditions(""); setEditing(null);
     }); }}>
       <label>Alcance de la ampliación<textarea required value={description} onChange={event => setDescription(event.target.value)} /></label>
@@ -61,14 +70,14 @@ export function ChangeOrders({ api, projectId, admin, readOnly = false, onChange
             const payload = item.payload!; const line = payload.partidas[0]!;
             setEditing(item); setDescription(payload.titulo); setPrice(String(line.cantidad*line.precioVentaUnitario*(1-line.descuento/100))); setConditions(payload.condicionesPago); setVat(line.iva);
           }}>Editar borrador</Button>}
-          <Button disabled={busy || editing?.id === item.id} onClick={() => void run(() => api.decideChange(projectId, item.id, "enviado"))}>Publicar para aprobación</Button>
+          <Button disabled={busy || editing?.id === item.id} onClick={() => void run(() => api.decideChange(projectId, item.id, "enviado", item.revision))}>Publicar para aprobación</Button>
         </div>}
         {!admin && !readOnly && item.estado === "enviado" && <div className="project-change-order__actions">
           <Button small variant="ghost" disabled={busy} onClick={() => { setSelected(item.id); setPassword(""); }}>Revisar decisión</Button>
           {selected === item.id && <div className="project-change-order__decision"><label>Confirma tu contraseña<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></label>
             <p>Al aprobar aceptas el alcance y el importe indicado, que se añadirá a tu obra.</p>
-            <Button disabled={busy || !password} onClick={() => void run(() => api.decideChange(projectId, item.id, "aprobado", password))}>Aceptar ampliación</Button>
-            <Button variant="ghost" disabled={busy || !password} onClick={() => void run(() => api.decideChange(projectId, item.id, "rechazado", password))}>Rechazar</Button>
+            <Button disabled={busy || !password} onClick={() => void run(() => api.decideChange(projectId, item.id, "aprobado", item.revision, password))}>Aceptar ampliación</Button>
+            <Button variant="ghost" disabled={busy || !password} onClick={() => void run(() => api.decideChange(projectId, item.id, "rechazado", item.revision, password))}>Rechazar</Button>
           </div>}
         </div>}
       </article>;

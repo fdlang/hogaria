@@ -1,15 +1,14 @@
-- Estado: lote crítico HOG-RET-002 implementado y en validación final.
-- Hecho: las obras se archivan sin borrar el equipo asignado ni su trazabilidad.
-- Hecho: clientes y profesionales pierden acceso operativo tras el archivo; administración conserva la consulta histórica.
-- Hecho: documentos, previsión laboral y datos de la obra archivada quedan inmutables en API y PostgreSQL.
-- Hecho: se bloquean DELETE/TRUNCATE físicos y el archivo mientras haya eliminaciones de ficheros pendientes.
-- Hecho: una jornada abierta puede cerrarse tras archivar; no se permite iniciar, pausar ni reanudar trabajo.
-- Hecho: la interfaz oculta acciones y muestra equipo, documentos y órdenes archivadas en modo lectura.
-- Hecho: HOG-RET-002 actualizada con alcance, supuesto, implementaciones, pruebas y métrica no instrumentada.
-- Compatibilidad: las obras archivadas antes de esta corrección no pueden recuperar automáticamente asignaciones ya borradas.
-- Pendiente alto: IVA, textos contractuales y órdenes de cambio, a validar por gestor/asesoría.
-- Pendiente alto: retención y anonimización, a validar por gestor y DPD.
-- Pendiente alto: segregación de funciones y MFA antes de ampliar administradores.
-- Pendiente alto: jornada y descansos, a validar por gestor laboral.
-- Despliegue: aplicar project-retention-hardening.sql con el runner versionado antes de publicar esta versión.
-- Próxima revisión global: 20/12/2026; HOG-RET-002: 13/01/2027.
+- Estado: auditoría funcional completa corregida y validación final superada.
+- Corregido: cambios rápidos de obra o profesional no mezclan respuestas tardías.
+- Corregido: obras archivadas preservan documentos, jornadas, costes y órdenes como histórico.
+- Corregido: solo se permite cerrar una jornada ya abierta o revisar un parte enviado al archivar.
+- Corregido: segundos, pausas, coste y trazabilidad de aprobación/rechazo se validan en base de datos.
+- Corregido: órdenes de cambio usan revisión optimista, identidad inmutable y orden uniforme de bloqueos.
+- Corregido: la migración de órdenes mantiene compatibilidad con el despliegue anterior durante el rollout.
+- Corregido: cargas Blob se registran antes de subir, tienen gracia inicial, referencias seguras y backoff.
+- Corregido: avisos, rutas privadas, errores recuperables y estados de interfaz quedan sincronizados.
+- Migraciones nuevas: archived-work-history-hardening.sql, change-order-optimistic-locking.sql y blob-cleanup-outbox.sql.
+- Validación: typecheck, 272 pruebas API, 80 web, 37 dominio y builds correctos.
+- Validación navegador: 138 escenarios Chromium/WebKit correctos.
+- Auditorías finales frontend, backend y seguridad sin bloqueos de código confirmados.
+- Pendiente: commit, migrar producción con el runner versionado y desplegar el mismo commit.

@@ -64,6 +64,7 @@ import pg from "pg";
 import { auditedPool } from "./infrastructure/audit/request-audit.js";
 import { PostgresCooldownGate } from "./infrastructure/database/postgresCooldownGate.js";
 import { PostgresCommercialTransaction } from "./infrastructure/database/postgresCommercialTransaction.js";
+import { InMemoryBlobCleanupQueue, PostgresBlobCleanupQueue } from "./infrastructure/database/blobCleanupQueue.js";
 
 // ─────────────────────────────────────────────────────────────
 // Tiny in-memory implementations for repos that don't have one yet
@@ -102,6 +103,7 @@ class InMemoryFileRepository implements IFileRepository {
   async findByProject(projectId: number): Promise<ProjectFile[]> {
     return this.files.filter(f => f.projectId === projectId);
   }
+  async findByStorageKey(storageKey: string): Promise<ProjectFile | null> { return this.files.find(file => file.storageKey === storageKey) ?? null; }
   async findDeleting(limit: number): Promise<ProjectFile[]> { return this.files.filter(file => file.deleting).slice(0, limit); }
   async markDeleting(id: number): Promise<void> {
     const file = this.files.find(f => f.id === id);
@@ -121,6 +123,7 @@ class InMemoryProfessionalDocumentRepository implements IProfessionalDocumentRep
   async save(document: Omit<ProfessionalDocument, "id">) { const saved = { ...document, id: this.nextId++ }; this.documents.push(saved); return saved; }
   async findById(id: number) { return this.documents.find(document => document.id === id) ?? null; }
   async findByProfessional(professionalId: number) { return this.documents.filter(document => document.professionalId === professionalId); }
+  async findByStorageKey(storageKey: string) { return this.documents.find(document => document.storageKey === storageKey) ?? null; }
   async findDeleting(limit: number) { return this.documents.filter(document => document.deleting).slice(0, limit); }
   async markDeleting(id: number) { const document = await this.findById(id); if (!document) throw new NotFoundError("Documento"); document.deleting = true; }
   async delete(id: number) { const index = this.documents.findIndex(document => document.id === id); if (index === -1) throw new NotFoundError("Documento"); this.documents.splice(index, 1); }
@@ -223,6 +226,7 @@ export async function buildApp(): Promise<AppDependencies> {
   const audit: IAuditRepository = pool ? new PostgresAuditRepository(pool) : new InMemoryAuditRepository();
   const files: IFileRepository = pool ? new PostgresFileRepository(pool) : new InMemoryFileRepository();
   const fileStorage: IFileStorage = new VercelBlobFileStorage();
+  const blobCleanupQueue = pool ? new PostgresBlobCleanupQueue(pool) : new InMemoryBlobCleanupQueue();
   const professionalDocuments = pool ? new PostgresProfessionalDocumentRepository(pool) : new InMemoryProfessionalDocumentRepository();
   const solicitudes: ISolicitudRepository = pool ? new PostgresSolicitudRepository(pool) : new InMemorySolicitudRepository();
   const opportunities: IOpportunityRepository = pool ? new PostgresOpportunityRepository(pool) : new InMemoryOpportunityRepository();
@@ -285,7 +289,7 @@ export async function buildApp(): Promise<AppDependencies> {
         : (solicitudId) => notifications.receiveLead(solicitudId)),
     listSolicitudes:            new ListSolicitudesUseCase(users, solicitudes),
     updateSolicitudStatus:      new UpdateSolicitudStatusUseCase(users, solicitudes),
-    uploadFile:                 new UploadFileUseCase(users, projects, files, fileStorage, events),
+    uploadFile:                 new UploadFileUseCase(users, projects, files, fileStorage, events, blobCleanupQueue),
     deleteFile:                 new DeleteFileUseCase(users, projects, files, fileStorage),
     listFiles:                  new ListFilesUseCase(users, projects, files),
     downloadFile:               new DownloadFileUseCase(users, projects, files, fileStorage),
@@ -296,8 +300,8 @@ export async function buildApp(): Promise<AppDependencies> {
     catalog:                    new CatalogUseCases(users, catalog),
     activation,
     work: new WorkTrackingUseCases(users, projects, workStore),
-    professionalDocuments: new ProfessionalDocumentUseCases(users, professionalDocuments, fileStorage),
-    retryPendingDeletions: new RetryPendingDeletionsUseCase(files, professionalDocuments, fileStorage, projects),
+    professionalDocuments: new ProfessionalDocumentUseCases(users, professionalDocuments, fileStorage, blobCleanupQueue),
+    retryPendingDeletions: new RetryPendingDeletionsUseCase(files, professionalDocuments, fileStorage, projects, blobCleanupQueue),
   };
 
   return { users, tokens, useCases };

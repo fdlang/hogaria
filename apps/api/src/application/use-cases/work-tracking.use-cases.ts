@@ -4,6 +4,7 @@ import {
   NotFoundError,
   ValidationError,
   workCostCents,
+  canActOnArchivedWork,
   requiresIndependentApproval,
 } from "@reformapro/domain";
 import type {
@@ -222,28 +223,31 @@ export class WorkTrackingUseCases {
     const rates = await this.store.rates(actorId),
       rate = rates.find((r) => r.effectiveAt <= this.now());
     const open = await this.store.openEntry(actorId);
+    const openProject = open ? await this.projects.findById(open.projectId) : null;
     return {
       engagement: rate?.engagement ?? null,
       rateUnit: rate?.rateUnit ?? null,
       unitLabel: rate?.unitLabel ?? null,
       open: open ? publicWork(open) : null,
+      openProjectArchived: Boolean(openProject?.archivedAt),
     };
   }
   async start(actorId: number, input: Record<string, unknown>) {
     const user = await this.professional(actorId),
-      project = await this.project(actorId, positiveId(input.projectId));
+      projectId = positiveId(input.projectId);
     const id = uuid(input.operationId);
     return this.store.transaction(actorId, async (repo) => {
       const existing = await repo.entry(id);
       if (existing) {
         if (
           existing.professionalId !== actorId ||
-          existing.projectId !== project.id ||
+          existing.projectId !== projectId ||
           existing.kind !== "jornada"
         )
           throw new ConflictError("Operación ya utilizada");
         return publicWork(existing);
       }
+      const project = await this.project(actorId, projectId);
       if (await repo.openEntry(actorId))
         throw new ConflictError("Ya tienes una jornada abierta");
       const at = this.now(),
@@ -298,8 +302,11 @@ export class WorkTrackingUseCases {
       throw new NotFoundError("Registro");
     const project = await this.projects.findById(original.projectId);
     if (!project) throw new NotFoundError("Proyecto");
-    if (project.archivedAt && actor.rol === "profesional" && input.action !== "salida")
-      throw new ConflictError("La obra está archivada; solo puedes cerrar una jornada que ya estaba abierta");
+    if (project.archivedAt) {
+      const action = String(input.action);
+      const allowed = canActOnArchivedWork({ role: actor.rol, action, status: original.status });
+      if (!allowed) throw new ConflictError("La obra está archivada; solo se permite cerrar y revisar trabajo pendiente");
+    }
     return this.store.transaction(original.professionalId, async (repo) => {
       const entry = await repo.entry(entryId);
       if (!entry) throw new NotFoundError("Registro");
@@ -384,8 +391,8 @@ export class WorkTrackingUseCases {
         entry.status = action === "aprobar" ? "aprobado" : "rechazado";
         entry.approvedCostCents =
           action === "aprobar" ? workCostCents(entry) : null;
-        entry.approvedBy = actorId;
-        entry.approvedAt = at;
+        entry.approvedBy = action === "aprobar" ? actorId : null;
+        entry.approvedAt = action === "aprobar" ? at : null;
         entry.reviewReason = reason;
       } else throw new ValidationError("Acción inválida");
       entry.revision++;
@@ -433,7 +440,7 @@ export class WorkTrackingUseCases {
   }
   async part(actorId: number, input: Record<string, unknown>) {
     const user = await this.professional(actorId),
-      project = await this.project(actorId, positiveId(input.projectId));
+      projectId = positiveId(input.projectId);
     const id = uuid(input.operationId),
       startedAt = date(input.startedAt);
     return this.store.transaction(actorId, async (repo) => {
@@ -441,12 +448,13 @@ export class WorkTrackingUseCases {
       if (existing) {
         if (
           existing.professionalId !== actorId ||
-          existing.projectId !== project.id ||
+          existing.projectId !== projectId ||
           existing.kind !== "parte"
         )
           throw new ConflictError("Operación ya utilizada");
         return publicWork(existing);
       }
+      const project = await this.project(actorId, projectId);
       const rate = await this.rate(repo, actorId, startedAt);
       if (rate.engagement === "empleado")
         throw new ValidationError(

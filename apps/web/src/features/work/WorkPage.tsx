@@ -202,6 +202,7 @@ export function WorkPage({
                   api={api}
                   entry={entry}
                   admin={isAdmin}
+                  projectArchived={Boolean(projectQuery.value?.find(project => project.id === entry.projectId)?.archivedAt)}
                   onSaved={saved}
                 />
               ))}
@@ -310,7 +311,7 @@ function WorkClock({
               {when(c.open.startedAt)} ·{" "}
               {c.open.pauses.some((p) => !p.endedAt) ? "En pausa" : "En curso"}
             </p>
-            <WorkForm
+            {!c.openProjectArchived && <WorkForm
               submit={
                 c.open.pauses.some((p) => !p.endedAt)
                   ? "Reanudar"
@@ -326,7 +327,8 @@ function WorkClock({
               }}
             >
               <span>Las pausas se descuentan del tiempo trabajado.</span>
-            </WorkForm>
+            </WorkForm>}
+            {c.openProjectArchived && <p className="work-guidance" role="status">La obra está archivada. Registra la salida para cerrar esta jornada pendiente.</p>}
             <WorkForm
               submit="Registrar salida"
               onSubmit={async (d) => {
@@ -419,11 +421,13 @@ function WorkRecord({
   api,
   entry: e,
   admin,
+  projectArchived,
   onSaved,
 }: {
   api: WorkApi;
   entry: Entry;
   admin: boolean;
+  projectArchived: boolean;
   onSaved: () => void;
 }) {
   const [history, setHistory] = useState(false);
@@ -480,7 +484,7 @@ function WorkRecord({
           </WorkForm>
         </div>
       )}
-      {admin && (
+      {admin && !projectArchived && (
         <details>
           <summary>Corregir registro</summary>
           <p>

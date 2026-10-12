@@ -99,6 +99,8 @@ export class UpdateProjectUseCase {
     const visibleKeys = ["estado","progreso","hitos","fechaInicio","fechaFinPrevista","nombre","descripcion","direccion","tipo","presupuesto"] as const;
     const changedFields = visibleKeys.filter(key => key in built && JSON.stringify(project[key]) !== JSON.stringify(built[key]));
 
+    if (changedFields.length === 0) return project;
+
     const updated = await this.projects.update(cmd.projectId, allowedChanges, project.revision ?? 0);
 
     // Emit ProjectCompleted if we just transitioned to finalizado

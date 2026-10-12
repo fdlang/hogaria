@@ -27,7 +27,7 @@ export type CatalogPickerItemDTO = Pick<CatalogItemDTO, "id" | "reference" | "ca
 export type CatalogPickerPageDTO = { items: CatalogPickerItemDTO[]; total: number; page: number; limit: number; pages: number };
 export type CatalogWriteDTO = Pick<CatalogItemDTO, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate"> & Partial<Pick<CatalogItemDTO, "itemType" | "costBreakdown" | "costComposition" | "pricingMode" | "tariffZone" | "evidence" | "searchTerms" | "reviewStatus" | "replacementReference" | "reviewNote">>;
 export type AdminEstimateDTO = { id: number; oportunidadId: number; estado: string; borrador: EstimateDraftDTO; updatedAt: string };
-export type ChangeOrderDTO = { id: number; numero: string; estado: string; payload?: EstimateDraftDTO; propuesta?: Pick<PublicProposalDTO, "titulo" | "partidas" | "condicionesPago"> };
+export type ChangeOrderDTO = { id: number; revision: number; numero: string; estado: string; payload?: EstimateDraftDTO; propuesta?: Pick<PublicProposalDTO, "titulo" | "partidas" | "condicionesPago"> };
 
 export const parseEstimateList = (value: unknown): EstimateDTO[] => {
   if (!Array.isArray(value) || value.some(item =>

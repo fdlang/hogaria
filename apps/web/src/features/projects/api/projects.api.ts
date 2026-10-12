@@ -30,8 +30,8 @@ export class ProjectsApi {
   update(id: number, changes: Partial<ProjectDTO>): Promise<ProjectDTO> { return this.http.patch(`/projects/${id}`, changes); }
   changes(id: number) { return this.http.get<import("@/features/sales/api/sales.api").ChangeOrderDTO[]>(`/projects/${id}/change-orders`); }
   createChange(id: number, borrador: import("@/features/sales/api/sales.api").EstimateDraftDTO) { return this.http.post(`/projects/${id}/change-orders`, { borrador }); }
-  editChange(projectId: number, id: number, borrador: import("@/features/sales/api/sales.api").EstimateDraftDTO) { return this.http.patch(`/projects/${projectId}/change-orders/${id}`, { borrador }); }
-  decideChange(projectId: number, id: number, estado: string, password?: string) { return this.http.post(`/projects/${projectId}/change-orders/${id}/transition`, { estado, password }); }
+  editChange(projectId: number, id: number, borrador: import("@/features/sales/api/sales.api").EstimateDraftDTO, revision: number) { return this.http.patch(`/projects/${projectId}/change-orders/${id}`, { borrador, revision }); }
+  decideChange(projectId: number, id: number, estado: string, revision: number, password?: string) { return this.http.post(`/projects/${projectId}/change-orders/${id}/transition`, { estado, revision, password }); }
   assign(projectId: number, userId: number): Promise<ProjectDTO> { return this.http.post(`/projects/${projectId}/professionals`, { userId }); }
   unassign(projectId: number, userId: number):                    Promise<ProjectDTO> { return this.http.delete(`/projects/${projectId}/professionals/${userId}`); }
   archive(projectId: number, reason: string, revision: number): Promise<ProjectDTO> { return this.http.post(`/projects/${projectId}/archive`, { reason, revision }); }

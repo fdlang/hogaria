@@ -5,5 +5,7 @@ describe("notification destinations",()=>{
   expect(notificationDestination({role:"cliente",type:"estimate_published",resourceId:"8"})).toBe("#/cliente/budgets");
   expect(notificationDestination({role:"profesional",type:"project_assigned",resourceId:"7",projectId:7})).toBe("#/profesional/projects/7");
   expect(notificationDestination({role:"admin",type:"work_submitted",resourceId:"x"})).toBe("#/admin/work");
+  expect(notificationDestination({role:"cliente",type:"project_archived",resourceId:"7",projectId:7})).toBe("#/cliente");
+  expect(notificationDestination({role:"profesional",type:"project_unassigned",resourceId:"7",projectId:7})).toBe("#/profesional");
  });
 });

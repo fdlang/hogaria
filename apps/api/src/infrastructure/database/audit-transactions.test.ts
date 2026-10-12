@@ -19,6 +19,7 @@ import { Email, Money, Percentage } from "@reformapro/domain/value-objects";
 import { PostgresNoticeStore } from "./clientNoticeStore.js";
 import { auditedPool, requestAudit } from "../audit/request-audit.js";
 import { PostgresCooldownGate } from "./postgresCooldownGate.js";
+import { PostgresBlobCleanupQueue } from "./blobCleanupQueue.js";
 describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   const db = new PGlite();
   // PGlite has one connection. Serialize checked-out clients, like a size-one pool.
@@ -96,6 +97,9 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
       "durable-audit.sql",
       "administrative-retirement.sql",
       "project-retention-hardening.sql",
+      "archived-work-history-hardening.sql",
+      "change-order-optimistic-locking.sql",
+      "blob-cleanup-outbox.sql",
     ])
       await db.exec(
         await readFile(
@@ -107,7 +111,7 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   afterAll(() => db.close());
   beforeEach(async () => {
     await db.exec(
-      "ALTER TABLE budget_versions DISABLE TRIGGER budget_version_no_truncate; ALTER TABLE projects DISABLE TRIGGER project_history_no_truncate; ALTER TABLE project_files DISABLE TRIGGER project_files_no_truncate; ALTER TABLE work_budgets DISABLE TRIGGER work_budgets_no_truncate; TRUNCATE users CASCADE; ALTER TABLE work_budgets ENABLE TRIGGER work_budgets_no_truncate; ALTER TABLE project_files ENABLE TRIGGER project_files_no_truncate; ALTER TABLE projects ENABLE TRIGGER project_history_no_truncate; ALTER TABLE budget_versions ENABLE TRIGGER budget_version_no_truncate; TRUNCATE client_email_notifications; TRUNCATE rate_limit_windows; DROP TRIGGER IF EXISTS test_failure ON estimates; DROP TRIGGER IF EXISTS activation_failure ON users;",
+      "ALTER TABLE budget_versions DISABLE TRIGGER budget_version_no_truncate; ALTER TABLE projects DISABLE TRIGGER project_history_no_truncate; ALTER TABLE project_files DISABLE TRIGGER project_files_no_truncate; ALTER TABLE work_budgets DISABLE TRIGGER work_budgets_no_truncate; ALTER TABLE work_entries DISABLE TRIGGER work_entries_no_truncate; ALTER TABLE change_orders DISABLE TRIGGER change_orders_no_truncate; TRUNCATE users CASCADE; ALTER TABLE change_orders ENABLE TRIGGER change_orders_no_truncate; ALTER TABLE work_entries ENABLE TRIGGER work_entries_no_truncate; ALTER TABLE work_budgets ENABLE TRIGGER work_budgets_no_truncate; ALTER TABLE project_files ENABLE TRIGGER project_files_no_truncate; ALTER TABLE projects ENABLE TRIGGER project_history_no_truncate; ALTER TABLE budget_versions ENABLE TRIGGER budget_version_no_truncate; TRUNCATE client_email_notifications; TRUNCATE rate_limit_windows; TRUNCATE blob_cleanup_jobs; DROP TRIGGER IF EXISTS test_failure ON estimates; DROP TRIGGER IF EXISTS activation_failure ON users;",
     );
     adminId = (
       await users.save({
@@ -148,6 +152,17 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     await expect(gate.check("login:test", 2, 60000)).resolves.toBe(true);
     await expect(gate.check("login:test", 2, 60000)).resolves.toBe(true);
     await expect(gate.check("login:test", 2, 60000)).resolves.toBe(false);
+  });
+  it("persists orphaned blob cleanup work until it is explicitly completed", async () => {
+    const cleanup = new PostgresBlobCleanupQueue(pool);
+    await cleanup.stage("projects/orphan.pdf");
+    expect(await cleanup.find(10)).toEqual([]);
+    await query("UPDATE blob_cleanup_jobs SET next_attempt_at=now() WHERE storage_key=$1", ["projects/orphan.pdf"]);
+    expect(await cleanup.find(10)).toEqual([{ storageKey:"projects/orphan.pdf" }]);
+    await cleanup.fail("projects/orphan.pdf", "transient");
+    expect(await cleanup.find(10)).toEqual([]);
+    await cleanup.remove("projects/orphan.pdf");
+    expect(await cleanup.find(10)).toEqual([]);
   });
   it("revokes activation links when deactivating an account", async () => {
     const tokens = new PostgresActivationTokenRepository(pool);
@@ -192,22 +207,27 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     await projects.update(project.id,{ nombre:"New" },0);
     await expect(projects.update(project.id,{ descripcion:"Stale" },0)).rejects.toThrow("ha cambiado");
     const changes = new PostgresChangeOrderRepository(pool);
-    const order = await changes.save({ projectId:project.id,numero:"OC-test",estado:"borrador",payload:draft,aprobadoAt:null });
-    await changes.transition(order.id,project.id,"borrador","enviado",adminId);
+    const order = await changes.save({ projectId:project.id,numero:"OC-test",estado:"borrador",payload:draft,aprobadoAt:null,revision:0 });
+    const editedOrder = await changes.update(order.id, { payload: { ...draft, titulo: "Edición vigente" } }, order.revision);
+    await expect(changes.update(order.id, { payload: draft }, order.revision)).rejects.toThrow("ha cambiado");
+    const sentOrder = await changes.transition(order.id,project.id,"borrador","enviado",adminId,editedOrder.revision);
     await db.exec("CREATE FUNCTION fail_apply_change() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'budget unavailable'; END $$; CREATE TRIGGER change_apply_failure BEFORE UPDATE ON projects FOR EACH ROW EXECUTE FUNCTION fail_apply_change();");
     try {
-      await expect(changes.transition(order.id,project.id,"enviado","aprobado",clientId)).rejects.toThrow("budget unavailable");
+      await expect(changes.transition(order.id,project.id,"enviado","aprobado",clientId,sentOrder.revision)).rejects.toThrow("budget unavailable");
       expect((await changes.findByProject(project.id))[0]?.estado).toBe("enviado");
       expect((await projects.findById(project.id))?.presupuesto.amount).toBe(100);
     } finally { await db.exec("DROP TRIGGER change_apply_failure ON projects; DROP FUNCTION fail_apply_change();"); }
-    await changes.transition(order.id,project.id,"enviado","aprobado",clientId);
+    const approvedOrder = await changes.transition(order.id,project.id,"enviado","aprobado",clientId,sentOrder.revision);
     const updated = await projects.findById(project.id);
     expect(updated?.presupuesto.amount).toBe(200);
     expect(updated?.fiscalSnapshots).toHaveLength(1);
-    await expect(changes.transition(order.id,project.id,"enviado","aprobado",clientId)).rejects.toThrow();
+    await expect(changes.transition(order.id,project.id,"enviado","aprobado",clientId,approvedOrder.revision)).rejects.toThrow();
     expect((await projects.findById(project.id))?.presupuesto.amount).toBe(200);
     await expect(query("DELETE FROM projects WHERE id=$1",[project.id])).rejects.toThrow("histórico");
     await expect(query("UPDATE change_orders SET payload=$2 WHERE id=$1",[order.id,{...draft,titulo:"Changed"}])).rejects.toThrow("inmutable");
+    await expect(query("UPDATE change_orders SET project_id=$2,revision=revision+1 WHERE id=$1", [order.id, project.id + 9999])).rejects.toThrow("identidad");
+    await expect(query("DELETE FROM change_orders WHERE id=$1", [order.id])).rejects.toThrow("historico");
+    await expect(query("TRUNCATE change_orders")).rejects.toThrow("historico");
   });
   it("blocks physical project deletion even without published change orders", async () => {
     const project = await projects.save({ id:0,estimateId,clienteId:clientId,nombre:"Obra protegida",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"planificacion",progreso:Percentage.zero(),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date() });
@@ -217,13 +237,33 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
   });
   it("protects archived project files, labour forecasts and project truncation in the database", async () => {
     const project = await projects.save({ id:0,estimateId,clienteId:clientId,nombre:"Obra archivada",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"pausado",progreso:Percentage.of(20),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date() });
+    const professional = await users.save({ id:0,email:Email.of("worker-history@test.es"),nombre:"Profesional",rol:"profesional",activo:true,createdAt:new Date() });
+    const entryId = crypto.randomUUID();
+    const openPayload = { id:entryId,professionalId:professional.id,projectId:project.id,status:"abierto",revision:1,startedAt:"2026-10-01T08:00:00.000Z",endedAt:null,pauses:[],breakSeconds:0,units:null,notes:"",rate:{rateUnit:"hora",rateCents:2000},approvedCostCents:null,approvedBy:null,approvedAt:null,reviewReason:"",createdAt:"2026-10-01T08:00:00.000Z" };
+    await query("INSERT INTO work_entries(id,professional_id,project_id,started_at,status,seconds,payload) VALUES($1,$2,$3,$4,'abierto',0,$5)", [entryId, professional.id, project.id, new Date("2026-10-01T08:00:00Z"), openPayload]);
     const file = (await query("INSERT INTO project_files(project_id,payload) VALUES($1,$2) RETURNING id", [project.id, { deleting: false }])).rows[0] as { id: number };
+    const archivedChanges = new PostgresChangeOrderRepository(pool);
+    const archivedOrder = await archivedChanges.save({ projectId:project.id,numero:"OC-archived",estado:"borrador",payload:draft,aprobadoAt:null,revision:0 });
     await query("INSERT INTO work_budgets(project_id,payload) VALUES($1,$2)", [project.id, { plannedHours: 10, plannedCostCents: 10000 }]);
     await projects.update(project.id, { archivedAt: new Date(), archiveReason: "Cierre administrativo" }, project.revision ?? 0);
 
     await expect(query("DELETE FROM project_files WHERE id=$1", [file.id])).rejects.toThrow("archivada");
     await expect(query("UPDATE project_files SET payload=jsonb_set(payload,'{deleting}','true') WHERE id=$1", [file.id])).rejects.toThrow("archivada");
     await expect(query("UPDATE work_budgets SET payload=$2 WHERE project_id=$1", [project.id, { plannedHours: 20, plannedCostCents: 20000 }])).rejects.toThrow("archivada");
+    await expect(archivedChanges.update(archivedOrder.id, { payload:{ ...draft,titulo:"Alterada" } }, archivedOrder.revision)).rejects.toThrow("archivada");
+    await expect(archivedChanges.transition(archivedOrder.id, project.id, "borrador", "enviado", adminId, archivedOrder.revision)).rejects.toThrow("archivada");
+    await expect(query("UPDATE work_entries SET started_at=$2 WHERE id=$1", [entryId, new Date("2026-10-01T07:30:00Z")])).rejects.toThrow("solo se permite");
+    const submittedPayload = { ...openPayload, status:"enviado", revision:2, endedAt:"2026-10-01T09:00:00.000Z", notes:"Cierre" };
+    const falsifiedPauses = { ...submittedPayload, pauses:[{ startedAt:"2026-10-01T08:30:00.000Z",endedAt:"2026-10-01T09:00:00.000Z" }] };
+    await expect(query("UPDATE work_entries SET ended_at=$2,status='enviado',seconds=1800,payload=$3 WHERE id=$1", [entryId, new Date("2026-10-01T09:00:00Z"), falsifiedPauses])).rejects.toThrow("solo se permite");
+    await expect(query("UPDATE work_entries SET ended_at=$2,status='enviado',seconds=7200,payload=$3 WHERE id=$1", [entryId, new Date("2026-10-01T09:00:00Z"), submittedPayload])).rejects.toThrow("solo se permite");
+    await expect(query("UPDATE work_entries SET ended_at=$2,status='enviado',seconds=3600,payload=$3 WHERE id=$1", [entryId, new Date("2026-10-01T09:00:00Z"), submittedPayload])).resolves.toBeDefined();
+    await expect(query("UPDATE work_entries SET started_at=$2 WHERE id=$1", [entryId, new Date("2026-10-01T07:30:00Z")])).rejects.toThrow("solo se permite");
+    await expect(query("UPDATE work_entries SET status='aprobado',approved_cost_cents=999,payload=$2 WHERE id=$1", [entryId, { ...submittedPayload,status:"aprobado",revision:3,approvedCostCents:999,approvedBy:adminId,approvedAt:new Date().toISOString(),rate:{rateUnit:"hora",rateCents:9999} }])).rejects.toThrow("solo se permite");
+    await expect(query("UPDATE work_entries SET status='aprobado',approved_cost_cents=2000,payload=$2 WHERE id=$1", [entryId, { ...submittedPayload,status:"aprobado",revision:3,approvedCostCents:2000 }])).rejects.toThrow("solo se permite");
+    await expect(query("UPDATE work_entries SET status='rechazado',payload=$2 WHERE id=$1", [entryId, { ...submittedPayload,status:"rechazado",revision:3,reviewReason:"" }])).rejects.toThrow("solo se permite");
+    const rejectedPayload = { ...submittedPayload,status:"rechazado",revision:3,reviewReason:"No corresponde" };
+    await expect(query("UPDATE work_entries SET status='rechazado',payload=$2 WHERE id=$1", [entryId, rejectedPayload])).resolves.toBeDefined();
     await expect(query("UPDATE projects SET payload=jsonb_set(payload,'{nombre}',to_jsonb('Alterada'::text)) WHERE id=$1", [project.id])).rejects.toThrow("archivada");
     await expect(query("TRUNCATE projects CASCADE")).rejects.toThrow("histórico");
     await expect(query("TRUNCATE project_files")).rejects.toThrow("historico");

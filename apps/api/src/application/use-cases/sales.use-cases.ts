@@ -68,6 +68,7 @@ type PublicEstimateSnapshot = Pick<
 > & { partidas: PublicEstimateLine[] };
 export type PublicChangeOrder = {
   id: number;
+  revision: number;
   projectId: number;
   numero: string;
   estado: "enviado" | "aprobado" | "rechazado";
@@ -925,7 +926,7 @@ export class ChangeOrderUseCases {
     private readonly gate?: ICooldownGate,
     private readonly events?: IEventEmitter,
   ) {}
-  async edit(actorId: number, projectId: number, id: number, payload: EstimateDraft) {
+  async edit(actorId: number, projectId: number, id: number, payload: EstimateDraft, expectedRevision: number) {
     assertAdmin(await this.users.findById(actorId));
     const project = await this.projects.findById(projectId);
     if (!project) throw new NotFoundError("Proyecto");
@@ -934,9 +935,10 @@ export class ChangeOrderUseCases {
     const order = (await this.changes.findByProject(projectId)).find(item => item.id === id);
     if (!order) throw new NotFoundError("Orden de cambio");
     if (order.estado !== "borrador") throw new ConflictError("Una orden publicada no se puede modificar");
-    return this.changes.update(id, { payload });
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new ValidationError("Versión de orden no válida");
+    return this.changes.update(id, { payload }, expectedRevision);
   }
-  async transition(actorId: number, projectId: number, id: number, next: string, password?: string) {
+  async transition(actorId: number, projectId: number, id: number, next: string, password: string | undefined, expectedRevision: number) {
     const actor = await this.users.findById(actorId);
     if (!actor?.activo) throw new ForbiddenError();
     const project = await this.projects.findById(projectId);
@@ -944,10 +946,12 @@ export class ChangeOrderUseCases {
     if (project.archivedAt) throw new ConflictError("La obra está archivada y es de solo lectura");
     const order = (await this.changes.findByProject(projectId)).find(item => item.id === id);
     if (!order) throw new NotFoundError("Orden de cambio");
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new ValidationError("Versión de orden no válida");
+    if (order.revision !== expectedRevision) throw new ConflictError("La orden ha cambiado. Actualiza los datos antes de continuar.");
     if (next === "enviado") {
       assertAdmin(actor);
       validateDraft(order.payload);
-      const saved = await this.changes.transition(id, projectId, "borrador", "enviado", actor.id);
+      const saved = await this.changes.transition(id, projectId, "borrador", "enviado", actor.id, expectedRevision);
       await this.events?.emit({ type: "ChangeOrderSent", eventId: crypto.randomUUID(), occurredAt: new Date(), actorId: actor.id, actorName: actor.nombre, projectId, changeOrderId: id });
       return saved;
     }
@@ -955,7 +959,7 @@ export class ChangeOrderUseCases {
     if (actor.rol !== "cliente" || project.clienteId !== actor.id) throw new ForbiddenError();
     if (this.gate && !(await this.gate.check(`change-decision:${actorId}`, ABUSE_LIMITS.changeDecision.limit, ABUSE_LIMITS.changeDecision.windowMs))) throw new ForbiddenError("Espera un minuto antes de volver a intentarlo");
     if (typeof password !== "string" || password.length > 72 || !(await this.users.verifyPassword(actor.email.value, password))) throw new ForbiddenError("Confirma tu contraseña para registrar la decisión");
-    await this.changes.transition(id, projectId, "enviado", next as "aprobado" | "rechazado", actor.id);
+    await this.changes.transition(id, projectId, "enviado", next as "aprobado" | "rechazado", actor.id, expectedRevision);
     return (await this.list(actorId, projectId)).find(item => item.id === id)!;
   }
   async list(
@@ -979,6 +983,7 @@ export class ChangeOrderUseCases {
     );
     return visibleOrders.map((order) => ({
       id: order.id,
+      revision: order.revision,
       projectId: order.projectId,
       numero: order.numero,
       estado: order.estado,
@@ -1000,6 +1005,7 @@ export class ChangeOrderUseCases {
       estado: "borrador",
       payload,
       aprobadoAt: null,
+      revision: 0,
     });
   }
 }

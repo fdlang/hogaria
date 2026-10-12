@@ -1,7 +1,7 @@
 import type { IUserRepository } from "@reformapro/domain/repositories";
 import { ForbiddenError, NotFoundError } from "@reformapro/domain/errors";
-import type { IFileStorage } from "./file.use-cases.js";
-import { validateUploadedFile } from "./file.use-cases.js";
+import type { IBlobCleanupQueue, IFileStorage } from "./file.use-cases.js";
+import { compensateFailedUpload, createStorageKey, validateUploadedFile } from "./file.use-cases.js";
 
 export interface ProfessionalDocument {
   id: number;
@@ -19,6 +19,7 @@ export interface IProfessionalDocumentRepository {
   save(document: Omit<ProfessionalDocument, "id">): Promise<ProfessionalDocument>;
   findById(id: number): Promise<ProfessionalDocument | null>;
   findByProfessional(professionalId: number): Promise<ProfessionalDocument[]>;
+  findByStorageKey(storageKey: string): Promise<ProfessionalDocument | null>;
   findDeleting(limit: number): Promise<ProfessionalDocument[]>;
   markDeleting(id: number): Promise<void>;
   delete(id: number): Promise<void>;
@@ -29,6 +30,7 @@ export class ProfessionalDocumentUseCases {
     private readonly users: IUserRepository,
     private readonly documents: IProfessionalDocumentRepository,
     private readonly storage: IFileStorage,
+    private readonly cleanupQueue: IBlobCleanupQueue,
   ) {}
 
   private async authorize(actorId: number, professionalId?: number) {
@@ -49,21 +51,31 @@ export class ProfessionalDocumentUseCases {
   async upload(command: { actorId: number; professionalId: number; nombre: string; tipo: string; tamano: number; contenidoBase64: string }): Promise<ProfessionalDocument> {
     await this.authorize(command.actorId, command.professionalId);
     const bytes = validateUploadedFile(command.contenidoBase64, command.nombre, command.tipo, command.tamano);
-    const stored = await this.storage.put({
-      scope: "professionals", ownerId: command.professionalId,
-      filename: command.nombre.trim(), contentType: command.tipo, bytes,
-    });
+    const storageKey = createStorageKey("professionals", command.professionalId, command.nombre.trim());
+    await this.cleanupQueue.stage(storageKey);
+    let stored: { key: string };
     try {
-      return await this.documents.save({
+      stored = await this.storage.put({
+        key: storageKey, scope: "professionals", ownerId: command.professionalId,
+        filename: command.nombre.trim(), contentType: command.tipo, bytes,
+      });
+    } catch (error) {
+      await Promise.resolve(this.cleanupQueue.fail(storageKey, error instanceof Error ? error.message : "Error de carga")).catch(() => undefined);
+      throw error;
+    }
+    let saved: ProfessionalDocument;
+    try {
+      saved = await this.documents.save({
         professionalId: command.professionalId,
         uploadedBy: command.actorId,
         nombre: command.nombre.trim(), tipo: command.tipo, tamano: bytes.byteLength,
         storageKey: stored.key, uploadedAt: new Date(),
       });
     } catch (error) {
-      await this.storage.delete(stored.key).catch(() => undefined);
-      throw error;
+      return compensateFailedUpload(this.storage, stored.key, error, this.cleanupQueue);
     }
+    await Promise.resolve(this.cleanupQueue.remove(stored.key)).catch(() => undefined);
+    return saved;
   }
 
   async download(actorId: number, documentId: number): Promise<{ document: ProfessionalDocument; bytes: Uint8Array }> {

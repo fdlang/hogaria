@@ -267,13 +267,14 @@ export class PostgresEstimateRepository implements IEstimateRepository {
 }
 
 export class PostgresChangeOrderRepository implements IChangeOrderRepository {
-  async transition(id: number, projectId: number, expected: ChangeOrder["estado"], next: ChangeOrder["estado"], actorId: number) {
+  async transition(id: number, projectId: number, expected: ChangeOrder["estado"], next: ChangeOrder["estado"], actorId: number, expectedRevision: number) {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
       const project = await client.query("SELECT id,payload FROM projects WHERE id=$1 FOR UPDATE", [projectId]);
       if (!project.rows.length) throw new NotFoundError("Proyecto");
-      const result = await client.query("UPDATE change_orders SET estado=$4,aprobado_at=CASE WHEN $4='aprobado' THEN now() ELSE NULL END,decision=jsonb_build_object('actorId',$5::bigint,'at',now(),'state',$4::text) WHERE id=$1 AND project_id=$2 AND estado=$3 RETURNING *", [id,projectId,expected,next,actorId]);
+      if (restoreProject(Number(project.rows[0].id), project.rows[0].payload).archivedAt) throw new ConflictError("La obra está archivada y es de solo lectura");
+      const result = await client.query("UPDATE change_orders SET estado=$4,revision=revision+1,aprobado_at=CASE WHEN $4='aprobado' THEN now() ELSE NULL END,decision=jsonb_build_object('actorId',$5::bigint,'at',now(),'state',$4::text) WHERE id=$1 AND project_id=$2 AND estado=$3 AND revision=$6 RETURNING *", [id,projectId,expected,next,actorId,expectedRevision]);
       if (!result.rows[0]) throw new ConflictError("La orden ha cambiado o ya fue resuelta. Actualiza los datos.");
       if (next === "aprobado") {
         const order = this.map(result.rows[0]);
@@ -293,10 +294,25 @@ export class PostgresChangeOrderRepository implements IChangeOrderRepository {
     finally { client.release(); }
   }
   constructor(private readonly pool: pg.Pool) {}
-  private map(r: Row): ChangeOrder { return { id: Number(r.id), projectId: Number(r.project_id), numero: r.numero, estado: r.estado, payload: r.payload as EstimateDraft, aprobadoAt: r.aprobado_at ? date(r.aprobado_at) : null, createdAt: date(r.created_at) }; }
+  private map(r: Row): ChangeOrder { return { id: Number(r.id), revision: Number(r.revision ?? 0), projectId: Number(r.project_id), numero: r.numero, estado: r.estado, payload: r.payload as EstimateDraft, aprobadoAt: r.aprobado_at ? date(r.aprobado_at) : null, createdAt: date(r.created_at) }; }
   async findByProject(projectId: number) { return (await this.pool.query("SELECT * FROM change_orders WHERE project_id=$1 ORDER BY id DESC", [projectId])).rows.map(row => this.map(row)); }
-  async save(c: Omit<ChangeOrder, "id" | "createdAt">) { const r = await this.pool.query("INSERT INTO change_orders(project_id,numero,estado,payload,aprobado_at) VALUES($1,$2,$3,$4,$5) RETURNING *", [c.projectId,c.numero,c.estado,c.payload,c.aprobadoAt]); return this.map(r.rows[0]); }
-  async update(id: number, changes: Partial<Pick<ChangeOrder, "estado" | "payload" | "aprobadoAt">>) { const r = await this.pool.query("UPDATE change_orders SET estado=COALESCE($2,estado),payload=COALESCE($3,payload),aprobado_at=COALESCE($4,aprobado_at) WHERE id=$1 AND ($3::jsonb IS NULL OR estado='borrador') RETURNING *", [id,changes.estado ?? null,changes.payload ?? null,changes.aprobadoAt ?? null]); if (!r.rows[0]) throw new ConflictError("La orden no existe o ya fue publicada"); return this.map(r.rows[0]); }
+  async save(c: Omit<ChangeOrder, "id" | "createdAt">) { const r = await this.pool.query("INSERT INTO change_orders(project_id,numero,estado,payload,aprobado_at,revision) VALUES($1,$2,$3,$4,$5,$6) RETURNING *", [c.projectId,c.numero,c.estado,c.payload,c.aprobadoAt,c.revision]); return this.map(r.rows[0]); }
+  async update(id: number, changes: Partial<Pick<ChangeOrder, "estado" | "payload" | "aprobadoAt">>, expectedRevision: number) {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const located = await client.query("SELECT project_id FROM change_orders WHERE id=$1", [id]);
+      if (!located.rows[0]) throw new NotFoundError("Orden de cambio");
+      const project = await client.query("SELECT payload FROM projects WHERE id=$1 FOR UPDATE", [located.rows[0].project_id]);
+      if (!project.rows[0]) throw new NotFoundError("Proyecto");
+      if (project.rows[0].payload.archivedAt) throw new ConflictError("La obra estÃ¡ archivada y es de solo lectura");
+      const result = await client.query("UPDATE change_orders SET estado=COALESCE($2,estado),payload=COALESCE($3,payload),aprobado_at=COALESCE($4,aprobado_at),revision=revision+1 WHERE id=$1 AND revision=$5 AND ($3::jsonb IS NULL OR estado='borrador') RETURNING *", [id,changes.estado ?? null,changes.payload ?? null,changes.aprobadoAt ?? null,expectedRevision]);
+      if (!result.rows[0]) throw new ConflictError("La orden ha cambiado o ya fue publicada. Actualiza los datos.");
+      await client.query("COMMIT");
+      return this.map(result.rows[0]);
+    } catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
+  }
 }
 
 export class PostgresAuditRepository implements IAuditRepository {
@@ -332,7 +348,7 @@ export class PostgresSolicitudRepository implements ISolicitudRepository {
   async findById(id: number) { const r = await this.pool.query("SELECT * FROM solicitudes WHERE id=$1", [id]); return r.rows[0] ? this.map(r.rows[0]) : null; }
   async update(id: number, changes: { estado: "contactado" | "rechazado"; motivo: string | null }) { const r = await this.pool.query("UPDATE solicitudes SET estado=$2,motivo=$3 WHERE id=$1 AND estado='pendiente' RETURNING *", [id, changes.estado, changes.motivo]); if (!r.rows[0]) throw new ConflictError("La solicitud ya no está pendiente"); return this.map(r.rows[0]); }
 }
-export class PostgresFileRepository implements IFileRepository { constructor(private readonly pool: pg.Pool) {} async save(file: Omit<ProjectFile,"id">) { const r=await this.pool.query("INSERT INTO project_files(project_id,payload,uploaded_at) VALUES($1,$2,$3) RETURNING id",[file.projectId,{...file,uploadedAt:file.uploadedAt.toISOString()},file.uploadedAt]); return { ...file, id:Number(r.rows[0].id) }; } async findById(id:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE id=$1",[id]); return r.rows[0] ? { ...r.rows[0].payload, id:Number(r.rows[0].id), uploadedAt:date(r.rows[0].payload.uploadedAt) } as ProjectFile : null; } async findByProject(projectId:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE project_id=$1 ORDER BY id",[projectId]); return r.rows.map(row=>({ ...row.payload,id:Number(row.id),uploadedAt:date(row.payload.uploadedAt) } as ProjectFile)); } async findDeleting(limit:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE payload->>'deleting'='true' ORDER BY id LIMIT $1",[limit]); return r.rows.map(row=>({ ...row.payload,id:Number(row.id),uploadedAt:date(row.payload.uploadedAt) } as ProjectFile)); } async markDeleting(id:number) { const r=await this.pool.query("UPDATE project_files SET payload=jsonb_set(payload,'{deleting}','true'::jsonb,true) WHERE id=$1",[id]); if(r.rowCount!==1) throw new NotFoundError("Archivo"); } async delete(id:number) { await this.pool.query("DELETE FROM project_files WHERE id=$1",[id]); } }
+export class PostgresFileRepository implements IFileRepository { constructor(private readonly pool: pg.Pool) {} async save(file: Omit<ProjectFile,"id">) { const r=await this.pool.query("INSERT INTO project_files(project_id,payload,uploaded_at) VALUES($1,$2,$3) RETURNING id",[file.projectId,{...file,uploadedAt:file.uploadedAt.toISOString()},file.uploadedAt]); return { ...file, id:Number(r.rows[0].id) }; } async findById(id:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE id=$1",[id]); return r.rows[0] ? { ...r.rows[0].payload, id:Number(r.rows[0].id), uploadedAt:date(r.rows[0].payload.uploadedAt) } as ProjectFile : null; } async findByProject(projectId:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE project_id=$1 ORDER BY id",[projectId]); return r.rows.map(row=>({ ...row.payload,id:Number(row.id),uploadedAt:date(row.payload.uploadedAt) } as ProjectFile)); } async findByStorageKey(storageKey:string) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE payload->>'storageKey'=$1 LIMIT 1",[storageKey]); return r.rows[0] ? { ...r.rows[0].payload,id:Number(r.rows[0].id),uploadedAt:date(r.rows[0].payload.uploadedAt) } as ProjectFile : null; } async findDeleting(limit:number) { const r=await this.pool.query("SELECT id,payload FROM project_files WHERE payload->>'deleting'='true' ORDER BY id LIMIT $1",[limit]); return r.rows.map(row=>({ ...row.payload,id:Number(row.id),uploadedAt:date(row.payload.uploadedAt) } as ProjectFile)); } async markDeleting(id:number) { const r=await this.pool.query("UPDATE project_files SET payload=jsonb_set(payload,'{deleting}','true'::jsonb,true) WHERE id=$1",[id]); if(r.rowCount!==1) throw new NotFoundError("Archivo"); } async delete(id:number) { await this.pool.query("DELETE FROM project_files WHERE id=$1",[id]); } }
 
 export class PostgresProfessionalDocumentRepository implements IProfessionalDocumentRepository {
   constructor(private readonly pool: pg.Pool) {}
@@ -348,6 +364,7 @@ export class PostgresProfessionalDocumentRepository implements IProfessionalDocu
     const result = await this.pool.query("SELECT id,payload FROM professional_documents WHERE professional_id=$1 ORDER BY uploaded_at DESC,id DESC", [professionalId]);
     return result.rows.map(row => ({ ...row.payload, id: Number(row.id), uploadedAt: date(row.payload.uploadedAt) } as ProfessionalDocument));
   }
+  async findByStorageKey(storageKey: string) { const result = await this.pool.query("SELECT id,payload FROM professional_documents WHERE payload->>'storageKey'=$1 LIMIT 1", [storageKey]); return result.rows[0] ? { ...result.rows[0].payload, id: Number(result.rows[0].id), uploadedAt: date(result.rows[0].payload.uploadedAt) } as ProfessionalDocument : null; }
   async findDeleting(limit: number) {
     const result = await this.pool.query("SELECT id,payload FROM professional_documents WHERE payload->>'deleting'='true' ORDER BY id LIMIT $1", [limit]);
     return result.rows.map(row => ({ ...row.payload, id: Number(row.id), uploadedAt: date(row.payload.uploadedAt) } as ProfessionalDocument));

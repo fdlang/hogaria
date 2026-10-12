@@ -178,6 +178,7 @@ describe("Client notification privacy and delivery", () => {
     await uc.execute({ ...base, changes: { estado: "planificacion" } });
     await uc.execute({ ...base, changes: {} });
     expect(events.emit).not.toHaveBeenCalled();
+    expect(f.projects.update).not.toHaveBeenCalled();
     await uc.execute({ ...base, changes: { estado: "en_curso" } });
     expect(events.emit).toHaveBeenCalledWith(
       expect.objectContaining({

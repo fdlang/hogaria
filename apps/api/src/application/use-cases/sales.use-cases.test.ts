@@ -120,18 +120,29 @@ describe("EstimateUseCases — client privacy and authorization", () => {
     const repository = new InMemoryChangeOrderRepository(projects);
     const service = new ChangeOrderUseCases(users,projects,repository);
     const change = await service.create(admin.id,project.id,draft);
-    await service.transition(admin.id,project.id,change.id,"enviado");
-    await expect(service.edit(admin.id,project.id,change.id,draft)).rejects.toThrow();
-    await expect(service.transition(clientB.id,project.id,change.id,"aprobado","valid")).rejects.toThrow();
-    await expect(service.transition(admin.id,project.id,change.id,"aprobado","valid")).rejects.toThrow();
-    await expect(service.transition(clientA.id,project.id,change.id,"aprobado")).rejects.toThrow();
-    const result = await service.transition(clientA.id,project.id,change.id,"aprobado","valid");
+    const sent = await service.transition(admin.id,project.id,change.id,"enviado",undefined,change.revision);
+    await expect(service.edit(admin.id,project.id,change.id,draft,change.revision)).rejects.toThrow();
+    await expect(service.transition(clientB.id,project.id,change.id,"aprobado","valid",sent.revision)).rejects.toThrow();
+    await expect(service.transition(admin.id,project.id,change.id,"aprobado","valid",sent.revision)).rejects.toThrow();
+    await expect(service.transition(clientA.id,project.id,change.id,"aprobado",undefined,sent.revision)).rejects.toThrow();
+    const result = await service.transition(clientA.id,project.id,change.id,"aprobado","valid",sent.revision);
     expect(JSON.stringify(result)).not.toContain("costeUnitario");
     const updatedProject = await projects.findById(project.id);
     expect(updatedProject?.presupuesto.amount).toBe(300);
     expect(updatedProject?.fiscalSnapshots).toHaveLength(2);
     expect(aggregateFiscalSnapshots(updatedProject?.fiscalSnapshots ?? [])).toMatchObject({ baseAmount: 300, vatAmount: 63, totalAmount: 363 });
-    await expect(service.transition(clientA.id,project.id,change.id,"aprobado","valid")).rejects.toThrow();
+    await expect(service.transition(clientA.id,project.id,change.id,"aprobado","valid",result.revision)).rejects.toThrow();
+  });
+  it("rejects a stale concurrent edit of a change-order draft", async () => {
+    const {users,clientA} = await setup();
+    const admin = await users.save({id:0,nombre:"Admin",email:Email.of("admin-lock@test.es"),rol:"admin",activo:true,createdAt:new Date()},"hash");
+    const projects = new InMemoryProjectRepository();
+    const project = await projects.save({id:0,estimateId:1,clienteId:clientA.id,nombre:"Obra",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"planificacion",progreso:Percentage.zero(),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date()});
+    const repository = new InMemoryChangeOrderRepository(projects);
+    const service = new ChangeOrderUseCases(users,projects,repository);
+    const change = await service.create(admin.id,project.id,draft);
+    await service.edit(admin.id,project.id,change.id,{...draft,titulo:"Primera edición"},change.revision);
+    await expect(service.edit(admin.id,project.id,change.id,{...draft,titulo:"Edición obsoleta"},change.revision)).rejects.toThrow("cambiado");
   });
   it("only returns the authenticated client's proposals", async () => {
     const { clientA, estimateA, estimateB, estimateUseCases } = await setup();
@@ -332,8 +343,8 @@ describe("EstimateUseCases — client privacy and authorization", () => {
       presupuesto: Money.of(0), fechaInicio: new Date(), fechaFinPrevista: new Date(),
       profesionalesAsignados: [], hitos: [], createdAt: new Date(),
     });
-    await changes.save({ projectId: project.id, numero: "OC-001", estado: "borrador", payload: draft, aprobadoAt: null });
-    await changes.save({ projectId: project.id, numero: "OC-002", estado: "enviado", payload: draft, aprobadoAt: null });
+    await changes.save({ projectId: project.id, numero: "OC-001", estado: "borrador", payload: draft, aprobadoAt: null, revision: 0 });
+    await changes.save({ projectId: project.id, numero: "OC-002", estado: "enviado", payload: draft, aprobadoAt: null, revision: 0 });
     const useCases = new ChangeOrderUseCases(users, projects, changes);
 
     const ownOrders = await useCases.list(clientA.id, project.id);

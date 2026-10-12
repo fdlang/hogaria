@@ -69,6 +69,8 @@ function ProfessionalDocumentsModal({ api, professional, onClose }: { api: Users
   const [loadError, setLoadError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const activeProfessional = useRef(professional?.id ?? null);
+  activeProfessional.current = professional?.id ?? null;
 
   useEffect(() => {
     if (!professional) { setDocuments([]); return; }
@@ -85,7 +87,8 @@ function ProfessionalDocumentsModal({ api, professional, onClose }: { api: Users
   const upload = async (file: File | undefined) => {
     if (!professional || !file) return;
     setUploading(true);
-    try { const created = await api.uploadProfessionalDocument(professional.id, file); setDocuments(current => [created, ...current]); push("Documento guardado", "success"); }
+    const professionalId = professional.id;
+    try { const created = await api.uploadProfessionalDocument(professionalId, file); if (activeProfessional.current === professionalId) { setDocuments(current => [created, ...current]); push("Documento guardado", "success"); } }
     catch (error) { push((error as { message?: string }).message ?? "No se pudo subir el documento", "error"); }
     finally { setUploading(false); if (inputRef.current) inputRef.current.value = ""; }
   };
@@ -95,11 +98,12 @@ function ProfessionalDocumentsModal({ api, professional, onClose }: { api: Users
   };
   const remove = async (document: ProfessionalDocumentDTO) => {
     if (!await confirm({ title: "Eliminar documento", message: <>¿Eliminar <strong>{document.nombre}</strong>?</>, variant: "danger", confirmLabel: "Eliminar" })) return;
-    try { await api.deleteProfessionalDocument(document.id); setDocuments(current => current.filter(item => item.id !== document.id)); push("Documento eliminado", "success"); }
+    const professionalId = professional?.id ?? null;
+    try { await api.deleteProfessionalDocument(document.id); if (activeProfessional.current === professionalId) { setDocuments(current => current.filter(item => item.id !== document.id)); push("Documento eliminado", "success"); } }
     catch (error) { push((error as { message?: string }).message ?? "No se pudo eliminar el documento", "error"); }
   };
 
-  return <Modal open={professional !== null} onClose={onClose} title={professional ? `Documentación · ${professional.nombre}` : "Documentación"} width={640}>
+  return <Modal open={professional !== null} onClose={() => { if (!uploading) onClose(); }} title={professional ? `Documentación · ${professional.nombre}` : "Documentación"} width={640}>
     <p style={{ color: "#71685e", fontSize: 13, marginBottom: 16 }}>Documentación interna del profesional. Solo es accesible para administración.</p>
     <input ref={inputRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif" hidden onChange={event => void upload(event.target.files?.[0])} />
     <Button small loading={uploading} disabled={uploading} onClick={() => inputRef.current?.click()}>+ Subir documentación</Button>

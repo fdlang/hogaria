@@ -85,6 +85,14 @@ export interface WorkFilters {
   to?: string;
   page?: number;
 }
+export function canActOnArchivedWork(input: {
+  role: "admin" | "cliente" | "profesional";
+  action: string;
+  status: WorkStatus;
+}): boolean {
+  if (input.role === "profesional") return input.action === "salida" && input.status === "abierto";
+  return input.role === "admin" && ["aprobar", "rechazar"].includes(input.action) && input.status === "enviado";
+}
 export function workSeconds(
   entry: Pick<WorkEntry, "startedAt" | "endedAt" | "breakSeconds" | "pauses">,
 ): number {

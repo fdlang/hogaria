@@ -33,15 +33,44 @@ export interface IFileRepository {
   save(f: Omit<ProjectFile, "id">): Promise<ProjectFile>;
   findById(id: number): Promise<ProjectFile | null>;
   findByProject(projectId: number): Promise<ProjectFile[]>;
+  findByStorageKey(storageKey: string): Promise<ProjectFile | null>;
   findDeleting(limit: number): Promise<ProjectFile[]>;
   markDeleting(id: number): Promise<void>;
   delete(id: number): Promise<void>;
 }
 
+export interface IBlobCleanupQueue {
+  stage(storageKey: string): Promise<void>;
+  find(limit: number): Promise<Array<{ storageKey: string }>>;
+  remove(storageKey: string): Promise<void>;
+  fail(storageKey: string, reason: string): Promise<void>;
+}
+
+export async function compensateFailedUpload(storage: IFileStorage, key: string, cause: unknown, queue: IBlobCleanupQueue): Promise<never> {
+  let cleanupError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await storage.delete(key);
+      await queue.remove(key);
+      throw cause;
+    }
+    catch (error) {
+      if (error === cause) throw error;
+      cleanupError = error;
+    }
+  }
+  throw new AggregateError([cause, cleanupError], "No se pudo guardar el archivo ni completar la limpieza del almacenamiento");
+}
+
 export interface IFileStorage {
-  put(input: { scope: "projects" | "professionals"; ownerId: number; filename: string; contentType: string; bytes: Uint8Array }): Promise<{ key: string }>;
+  put(input: { key: string; scope: "projects" | "professionals"; ownerId: number; filename: string; contentType: string; bytes: Uint8Array }): Promise<{ key: string }>;
   delete(key: string): Promise<void>;
   get(key: string): Promise<Uint8Array>;
+}
+
+export function createStorageKey(scope: "projects" | "professionals", ownerId: number, filename: string): string {
+  const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return `${scope}/${ownerId}/${crypto.randomUUID()}-${safeFilename}`;
 }
 
 // Server uploads on Vercel stay below the platform request-body limit.
@@ -58,6 +87,7 @@ export class UploadFileUseCase {
     private readonly files: IFileRepository,
     private readonly storage: IFileStorage,
     private readonly events: IEventEmitter,
+    private readonly cleanupQueue: IBlobCleanupQueue,
   ) {}
 
   async execute(cmd: {
@@ -105,7 +135,15 @@ export class UploadFileUseCase {
 
     // Metadata alone is never accepted: persist exactly the bytes selected in the browser.
     const bytes = validateUploadedFile(cmd.contenidoBase64, cmd.nombre, cmd.tipo, cmd.tamaño);
-    const stored = await this.storage.put({ scope: "projects", ownerId: cmd.projectId, filename: cmd.nombre.trim(), contentType: cmd.tipo, bytes });
+    const storageKey = createStorageKey("projects", cmd.projectId, cmd.nombre.trim());
+    await this.cleanupQueue.stage(storageKey);
+    let stored: { key: string };
+    try {
+      stored = await this.storage.put({ key: storageKey, scope: "projects", ownerId: cmd.projectId, filename: cmd.nombre.trim(), contentType: cmd.tipo, bytes });
+    } catch (error) {
+      await Promise.resolve(this.cleanupQueue.fail(storageKey, error instanceof Error ? error.message : "Error de carga")).catch(() => undefined);
+      throw error;
+    }
     let saved: ProjectFile;
     try {
       saved = await this.files.save({
@@ -120,9 +158,9 @@ export class UploadFileUseCase {
       uploadedAt: new Date(),
       });
     } catch (error) {
-      await this.storage.delete(stored.key).catch(() => undefined);
-      throw error;
+      return compensateFailedUpload(this.storage, stored.key, error, this.cleanupQueue);
     }
+    await Promise.resolve(this.cleanupQueue.remove(stored.key)).catch(() => undefined);
 
     await this.events.emit({
       type: "FileUploaded", eventId: crypto.randomUUID(), occurredAt: new Date(),

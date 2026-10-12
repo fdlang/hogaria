@@ -1,6 +1,6 @@
 /** Project documents persisted in private object storage through the API. */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiClient } from "@/shared/lib/api-client";
 
 export interface FileDTO {
@@ -52,27 +52,37 @@ export function useProjectFiles(api: FilesApi, projectId: number | null) {
   const [data, setData] = useState<FileDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const request = useRef(0);
+  const activeProject = useRef(projectId);
+  activeProject.current = projectId;
 
   const refresh = useCallback(async () => {
     if (projectId == null) return;
+    const token = ++request.current;
     setLoading(true); setError(null);
-    try { setData(await api.list(projectId)); }
-    catch (e) { setError((e as { message?: string }).message ?? "Error"); }
-    finally { setLoading(false); }
+    try { const files = await api.list(projectId); if (token === request.current) setData(files); }
+    catch (e) { if (token === request.current) setError((e as { message?: string }).message ?? "Error"); }
+    finally { if (token === request.current) setLoading(false); }
   }, [api, projectId]);
 
-  useEffect(() => { if (projectId != null) refresh(); }, [projectId, refresh]);
+  useEffect(() => {
+    request.current++;
+    setData([]); setError(null); setLoading(projectId != null);
+    if (projectId != null) void refresh();
+  }, [projectId, refresh]);
 
   const upload = useCallback(async (file: File, sensitive: boolean, classification?: FileDTO["classification"]) => {
     if (projectId == null) return;
-    const created = await api.upload(projectId, file, sensitive, classification);
-    setData(list => [...list, created]);
+    const targetProject = projectId;
+    const created = await api.upload(targetProject, file, sensitive, classification);
+    if (activeProject.current === targetProject) setData(list => [...list, created]);
     return created;
   }, [api, projectId]);
 
   const remove = useCallback(async (fileId: number) => {
+    const targetProject = activeProject.current;
     await api.delete(fileId);
-    setData(list => list.filter(f => f.id !== fileId));
+    if (activeProject.current === targetProject) setData(list => list.filter(f => f.id !== fileId));
   }, [api]);
 
   return { data, loading, error, refresh, upload, remove };

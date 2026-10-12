@@ -11,6 +11,9 @@ describe("versioned migration runner", () => {
       "migrate-catalog.sql",
       "app-notifications.sql",
       "project-retention-hardening.sql",
+      "archived-work-history-hardening.sql",
+      "change-order-optimistic-locking.sql",
+      "blob-cleanup-outbox.sql",
     ]));
   });
 

@@ -88,23 +88,20 @@ describe("work tracking isolation and lifecycle", () => {
     await s.projects.update(s.project.id, { estado: "planificacion" }, s.project.revision ?? 0);
     await expect(s.start()).rejects.toThrow("no está abierta");
   });
-  it("blocks new work in an archived project but lets an open shift be closed", async () => {
+  it("only closes and reviews pending work after a project is archived", async () => {
     const s = await setup();
     const entry = await s.start();
     await s.projects.update(1, { archivedAt: new Date(), archiveReason: "Cierre administrativo" });
-
-    await expect(s.start()).rejects.toThrow();
-    await expect(s.work.part(3, {
-      projectId: 1,
-      operationId: crypto.randomUUID(),
-      startedAt: "2026-09-19T07:00:00.000Z",
-      endedAt: "2026-09-19T08:00:00.000Z",
-      units: 1,
-      breakMinutes: 0,
-    })).rejects.toThrow();
-    await expect(s.work.action(2, entry.id, { action: "pausa", revision: entry.revision })).rejects.toThrow("archivada");
     s.at("2026-09-19T09:00:00Z");
-    await expect(s.work.action(2, entry.id, { action: "salida", revision: entry.revision })).resolves.toMatchObject({ status: "enviado" });
+    const submitted = await s.work.action(2, entry.id, { action: "salida", revision: entry.revision });
+    await expect(s.work.action(1, entry.id, {
+      action: "corregir", revision: submitted.revision,
+      startedAt: submitted.startedAt, endedAt: submitted.endedAt, reason: "Cambio",
+    })).rejects.toThrow("archivada");
+    const rejected = await s.work.action(1, entry.id, {
+      action: "rechazar", revision: submitted.revision, reason: "No corresponde",
+    });
+    expect(rejected).toMatchObject({ status: "rechazado", approvedAt: null, approvedBy: null });
   });
   it("blocks new work in an archived project but lets an open shift be closed", async () => {
     const s = await setup();
@@ -203,6 +200,12 @@ describe("work tracking isolation and lifecycle", () => {
     expect(a.id).toBe(b.id);
     expect(await s.work.history(1, a.id)).toHaveLength(1);
     await expect(s.start()).rejects.toThrow("abierta");
+  });
+  it("returns the original result when an idempotent retry arrives after archival", async () => {
+    const s = await setup(), operationId = crypto.randomUUID();
+    const first = await s.work.start(2, { projectId: 1, operationId });
+    await s.projects.update(1, { archivedAt: new Date(), archiveReason: "Cierre" });
+    await expect(s.work.start(2, { projectId: 1, operationId })).resolves.toEqual(first);
   });
   it("accepts only one of two concurrent revisions", async () => {
     const s = await setup(),
@@ -337,11 +340,12 @@ describe("work tracking isolation and lifecycle", () => {
     await expect(
       s.work.action(1, e.id, { action: "rechazar", revision: 2 }),
     ).rejects.toThrow();
-    await s.work.action(1, e.id, {
+    const rejected = await s.work.action(1, e.id, {
       action: "rechazar",
       revision: 2,
       reason: "Revisar horas",
     });
+    expect(rejected).toMatchObject({ approvedBy: null, approvedAt: null });
     expect((await s.work.summary(1, 1)).approvedCostCents).toBe(0);
   });
   it("compares approved labour with a planned budget", async () => {

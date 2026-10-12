@@ -234,14 +234,16 @@ export class InMemoryEstimateRepository implements IEstimateRepository {
 export class InMemoryChangeOrderRepository implements IChangeOrderRepository {
   constructor(private readonly projects?: IProjectRepository) {}
   private changing = false;
-  async transition(id: number, projectId: number, expected: ChangeOrder["estado"], next: ChangeOrder["estado"], _actorId: number) {
+  async transition(id: number, projectId: number, expected: ChangeOrder["estado"], next: ChangeOrder["estado"], _actorId: number, expectedRevision: number) {
     if (this.changing) throw new ConflictError("La orden está siendo actualizada");
     this.changing = true;
     try {
       const item = this.items.find(row => row.id === id && row.projectId === projectId);
-      if (!item || item.estado !== expected) throw new ConflictError("La orden ha cambiado o ya fue resuelta");
+      if (!item || item.estado !== expected || item.revision !== expectedRevision) throw new ConflictError("La orden ha cambiado o ya fue resuelta");
+      const currentProject = await this.projects?.findById(projectId);
+      if (currentProject?.archivedAt) throw new ConflictError("La obra está archivada y es de solo lectura");
       if (next === "aprobado") {
-        const project = await this.projects?.findById(projectId);
+        const project = currentProject;
         if (!project || !this.projects) throw new NotFoundError("Proyecto");
         const approvedAt = new Date();
         const fiscalSnapshot = createFiscalSnapshot(item.payload.partidas, { type: "change_order", id: item.id }, approvedAt);
@@ -250,13 +252,13 @@ export class InMemoryChangeOrderRepository implements IChangeOrderRepository {
           fiscalSnapshots: [...(project.fiscalSnapshots ?? []), fiscalSnapshot],
         }, project.revision ?? 0);
       }
-      return this.update(id, { estado: next, aprobadoAt: next === "aprobado" ? new Date() : null });
+      return this.update(id, { estado: next, aprobadoAt: next === "aprobado" ? new Date() : null }, item.revision);
     } finally { this.changing = false; }
   }
   private readonly items: ChangeOrder[] = []; private nextId = 1;
   async findByProject(projectId: number) { return this.items.filter(item => item.projectId === projectId); }
   async save(item: Omit<ChangeOrder, "id" | "createdAt">) { const saved: ChangeOrder = { ...item, id: this.nextId++, createdAt: new Date() }; this.items.push(saved); return saved; }
-  async update(id: number, changes: Partial<Pick<ChangeOrder, "estado" | "payload" | "aprobadoAt">>) { const old = this.items.find(item => item.id === id); if (!old) throw new NotFoundError("Orden de cambio"); if (changes.payload && old.estado !== "borrador") throw new ConflictError("Una orden publicada no se puede modificar"); const next = { ...old, ...changes }; this.items[this.items.indexOf(old)] = next; return next; }
+  async update(id: number, changes: Partial<Pick<ChangeOrder, "estado" | "payload" | "aprobadoAt">>, expectedRevision: number) { const old = this.items.find(item => item.id === id); if (!old) throw new NotFoundError("Orden de cambio"); if (old.revision !== expectedRevision) throw new ConflictError("La orden ha cambiado. Actualiza los datos."); if (changes.payload && old.estado !== "borrador") throw new ConflictError("Una orden publicada no se puede modificar"); const next = { ...old, ...changes, revision: old.revision + 1 }; this.items[this.items.indexOf(old)] = next; return next; }
 }
 
 // In production: Redis with TTL — challenges auto-expire without a cleanup job.

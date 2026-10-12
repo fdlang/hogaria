@@ -16,6 +16,7 @@ export interface CurrentWork {
   rateUnit: RateUnit | null;
   unitLabel: string | null;
   open: PublicWorkEntry | null;
+  openProjectArchived: boolean;
 }
 export class WorkApi {
   constructor(private readonly http: ApiClient) {}

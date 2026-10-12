@@ -58,6 +58,12 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/interfaces/http/projectController.ts", "apps/web/src/features/projects/components/ProjectDetail.tsx"], tests: ["apps/api/src/application/use-cases/security-regressions.test.ts", "apps/web/e2e/commercial-workflow.browser.ts"],
   },
   {
+    id: "HOG-SEC-008", description: "Una carga binaria sin metadatos se elimina inmediatamente o conserva su clave en una cola durable hasta completar la limpieza.", origin: "security", owner: "seguridad",
+    assumption: "El almacenamiento de objetos y PostgreSQL no ofrecen una transacción distribuida común.", validScale: "Cargas privadas de hasta 3 MB; revisar al adoptar subida directa o un proveedor con eventos de ciclo de vida.", validFrom: "2026-10-13", validUntil: null, nextReview: "2027-01-13",
+    metrics: [metric("orphan_blob_cleanup_backlog", "Objetos pendientes de limpieza", "database"), metric("orphan_blob_cleanup_failure_rate", "Reintentos de limpieza fallidos")],
+    implementation: ["apps/api/src/application/use-cases/file.use-cases.ts", "apps/api/src/application/use-cases/deletion-retry.use-cases.ts", "apps/api/database/blob-cleanup-outbox.sql"], tests: ["apps/api/src/application/use-cases/security-regressions.test.ts", "apps/api/src/application/use-cases/deletion-retry.use-cases.test.ts"],
+  },
+  {
     id: "HOG-USR-001", description: "Siempre debe permanecer al menos un administrador activo.", origin: "security", owner: "direccion",
     assumption: "La continuidad operativa depende de administradores internos sin autoservicio de recuperación privilegiada.", validScale: "Una empresa con uno o varios administradores.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("last_admin_block_count", "Intentos bloqueados de desactivar al último administrador", "audit_log"), metric("active_admin_count", "Administradores activos", "database")],
@@ -168,6 +174,18 @@ export const BUSINESS_RULES = [
     implementation: ["apps/api/src/application/use-cases/sales.use-cases.ts", "apps/api/database/commercial-workflow.sql"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
   },
   {
+    id: "HOG-CHG-002", description: "La edición de una orden de cambio en borrador rechaza revisiones obsoletas antes de sobrescribir trabajo posterior.", origin: "technical", owner: "comercial",
+    assumption: "Más de un administrador o pestaña puede editar el mismo borrador.", validScale: "Edición concurrente ocasional; revisar si se incorpora colaboración en tiempo real.", validFrom: "2026-10-13", validUntil: null, nextReview: "2027-01-13",
+    metrics: [metric("change_order_edit_conflict_rate", "Ediciones obsoletas de órdenes rechazadas", "audit_log")],
+    implementation: ["apps/api/src/application/use-cases/sales.use-cases.ts", "apps/api/database/change-order-optimistic-locking.sql"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
+  },
+  {
+    id: "HOG-CHG-003", description: "Archivar una obra inmoviliza sus órdenes de cambio y ninguna revisión obsoleta puede publicarse o resolverse.", origin: "security", owner: "comercial",
+    assumption: "El archivo representa un cierre administrativo incompatible con nuevos cambios contractuales.", validScale: "Órdenes independientes por obra; revisar si se incorpora reapertura formal de proyectos.", validFrom: "2026-10-13", validUntil: null, nextReview: "2027-01-13",
+    metrics: [metric("archived_change_order_denial_rate", "Cambios contractuales bloqueados tras archivo", "audit_log"), metric("change_order_transition_conflict_rate", "Transiciones rechazadas por revisión obsoleta")],
+    implementation: ["apps/api/src/application/use-cases/sales.use-cases.ts", "apps/api/database/change-order-optimistic-locking.sql"], tests: ["apps/api/src/application/use-cases/sales.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
+  },
+  {
     id: "HOG-WRK-001", description: "Solo un profesional activo y asignado puede iniciar una jornada en una obra en curso.", origin: "business", owner: "operaciones",
     assumption: "Toda presencia corresponde a una asignación previa y a una obra formalmente iniciada.", validScale: "Plantilla y autónomos identificados individualmente; no cubre subcontratas por cuadrilla.", validFrom: "2026-10-10", validUntil: null, nextReview: "2027-01-10",
     metrics: [metric("unassigned_clock_in_denial_rate", "Fichajes rechazados por falta de asignación", "audit_log"), metric("manual_time_entry_rate", "Partes creados o corregidos manualmente")],
@@ -179,6 +197,13 @@ export const BUSINESS_RULES = [
     metrics: [metric("time_entry_correction_rate", "Partes rectificados tras envío", "audit_log"), metric("missing_rate_block_rate", "Jornadas bloqueadas por falta de tarifa", "audit_log")],
     externalValidation: "gestor",
     implementation: ["packages/domain/src/work-tracking.ts", "apps/api/src/application/use-cases/work-tracking.use-cases.ts"], tests: ["apps/api/src/application/use-cases/work-tracking.use-cases.test.ts", "apps/api/src/infrastructure/database/postgresWorkStore.test.ts"],
+  },
+  {
+    id: "HOG-WRK-003", description: "Archivar una obra inmoviliza su histórico laboral, salvo cerrar una jornada ya abierta y aprobar o rechazar un parte ya enviado.", origin: "business", owner: "operaciones",
+    assumption: "El cierre administrativo no debe dejar una jornada abierta ni impedir decidir costes pendientes, pero tampoco permite reescribir intervalos históricos.", validScale: "Una empresa con revisión individual de partes pendientes al cierre; revisar si se introduce cierre masivo.", validFrom: "2026-10-13", validUntil: null, nextReview: "2027-01-13",
+    metrics: [metric("archived_work_pending_rate", "Partes pendientes al archivar una obra", "database"), metric("archived_work_denial_rate", "Cambios laborales rechazados tras archivo", "audit_log")],
+    externalValidation: "gestor",
+    implementation: ["packages/domain/src/work-tracking.ts", "apps/api/src/application/use-cases/work-tracking.use-cases.ts", "apps/api/database/archived-work-history-hardening.sql"], tests: ["packages/domain/src/work-tracking.test.ts", "apps/api/src/application/use-cases/work-tracking.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
   },
   {
     id: "HOG-CAT-001", description: "Solo administración mantiene el catálogo; el estado de revisión determina su disponibilidad y archivar conserva el histórico comercial.", origin: "business", owner: "comercial",

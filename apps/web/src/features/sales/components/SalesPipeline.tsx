@@ -132,6 +132,7 @@ export function SalesPipeline({
   const [showCatalog, setShowCatalog] = useState(false);
   const [catalogNotice, setCatalogNotice] = useState("");
   const [error, setError] = useState("");
+  const [opportunityError, setOpportunityError] = useState("");
   const [preview, setPreview] = useState<EstimateDTO | null>(null);
   const [showEditor, setShowEditor] = useState(() => Boolean(recoveredDraft || new URLSearchParams(window.location.hash.split("?")[1] ?? window.location.search).get("opportunity")));
   const [opportunity, setOpportunity] = useState(recoveredDraft?.opportunity ?? blankOpportunity);
@@ -228,6 +229,7 @@ export function SalesPipeline({
   const refreshOpportunities = async () => {
     const request = ++opportunityRequest.current;
     setOpportunitiesLoading(true);
+    setOpportunityError("");
     try {
       const result = await api.opportunityPage({ page: opportunityPage, search: deferredOpportunitySearch.trim(), status: opportunityStatus });
       let items = result.items;
@@ -240,6 +242,7 @@ export function SalesPipeline({
         setOpportunities(items);
         setOpportunityPages(result.pages);
         setOpportunityTotal(result.total);
+        setOpportunityError("");
       }
     } finally {
       if (request === opportunityRequest.current) setOpportunitiesLoading(false);
@@ -265,7 +268,7 @@ export function SalesPipeline({
   useEffect(() => {
     let current = true;
     void refreshOpportunities().catch(() => {
-      if (current) setError("No se pudieron cargar las oportunidades. Inténtalo de nuevo.");
+      if (current) setOpportunityError("No se pudieron cargar las oportunidades. Inténtalo de nuevo.");
     });
     return () => { current = false; };
   }, [api, deferredOpportunitySearch, existingOpportunity, opportunityPage, opportunityStatus]);
@@ -626,6 +629,7 @@ export function SalesPipeline({
           {error}
         </p>
       )}
+      {opportunityError && <p role="alert" className="form-error">{opportunityError}</p>}
 
       <RecentEstimates
         api={api}
