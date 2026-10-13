@@ -69,8 +69,9 @@ export class CreateUserUseCase {
       ...(cmd.telefono?.trim() ? { telefono: cmd.telefono.trim() } : {}),
     };
     const saved = await this.users.save(user, passwordHash);
+    let invitation;
     try {
-      await activation.invite(actor.id, saved.id, cmd.ctx);
+      invitation = await activation.invite(actor.id, saved.id, cmd.ctx);
     } catch (error) {
       // No related records exist yet: compensate a failed invitation so the admin
       // can retry creation instead of inheriting a silent, inactive account.
@@ -83,15 +84,12 @@ export class CreateUserUseCase {
       ip: cmd.ctx.ip, userAgent: cmd.ctx.userAgent,
       userId: saved.id, role: cmd.rol,
     });
-    return { user: saved, invitationSent: true };
+    return { user: saved, invitationSent: invitation.sent };
   }
 }
 
 export class UpdateUserUseCase {
-  constructor(
-    private readonly users: IUserRepository,
-    private readonly events: IEventEmitter,
-  ) {}
+  constructor(private readonly users: IUserRepository) {}
 
   async execute(cmd: {
     actorId: number;

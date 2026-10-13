@@ -65,7 +65,7 @@ function FeaturedBathroom() {
       </div>
 
       <div className="project-showcase__video">
-        <video ref={videoRef} controls muted loop preload="none" playsInline poster="/images/portfolio/bano-pinto-detalle-960.jpg" aria-label="Recorrido por el Baño Pinto reformado">
+        <video ref={videoRef} controls muted loop autoPlay preload="metadata" playsInline poster="/images/portfolio/bano-pinto-detalle-960.jpg" aria-label="Recorrido por el Baño Pinto reformado">
           <source src="/images/portfolio/bano-pinto.mp4" type="video/mp4" />
           Tu navegador no puede reproducir este vídeo.
         </video>

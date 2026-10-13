@@ -66,6 +66,7 @@ const savePreference = (key: string, references: string[]) => {
 export function CatalogPicker({ onPickItem, onImportTemplate, loadItems, browseItems }: Props) {
   const [mode, setMode] = useState<PickerMode>("search");
   const [search, setSearch] = useState("");
+  const [searchRetry, setSearchRetry] = useState(0);
   const [results, setResults] = useState<CatalogCategory[]>([]);
   const [templateCatalog, setTemplateCatalog] = useState<CatalogCategory[]>([]);
   const [loading, setLoading] = useState(false);
@@ -137,7 +138,7 @@ export function CatalogPicker({ onPickItem, onImportTemplate, loadItems, browseI
         .finally(() => { if (request.current === current) setLoading(false); });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [loadItems, search]);
+  }, [loadItems, search, searchRetry]);
 
   const favorites = useMemo(() => catalogItemsForReferences(templateCatalog, favoriteRefs), [favoriteRefs, templateCatalog]);
   const recent = useMemo(() => catalogItemsForReferences(templateCatalog, recentRefs.filter(reference => !favoriteRefs.includes(reference))), [favoriteRefs, recentRefs, templateCatalog]);
@@ -216,7 +217,7 @@ export function CatalogPicker({ onPickItem, onImportTemplate, loadItems, browseI
         {recent.length > 0 && <CatalogShortcutGroup title="Usadas recientemente" items={recent} favorites={favoriteRefs} onPick={pick} onToggleFavorite={toggleFavorite} />}
         <small>Guardadas únicamente en este dispositivo.</small>
       </section>}
-      <CatalogLoadState loading={loading} error={error} reload={async () => { if (search.trim()) setSearch(value => `${value} `); }} />
+      <CatalogLoadState loading={loading} error={error} reload={async () => { if (search.trim()) setSearchRetry(value => value + 1); }} />
       {results.map(cat => (
         <section key={cat.categoria} className="catalog-results-group">
           <header className="catalog-category-header">

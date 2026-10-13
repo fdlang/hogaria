@@ -20,6 +20,7 @@ export interface PasswordHasher {
 }
 
 type StoredUser = User & { passwordHash: string };
+const LOGIN_DUMMY_HASH = "$2a$12$86OJUCQ24qCL8ZbIgPWwc.qmeldCwtoTkqEWKfbbxEIc0sX7XvWhu";
 
 export class InMemoryUserRepository implements IUserRepository {
   private readonly users: StoredUser[] = [];
@@ -92,8 +93,8 @@ export class InMemoryUserRepository implements IUserRepository {
 
   async verifyPassword(email: string, plaintext: string): Promise<User | null> {
     const u = this.users.find(u => u.email.value.toLowerCase() === email.toLowerCase());
+    const ok = await this.hasher.verify(plaintext, u?.passwordHash ?? LOGIN_DUMMY_HASH);
     if (!u) return null;
-    const ok = await this.hasher.verify(plaintext, u.passwordHash);
     return ok ? this.strip(u) : null;
   }
 
@@ -204,7 +205,7 @@ export class InMemoryCatalogRepository implements ICatalogRepository {
   async findById(id: number) { return this.items.find(item => item.id === id) ?? null; }
   async findByReference(reference: string) { return this.items.find(item => item.reference === reference) ?? null; }
   async save(item: Omit<CatalogItem, "id" | "createdAt" | "updatedAt">) { const now = new Date(); const saved = { ...item, id: this.nextId++, createdAt: now, updatedAt: now }; this.items.push(saved); return saved; }
-  async update(id: number, changes: Partial<Omit<CatalogItem, "id" | "createdAt" | "updatedAt">>) { const old = await this.findById(id); if (!old) throw new NotFoundError("Partida de catálogo"); const next = { ...old, ...changes, updatedAt: new Date() }; this.items[this.items.indexOf(old)] = next; return next; }
+  async update(id: number, changes: Partial<Omit<CatalogItem, "id" | "createdAt" | "updatedAt">>, expectedUpdatedAt?: Date) { const old = await this.findById(id); if (!old) throw new NotFoundError("Partida de catálogo"); if (expectedUpdatedAt && old.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw new ConflictError("La partida ha cambiado. Actualiza los datos antes de guardar."); const next = { ...old, ...changes, updatedAt: new Date(Math.max(Date.now(), old.updatedAt.getTime() + 1)) }; this.items[this.items.indexOf(old)] = next; return next; }
 }
 
 export class InMemoryEstimateRepository implements IEstimateRepository {

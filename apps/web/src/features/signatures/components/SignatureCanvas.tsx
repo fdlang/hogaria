@@ -9,30 +9,43 @@ export const SignatureCanvas = forwardRef<SignatureCanvasHandle, Props>(function
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
   const [hasContent, setHasContent] = useState(false);
+  const hasContentRef = useRef(false);
+  const onChangeRef = useRef(onChange);
   const [width, setWidth] = useState(requestedWidth);
   const instructionsId = useId();
   const keyboardPoint = useRef({ x: requestedWidth / 2, y: height / 2 });
 
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
   useEffect(() => {
     const element = wrapperRef.current; if (!element) return;
-    const resize = () => setWidth(Math.max(240, Math.min(requestedWidth, Math.floor(element.getBoundingClientRect().width))));
+    const resize = () => setWidth(Math.max(1, Math.min(requestedWidth, Math.floor(element.getBoundingClientRect().width))));
     resize(); const observer = new ResizeObserver(resize); observer.observe(element); return () => observer.disconnect();
   }, [requestedWidth]);
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
+    const snapshot = document.createElement("canvas");
+    if (hasContentRef.current && canvas.width && canvas.height) {
+      snapshot.width = canvas.width;
+      snapshot.height = canvas.height;
+      snapshot.getContext("2d")?.drawImage(canvas, 0, 0);
+    }
     const ratio = window.devicePixelRatio || 1;
     canvas.width = width * ratio; canvas.height = height * ratio;
     const context = canvas.getContext("2d"); if (!context) return;
     context.scale(ratio, ratio); context.lineWidth = 2; context.lineCap = "round"; context.lineJoin = "round"; context.strokeStyle = "#302d29";
+    if (hasContentRef.current && snapshot.width && snapshot.height) {
+      context.drawImage(snapshot, 0, 0, snapshot.width, snapshot.height, 0, 0, width, height);
+      onChangeRef.current?.(canvas.toDataURL("image/png"));
+    }
     keyboardPoint.current = { x: width / 2, y: height / 2 };
-    setHasContent(false); onChange?.("");
-  }, [width, height, onChange]);
-  const clear = () => { const canvas = canvasRef.current; const context = canvas?.getContext("2d"); if (canvas && context) context.clearRect(0, 0, canvas.width, canvas.height); keyboardPoint.current = { x: width / 2, y: height / 2 }; setHasContent(false); onChange?.(""); };
+  }, [width, height]);
+  const clear = () => { const canvas = canvasRef.current; const context = canvas?.getContext("2d"); if (canvas && context) context.clearRect(0, 0, canvas.width, canvas.height); keyboardPoint.current = { x: width / 2, y: height / 2 }; hasContentRef.current = false; setHasContent(false); onChangeRef.current?.(""); };
   useImperativeHandle(ref, () => ({ clear, getData: () => canvasRef.current?.toDataURL("image/png") ?? "", isEmpty: () => !hasContent }), [hasContent]);
   const position = (event: React.PointerEvent<HTMLCanvasElement>) => { const rect = event.currentTarget.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; };
   const start = (event: React.PointerEvent<HTMLCanvasElement>) => { if (disabled) return; event.currentTarget.setPointerCapture(event.pointerId); const context = canvasRef.current?.getContext("2d"); if (!context) return; const point = position(event); context.beginPath(); context.moveTo(point.x, point.y); setDrawing(true); };
   const move = (event: React.PointerEvent<HTMLCanvasElement>) => { if (!drawing || disabled) return; const context = canvasRef.current?.getContext("2d"); if (!context) return; const point = position(event); context.lineTo(point.x, point.y); context.stroke(); };
-  const finish = () => { if (!drawing) return; setDrawing(false); setHasContent(true); onChange?.(canvasRef.current?.toDataURL("image/png") ?? ""); };
+  const finish = () => { if (!drawing) return; setDrawing(false); hasContentRef.current = true; setHasContent(true); onChangeRef.current?.(canvasRef.current?.toDataURL("image/png") ?? ""); };
   const drawWithKeyboard = (event: React.KeyboardEvent<HTMLCanvasElement>) => {
     if (disabled || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
     event.preventDefault();
@@ -44,7 +57,7 @@ export const SignatureCanvas = forwardRef<SignatureCanvasHandle, Props>(function
       y: Math.max(0, Math.min(height, from.y + (event.key === "ArrowDown" ? step : event.key === "ArrowUp" ? -step : 0))),
     };
     context.beginPath(); context.moveTo(from.x, from.y); context.lineTo(next.x, next.y); context.stroke();
-    keyboardPoint.current = next; setHasContent(true); onChange?.(canvas.toDataURL("image/png"));
+    keyboardPoint.current = next; hasContentRef.current = true; setHasContent(true); onChangeRef.current?.(canvas.toDataURL("image/png"));
   };
 
   return <div ref={wrapperRef} style={{ width: "100%" }}>

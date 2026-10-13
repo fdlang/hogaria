@@ -2,6 +2,7 @@ import pg from "pg";
 import { ConflictError } from "@reformapro/domain/errors";
 import type {
   ActivationToken,
+  ActivationDelivery,
   IActivationTokenRepository,
 } from "../../application/use-cases/account-activation.use-cases.js";
 import type { InMemoryUserRepository } from "./inMemoryRepositories.js";
@@ -11,16 +12,19 @@ export class InMemoryActivationTokenRepository
   implements IActivationTokenRepository
 {
   private items: ActivationToken[] = [];
+  private deliveries = new Map<string, { delivery: ActivationDelivery; state: "pending" | "sending" | "failed"; attempts: number; nextAt: number }>();
   private readonly revisions = new Map<string, number>();
   constructor(
-    private readonly users: Pick<InMemoryUserRepository, "activateAccount" | "activationRevision">,
+    private readonly users: Pick<InMemoryUserRepository, "activateAccount" | "activationRevision" | "update">,
   ) {}
-  async reserve(token: ActivationToken, now: Date) {
+  async reserve(token: ActivationToken, now: Date, delivery?: ActivationDelivery, markPendingActivation = false) {
     const expired = this.items.filter((item) => item.expiresAt <= now || item.usedAt);
     expired.forEach((item) => this.revisions.delete(item.tokenHash));
     this.items = this.items.filter((item) => item.expiresAt > now && !item.usedAt);
     if (this.items.some(item => item.userId === token.userId && !item.usedAt && item.expiresAt > now)) return false;
     await this.stage(token);
+    if (delivery) this.deliveries.set(delivery.id, { delivery, state: "pending", attempts: 0, nextAt: 0 });
+    if (markPendingActivation) await this.users.update(token.userId, { accountStatus: "pending_activation" });
     return true;
   }
   async stage(token: ActivationToken) {
@@ -34,6 +38,7 @@ export class InMemoryActivationTokenRepository
   }
   async discard(tokenHash: string) {
     this.items = this.items.filter(token => token.tokenHash !== tokenHash);
+    for (const [id, row] of this.deliveries) if (row.delivery.tokenHash === tokenHash) this.deliveries.delete(id);
     this.revisions.delete(tokenHash);
   }
   async findValid(hash: string, now: Date) {
@@ -53,13 +58,36 @@ export class InMemoryActivationTokenRepository
     this.users.activateAccount(token.userId, passwordHash);
     for (const item of this.items) if (item.userId === token.userId) this.revisions.delete(item.tokenHash);
     this.items = this.items.filter(item => item.userId !== token.userId);
+    for (const [id, row] of this.deliveries) if (row.delivery.tokenHash === hash) this.deliveries.delete(id);
+  }
+  async claimDelivery(tokenHash?: string) {
+    const now = Date.now();
+    const row = [...this.deliveries.values()].find(item =>
+      (!tokenHash || item.delivery.tokenHash === tokenHash) &&
+      ["pending", "sending"].includes(item.state) && item.attempts < 5 && item.nextAt <= now &&
+      this.items.some(token => token.tokenHash === item.delivery.tokenHash && token.expiresAt.getTime() > now),
+    );
+    if (!row) return null;
+    row.state = "sending";
+    row.attempts++;
+    row.nextAt = now + 120_000;
+    return row.delivery;
+  }
+  async finishDelivery(id: string, state: "accepted" | "pending") {
+    const row = this.deliveries.get(id);
+    if (!row) return;
+    if (state === "accepted") this.deliveries.delete(id);
+    else {
+      row.state = row.attempts >= 5 ? "failed" : "pending";
+      row.nextAt = Date.now() + 900_000;
+    }
   }
 }
 export class PostgresActivationTokenRepository
   implements IActivationTokenRepository
 {
   constructor(private readonly pool: pg.Pool) {}
-  async reserve(token: ActivationToken, now: Date) {
+  async reserve(token: ActivationToken, now: Date, delivery?: ActivationDelivery, markPendingActivation = false) {
     return this.transaction(async (client) => {
       await client.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [token.userId]);
       await client.query("DELETE FROM account_activation_tokens WHERE expires_at<=$1 OR used_at IS NOT NULL", [now]);
@@ -68,6 +96,14 @@ export class PostgresActivationTokenRepository
       await client.query(
         "INSERT INTO account_activation_tokens(user_id,token_hash,expires_at,used_at) VALUES($1,$2,$3,$4)",
         [token.userId, token.tokenHash, token.expiresAt, token.usedAt],
+      );
+      if (delivery) await client.query(
+        "INSERT INTO account_access_outbox(id,token_hash,payload) VALUES($1,$2,$3)",
+        [delivery.id, token.tokenHash, delivery],
+      );
+      if (markPendingActivation) await client.query(
+        "UPDATE users SET account_status='pending_activation' WHERE id=$1 AND account_status='archived'",
+        [token.userId],
       );
       return true;
     });
@@ -140,5 +176,36 @@ export class PostgresActivationTokenRepository
       );
       if (updated.rowCount !== 1) throw invalid();
     });
+  }
+  async claimDelivery(tokenHash?: string) {
+    await this.pool.query(
+      "DELETE FROM account_activation_tokens WHERE expires_at<=now() OR used_at IS NOT NULL",
+    );
+    await this.pool.query(
+      "UPDATE account_access_outbox SET state='failed',failure_reason=CASE WHEN first_attempt_at<now()-interval '23 hours' THEN 'idempotency_window_expired' ELSE 'attempts_exhausted' END,updated_at=now() WHERE state IN ('pending','sending') AND (first_attempt_at<now()-interval '23 hours' OR (attempts>=5 AND next_attempt_at<=now()))",
+    );
+    const result = await this.pool.query(
+      `WITH candidate AS (
+        SELECT o.id FROM account_access_outbox o
+        JOIN account_activation_tokens t ON t.token_hash=o.token_hash AND t.used_at IS NULL AND t.expires_at>now()
+        WHERE o.state IN ('pending','sending') AND o.attempts<5 AND o.next_attempt_at<=now()
+          AND ($1::text IS NULL OR o.token_hash=$1)
+        ORDER BY o.created_at LIMIT 1 FOR UPDATE OF o SKIP LOCKED
+      ) UPDATE account_access_outbox o SET state='sending',first_attempt_at=coalesce(first_attempt_at,now()),attempts=attempts+1,next_attempt_at=now()+interval '2 minutes',updated_at=now()
+      FROM candidate c WHERE o.id=c.id RETURNING o.payload`,
+      [tokenHash ?? null],
+    );
+    const payload = result.rows[0]?.payload as (ActivationDelivery & { expiresAt: string | Date }) | undefined;
+    return payload ? { ...payload, expiresAt: new Date(payload.expiresAt) } : null;
+  }
+  async finishDelivery(id: string, state: "accepted" | "pending") {
+    if (state === "accepted") {
+      await this.pool.query("DELETE FROM account_access_outbox WHERE id=$1", [id]);
+      return;
+    }
+    await this.pool.query(
+      "UPDATE account_access_outbox SET state=CASE WHEN attempts>=5 THEN 'failed' ELSE 'pending' END,next_attempt_at=now()+interval '15 minutes',updated_at=now() WHERE id=$1",
+      [id],
+    );
   }
 }

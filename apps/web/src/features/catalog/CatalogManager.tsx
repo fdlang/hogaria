@@ -79,7 +79,11 @@ export function CatalogManager({ api }: { api: SalesApi }) {
     };
     try {
       setSaving(true); setError("");
-      if (editing == null) await api.createCatalogItem(payload); else await api.updateCatalogItem(editing, payload);
+      if (editing == null) await api.createCatalogItem(payload); else {
+        const current = items.find(item => item.id === editing);
+        if (!current) throw new Error("La partida ya no está disponible. Actualiza el catálogo.");
+        await api.updateCatalogItem(editing, { ...payload, expectedUpdatedAt: current.updatedAt });
+      }
       setForm(blank()); setEditing(null); await load();
     } catch (cause) { setError((cause as { message?: string }).message ?? "No se pudo guardar la partida"); }
     finally { setSaving(false); }
@@ -108,19 +112,19 @@ export function CatalogManager({ api }: { api: SalesApi }) {
   };
   const archive = async (item: CatalogItemDTO) => {
     if (item.reviewStatus === "archived" || !window.confirm(`¿Archivar ${item.reference}? Dejará de aparecer al crear propuestas.`)) return;
-    try { await api.archiveCatalogItem(item.id); await load(); }
+    try { await api.archiveCatalogItem(item.id, item.updatedAt); await load(); }
     catch (cause) { setError((cause as { message?: string }).message ?? "No se pudo archivar la partida"); }
   };
   const activate = async (item: CatalogItemDTO) => {
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
     const issues = catalogActivationIssues(item, today);
     if (issues.length) { setError(`No se puede activar ${item.reference}. Completa precio, fuente y vigencia y comprueba que no se venda por debajo del coste.`); return; }
-    try { setSaving(true); setError(""); await api.updateCatalogItem(item.id, { reviewStatus: "verified" }); await load(); }
+    try { setSaving(true); setError(""); await api.updateCatalogItem(item.id, { reviewStatus: "verified", expectedUpdatedAt: item.updatedAt }); await load(); }
     catch (cause) { setError((cause as { message?: string }).message ?? "No se pudo activar la partida"); }
     finally { setSaving(false); }
   };
   const reopen = async (item: CatalogItemDTO) => {
-    try { setSaving(true); setError(""); await api.updateCatalogItem(item.id, { reviewStatus: "pending_review" }); await load(); }
+    try { setSaving(true); setError(""); await api.updateCatalogItem(item.id, { reviewStatus: "pending_review", expectedUpdatedAt: item.updatedAt }); await load(); }
     catch (cause) { setError((cause as { message?: string }).message ?? "No se pudo reabrir la revisión"); }
     finally { setSaving(false); }
   };
@@ -141,7 +145,7 @@ export function CatalogManager({ api }: { api: SalesApi }) {
         <label>Precio sin IVA *<input type="number" min="0" step="0.01" readOnly={form.pricingMode === "decomposed"} value={form.pricingMode === "decomposed" ? priceCalculation?.suggestedSalePrice ?? "" : form.salePrice} onChange={event => set("salePrice", event.target.value)} /></label>
         <label>IVA (%) *<select value={form.vatRate} onChange={event => set("vatRate", event.target.value)}>{CURRENT_FISCAL_POLICY.selectableVatRates.map(rate => <option key={rate} value={rate}>{rate}%</option>)}</select></label>
       </div>
-      <details className="catalog-manager__pricing">
+      <details className="catalog-manager__pricing" open={editing == null ? true : undefined}>
         <summary>Coste y trazabilidad <small>Información interna; el cliente no la ve</small></summary>
         <div className="estimate-line__main">
           <label>Tipo<select value={form.itemType} onChange={event => set("itemType", event.target.value)}><option value="simple">Simple</option><option value="composite">Compuesta</option></select></label>

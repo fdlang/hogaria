@@ -43,7 +43,7 @@ export const BUSINESS_RULES = [
     id: "HOG-SEC-003", description: "El alta, la reactivación y el restablecimiento de acceso usan enlaces de un solo uso y una única emisión vigente.", origin: "security", owner: "seguridad",
     assumption: "El correo es el canal de incorporación y recuperación verificado y cada cuenta mantiene como máximo un enlace vigente.", validScale: "Altas y recuperaciones ocasionales; requiere cola duradera al crecer el volumen de accesos.", validFrom: "2026-09-20", validUntil: null, nextReview: "2026-12-20",
     metrics: [metric("activation_expiry_rate", "Invitaciones caducadas sin activación", "database"), metric("duplicate_identity_attempt_rate", "Altas duplicadas bloqueadas")],
-    implementation: ["apps/api/src/application/use-cases/account-activation.use-cases.ts", "apps/api/src/infrastructure/database/activationTokenRepositories.ts"], tests: ["apps/api/src/application/use-cases/account-activation.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
+    implementation: ["apps/api/src/application/use-cases/account-activation.use-cases.ts", "apps/api/src/infrastructure/database/activationTokenRepositories.ts", "apps/api/database/account-access-outbox.sql"], tests: ["apps/api/src/application/use-cases/account-activation.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts"],
   },
   {
     id: "HOG-SEC-005", description: "La documentación laboral del profesional es privada y solo la administra el rol de administración.", origin: "security", owner: "seguridad",
@@ -189,7 +189,7 @@ export const BUSINESS_RULES = [
     id: "HOG-WRK-001", description: "Solo un profesional activo y asignado puede iniciar una jornada en una obra en curso.", origin: "business", owner: "operaciones",
     assumption: "Toda presencia corresponde a una asignación previa y a una obra formalmente iniciada.", validScale: "Plantilla y autónomos identificados individualmente; no cubre subcontratas por cuadrilla.", validFrom: "2026-10-10", validUntil: null, nextReview: "2027-01-10",
     metrics: [metric("unassigned_clock_in_denial_rate", "Fichajes rechazados por falta de asignación", "audit_log"), metric("manual_time_entry_rate", "Partes creados o corregidos manualmente")],
-    implementation: ["apps/api/src/application/use-cases/work-tracking.use-cases.ts"], tests: ["apps/api/src/application/use-cases/work-tracking.use-cases.test.ts", "apps/web/e2e/work.browser.ts"],
+    implementation: ["apps/api/src/application/use-cases/work-tracking.use-cases.ts", "apps/api/database/work-entry-assignment-guard.sql"], tests: ["apps/api/src/application/use-cases/work-tracking.use-cases.test.ts", "apps/api/src/infrastructure/database/audit-transactions.test.ts", "apps/web/e2e/work.browser.ts"],
   },
   {
     id: "HOG-WRK-002", description: "Las jornadas siguen entrada, pausas y salida válidas, y el coste se congela con la tarifa histórica aplicable.", origin: "business", owner: "administracion",
@@ -222,6 +222,12 @@ export const BUSINESS_RULES = [
     assumption: "Una tarifa Madrid y el desglose por unidad permiten presupuestar con rapidez sin inventar ni ocultar el origen del coste.", validScale: "Una zona tarifaria; requiere tarifas por zona antes de operar en otros mercados.", validFrom: "2026-10-10", validUntil: null, nextReview: "2027-01-10",
     metrics: [metric("catalog_decomposition_coverage", "Partidas activas con desglose completo", "database"), metric("catalog_price_revision_rate", "Versiones de precio creadas por periodo", "database")],
     implementation: ["packages/domain/src/catalog-pricing.ts", "apps/api/database/catalog-cost-composition.sql", "apps/api/src/application/use-cases/catalog.use-cases.ts"], tests: ["packages/domain/src/catalog-pricing.test.ts", "apps/api/src/infrastructure/database/catalog-pricing.migration.test.ts"],
+  },
+  {
+    id: "HOG-CAT-004", description: "Una edición o archivo de catálogo se rechaza si otra sesión modificó antes la misma partida.", origin: "technical", owner: "administracion",
+    assumption: "Puede haber más de una sesión administrativa editando el catálogo y la última escritura silenciosa perdería trabajo o publicaría precios obsoletos.", validScale: "Concurrencia administrativa moderada sobre un catálogo único; revisar si se introduce edición masiva.", validFrom: "2026-10-13", validUntil: null, nextReview: "2027-01-13",
+    metrics: [metric("catalog_edit_conflict_rate", "Ediciones de catálogo obsoletas rechazadas", "audit_log")],
+    implementation: ["apps/api/src/application/use-cases/catalog.use-cases.ts", "apps/api/src/infrastructure/database/postgresRepositories.ts", "apps/web/src/features/catalog/CatalogManager.tsx"], tests: ["apps/api/src/application/use-cases/catalog.use-cases.test.ts"],
   },
   {
     id: "HOG-FIN-002", description: "Cada obra nueva conserva instantáneas fiscales inmutables de la propuesta firmada y de cada orden aprobada, sin reinterpretar importes históricos.", origin: "legal_fiscal", owner: "administracion",

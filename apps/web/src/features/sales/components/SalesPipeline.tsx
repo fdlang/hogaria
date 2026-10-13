@@ -140,7 +140,18 @@ export function SalesPipeline({
   const [draft, setDraft] = useState(recoveredDraft?.draft ?? blankDraft);
   const [existingOpportunity, setExistingOpportunity] = useState(() => recoveredDraft?.existingOpportunity ?? new URLSearchParams(window.location.hash.split("?")[1] ?? window.location.search).get("opportunity") ?? "");
   const [editExistingOpportunity, setEditExistingOpportunity] = useState(false);
+  const hydratedOpportunity = useRef(recoveredDraft?.existingOpportunity ?? "");
   useEffect(() => {
+    if (!existingOpportunity) {
+      if (hydratedOpportunity.current !== "__new__") {
+        hydratedOpportunity.current = "__new__";
+        setOpportunity(blankOpportunity());
+      }
+      return;
+    }
+    const selectedOpportunity = opportunities.find(item => item.id === Number(existingOpportunity));
+    if (!selectedOpportunity || hydratedOpportunity.current === existingOpportunity) return;
+    hydratedOpportunity.current = existingOpportunity;
     setOpportunity(opportunityForSelection(existingOpportunity, opportunities));
   }, [existingOpportunity, opportunities]);
   useEffect(() => { setEditExistingOpportunity(false); }, [existingOpportunity]);
@@ -153,6 +164,7 @@ export function SalesPipeline({
   const autosaveInFlight = useRef(false);
   const autosavePending = useRef(false);
   const [autosaveRetry, setAutosaveRetry] = useState(0);
+  const editorHasChanges = useMemo(() => editingId !== null || selected !== null || existingOpportunity !== "" || JSON.stringify(opportunity) !== JSON.stringify(blankOpportunity()) || JSON.stringify(draft) !== JSON.stringify(blankDraft()), [draft, editingId, existingOpportunity, opportunity, selected]);
   const rememberServerDraft = (value: EstimateDraftDTO, updatedAt: string) => {
     lastSavedDraft.current = JSON.stringify(value);
     failedAutosaveDraft.current = "";
@@ -164,6 +176,12 @@ export function SalesPipeline({
     if (!showEditor) { sessionStorage.removeItem(SALES_DRAFT_KEY); return; }
     sessionStorage.setItem(SALES_DRAFT_KEY, JSON.stringify({ step, opportunity, selected, draft, existingOpportunity, editingId, draftUpdatedAt } satisfies RecoverableSalesDraft));
   }, [showEditor, step, opportunity, selected, draft, existingOpportunity, editingId, draftUpdatedAt]);
+  useEffect(() => {
+    if (!showEditor || !editorHasChanges) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [editorHasChanges, showEditor]);
   useEffect(() => {
     if (editingId === null || draftUpdatedAt) return;
     let current = true;
@@ -185,7 +203,7 @@ export function SalesPipeline({
 
   const editEstimate = async (estimate: EstimateDTO) => {
     if (saving || openingId !== null) return;
-    if ((editingId !== null || draft.partidas.length > 0) && !window.confirm("Se descartarán los cambios sin guardar. ¿Continuar?")) return;
+    if (editorHasChanges && !window.confirm("Se descartarán los cambios sin guardar. ¿Continuar?")) return;
     setOpeningId(estimate.id);
     setError("");
     try {
@@ -206,7 +224,7 @@ export function SalesPipeline({
 
   const duplicateEstimate = async (estimate: EstimateDTO) => {
     if (saving || openingId !== null || duplicatingId !== null) return;
-    if ((editingId !== null || draft.partidas.length > 0) && !window.confirm("Se cerrará el editor actual para abrir la copia. ¿Continuar?")) return;
+    if (editorHasChanges && !window.confirm("Se cerrará el editor actual para abrir la copia. ¿Continuar?")) return;
     setDuplicatingId(estimate.id);
     setError("");
     try {
@@ -564,6 +582,7 @@ export function SalesPipeline({
     setShowCatalog(false);
   };
   const openNewEstimate = () => {
+    if (showEditor && editorHasChanges && !window.confirm("Se descartarán los cambios actuales. ¿Crear un presupuesto nuevo?")) return;
     setEditingId(null);
     setDraftUpdatedAt(null);
     draftUpdatedAtRef.current = null;
@@ -579,8 +598,7 @@ export function SalesPipeline({
     setShowEditor(true);
   };
   const closeEditor = () => {
-    const hasChanges = editingId !== null || selected !== null || draft.partidas.length > 0 || draft.titulo.trim() !== "";
-    if (hasChanges && !window.confirm("¿Cerrar el editor? El último guardado automático seguirá disponible en Presupuestos recientes.")) return;
+    if (editorHasChanges && !window.confirm("¿Cerrar el editor? El último guardado automático seguirá disponible en Presupuestos recientes.")) return;
     setEditingId(null);
     setDraftUpdatedAt(null);
     draftUpdatedAtRef.current = null;

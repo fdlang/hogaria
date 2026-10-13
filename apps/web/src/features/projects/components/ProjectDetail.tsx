@@ -75,9 +75,9 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
       setAssigning(true);
       const professional = (professionals.data ?? []).find(item => item.id === Number(selectedProfessional));
       if (!professional?.profesion) throw new Error("Selecciona un profesional con oficio configurado");
-      await apis.projects.assign(projectId, professional.id);
+      const ran = await runProjectAction(async () => { await apis.projects.assign(projectId, professional.id); await project.refresh(); });
+      if (!ran) return;
       setSelectedProfessional("");
-      await project.refresh();
       push("Profesional asignado", "success");
     } catch (e) { push((e as { message?: string }).message ?? "No se pudo asignar", "error"); }
     finally { setAssigning(false); }
@@ -86,14 +86,14 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
   const handleUnassignProfessional = async (userId: number) => {
     const ok = await confirm({ title: "Quitar del proyecto", message: "El profesional dejará de acceder a esta obra.", variant: "danger", confirmLabel: "Quitar" });
     if (!ok) return;
-    try { await apis.projects.unassign(projectId, userId); await project.refresh(); push("Profesional desasignado", "success"); }
+    try { const ran = await runProjectAction(async () => { await apis.projects.unassign(projectId, userId); await project.refresh(); }); if (!ran) return; push("Profesional desasignado", "success"); }
     catch (e) { push((e as { message?: string }).message ?? "No se pudo desasignar", "error"); }
   };
 
   const handleTransition = async (estado: ProjectDTO["estado"]) => {
     const ok = await confirm({ title: "Cambiar estado de la obra", message: `La obra pasará a ${estado.replace("_", " ")}.`, confirmLabel: "Confirmar" });
     if (!ok) return;
-    try { setTransitioning(estado); await apis.projects.update(projectId, { estado, revision: project.data?.revision ?? 0 }); await project.refresh(); push("Estado actualizado", "success"); }
+    try { setTransitioning(estado); const ran = await runProjectAction(async () => { await apis.projects.update(projectId, { estado, revision: project.data?.revision ?? 0 }); await project.refresh(); }); if (!ran) return; push("Estado actualizado", "success"); }
     catch (e) { push((e as { message?: string }).message ?? "No se pudo actualizar el estado", "error"); }
     finally { setTransitioning(null); }
   };
@@ -113,13 +113,13 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
       : project.data?.hitos ?? [];
     try {
       setPlanningSaving(true);
-      await apis.projects.update(projectId, {
+      const ran = await runProjectAction(async () => { await apis.projects.update(projectId, {
         fechaInicio: String(form.get("startDate")),
         fechaFinPrevista: String(form.get("endDate")),
         hitos,
         revision: project.data?.revision ?? 0,
-      });
-      await project.refresh();
+      }); await project.refresh(); });
+      if (!ran) return;
       formElement.reset();
       push("Planificacion guardada", "success");
     } catch (cause) {
@@ -133,8 +133,8 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
     if (!project.data || archiveReason.trim().length < 10) return;
     try {
       setArchiving(true);
-      await apis.projects.archive(projectId, archiveReason.trim(), project.data.revision ?? 0);
-      await project.refresh();
+      const ran = await runProjectAction(async () => { await apis.projects.archive(projectId, archiveReason.trim(), project.data!.revision ?? 0); await project.refresh(); });
+      if (!ran) return;
       setShowArchive(false);
       setArchiveReason("");
       push("Obra archivada. El histórico se conserva.", "success");
@@ -168,7 +168,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url; link.download = name; link.click();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) { push((e as { message?: string }).message ?? "No se pudo descargar el archivo", "error"); }
   };
 
@@ -207,14 +207,14 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
         </>}
       />
       {isAdmin && !p.archivedAt && <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
-        <Button small variant="danger" onClick={() => setShowArchive(true)}>{p.estado === "finalizado" ? "Archivar obra" : "Cancelar y archivar obra"}</Button>
+        <Button small variant="danger" disabled={projectSaving} onClick={() => setShowArchive(true)}>{p.estado === "finalizado" ? "Archivar obra" : "Cancelar y archivar obra"}</Button>
       </div>}
       {p.archivedAt && <div className="project-detail__section" role="status" style={{ marginBottom: 20, padding: 16 }}>
         <strong>Obra archivada el {formatDate(p.archivedAt)}</strong>
         {p.archiveReason && <p style={{ marginTop: 6 }}>{p.archiveReason}</p>}
       </div>}
       {isAdmin && !p.archivedAt && nextStates[p.estado].length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-        {nextStates[p.estado].map(estado => <Button key={estado} small variant="ghost" loading={transitioning === estado} disabled={transitioning !== null || (estado === "en_curso" && p.estado === "planificacion" && !startReady) || (estado === "finalizado" && p.progreso !== 100)} onClick={() => void handleTransition(estado)}>{estado === "en_curso" ? "Iniciar/Reanudar obra" : estado === "pausado" ? "Pausar obra" : "Finalizar obra"}</Button>)}
+        {nextStates[p.estado].map(estado => <Button key={estado} small variant="ghost" loading={transitioning === estado} disabled={projectSaving || transitioning !== null || (estado === "en_curso" && p.estado === "planificacion" && !startReady) || (estado === "finalizado" && p.progreso !== 100)} onClick={() => void handleTransition(estado)}>{estado === "en_curso" ? "Iniciar/Reanudar obra" : estado === "pausado" ? "Pausar obra" : "Finalizar obra"}</Button>)}
         {p.estado === "planificacion" && !startReady && <p style={{ width: "100%", color: "#71685e", fontSize: 12 }}>Completa las fechas, asigna un profesional y crea al menos un hito para iniciar la obra.</p>}
         {nextStates[p.estado].includes("finalizado") && p.progreso !== 100 && <p style={{ width: "100%", color: "#71685e", fontSize: 12 }}>Completa el progreso al 100 % para finalizar la obra.</p>}
       </div>}
@@ -230,7 +230,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                 <label>Entrega prevista<input name="endDate" type="date" required defaultValue={p.fechaFinPrevista.slice(0, 10)} /></label>
                 <label>Nuevo hito<input name="milestoneName" maxLength={300} placeholder={p.hitos.length ? "Opcional" : "Ej. Demoliciones terminadas"} required={p.hitos.length === 0} /></label>
                 <label>Fecha del hito<input name="milestoneDate" type="date" defaultValue={p.fechaFinPrevista.slice(0, 10)} required={p.hitos.length === 0} /></label>
-                <Button type="submit" small loading={planningSaving}>Guardar planificacion</Button>
+                <Button type="submit" small loading={planningSaving} disabled={projectSaving}>Guardar planificacion</Button>
               </form>
             </section>
           )}
@@ -339,7 +339,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                 {projectAssignments.map(a => (
                   <li key={a.userId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#302d29" }}>
                     <ProfesionBadge profesion={a.profesion as Profesion} />
-                    {canManageProject && <Button small variant="ghost" onClick={() => handleUnassignProfessional(a.userId)}>Quitar</Button>}
+                    {canManageProject && <Button small variant="ghost" disabled={projectSaving} onClick={() => handleUnassignProfessional(a.userId)}>Quitar</Button>}
                   </li>
                 ))}
               </ul>
@@ -349,7 +349,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
                     <option value="">{professionals.loading ? "Cargando profesionales…" : "Asignar profesional"}</option>
                     {assignableProfessionals.map(item => <option key={item.id} value={item.id}>{item.nombre} · {item.profesion}</option>)}
                   </select>
-                  <Button small onClick={handleAssignProfessional} disabled={!selectedProfessional || assigning}>{assigning ? "…" : "Añadir"}</Button>
+                  <Button small onClick={handleAssignProfessional} disabled={!selectedProfessional || assigning || projectSaving}>{assigning ? "…" : "Añadir"}</Button>
                 </div>
               )}
             </div>
@@ -362,7 +362,7 @@ export function ProjectDetail({ apis, projectId, onBack }: Props) {
         <label>Motivo *<textarea rows={4} minLength={10} maxLength={1000} value={archiveReason} onChange={event => setArchiveReason(event.target.value)} placeholder="Explica el motivo del cierre administrativo" /></label>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
           <Button variant="ghost" disabled={archiving} onClick={() => { setShowArchive(false); setArchiveReason(""); }}>Volver</Button>
-          <Button variant="danger" loading={archiving} disabled={archiveReason.trim().length < 10} onClick={() => void handleArchive()}>{p.estado === "finalizado" ? "Archivar" : "Cancelar y archivar"}</Button>
+          <Button variant="danger" loading={archiving} disabled={projectSaving || archiveReason.trim().length < 10} onClick={() => void handleArchive()}>{p.estado === "finalizado" ? "Archivar" : "Cancelar y archivar"}</Button>
         </div>
       </Modal>
     </section>

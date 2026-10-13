@@ -1,10 +1,13 @@
 import { readFile } from "node:fs/promises";
 import pg from "pg";
+import { assertLocalDatabaseTarget } from "./database-safety.mjs";
 
 if (process.env.CONFIRM_DATABASE_RESET !== "RESET_HOGARIA" && !process.argv.includes("--confirm=RESET_HOGARIA")) {
   throw new Error("Reset cancelado: confirma explícitamente con --confirm=RESET_HOGARIA");
 }
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL no está configurada");
+
+assertLocalDatabaseTarget(process.env.DATABASE_URL);
 
 const sql = await readFile(new URL("../database/reset-all.sql", import.meta.url), "utf8");
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });

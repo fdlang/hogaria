@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
-import { applyMigrations, MIGRATIONS, migrationChecksum, migrationChecksumCandidates } from "../../../scripts/migrations.mjs";
+import {
+  applyMigrations,
+  MIGRATIONS,
+  migrationChecksum,
+  migrationChecksumCandidates,
+  unwrapMigrationTransaction,
+} from "../../../scripts/migrations.mjs";
 
 describe("versioned migration runner", () => {
   it("contains every incremental migration required by legacy databases", () => {
@@ -14,6 +20,8 @@ describe("versioned migration runner", () => {
       "archived-work-history-hardening.sql",
       "change-order-optimistic-locking.sql",
       "blob-cleanup-outbox.sql",
+      "work-entry-assignment-guard.sql",
+      "account-access-outbox.sql",
     ]));
   });
 
@@ -32,6 +40,31 @@ describe("versioned migration runner", () => {
     expect(migrationChecksumCandidates("schema.sql", linux)).toContain(
       "0407a28b67adea514ef4b6ee7b53aabb165a728523bea61aa8cd929cf3ec97df",
     );
+  });
+
+  it("lets the runner own the transaction around legacy wrapped SQL", () => {
+    expect(unwrapMigrationTransaction("BEGIN;\nSELECT 1;\nCOMMIT;\n")).toBe("\nSELECT 1;\n");
+    expect(unwrapMigrationTransaction("SELECT 1;\n")).toBe("SELECT 1;\n");
+  });
+
+  it("commits migration SQL and its ledger record atomically", async () => {
+    const calls: string[] = [];
+    const query = vi.fn(async (sql: string) => {
+      calls.push(sql);
+      return {
+        rows: sql.startsWith("SELECT name")
+          ? MIGRATIONS.map((name) => ({ name, checksum: migrationChecksum(`-- ${name}`) })).slice(1)
+          : [],
+      };
+    });
+    await expect(applyMigrations({ query }, async (name) => `-- ${name}`)).resolves.toEqual([MIGRATIONS[0]]);
+    expect(calls.slice(-5)).toEqual([
+      "BEGIN",
+      `-- ${MIGRATIONS[0]}`,
+      "INSERT INTO schema_migrations(name,checksum) VALUES($1,$2)",
+      "COMMIT",
+      "SELECT pg_advisory_unlock(48127, 9026)",
+    ]);
   });
 
   it("accepts the known mixed-line legacy checksum without accepting other content", () => {

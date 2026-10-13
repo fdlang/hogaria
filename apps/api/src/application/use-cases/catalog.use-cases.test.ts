@@ -31,10 +31,10 @@ describe("CatalogUseCases — administración exclusiva", () => {
     const item = await catalog.create(admin.id, traceable);
     expect(item.reviewStatus).toBe("pending_review");
     expect(await catalog.list(admin.id)).toHaveLength(0);
-    const verified = await catalog.update(admin.id, item.id, { reviewStatus: "verified" });
+    const verified = await catalog.update(admin.id, item.id, { reviewStatus: "verified", expectedUpdatedAt: item.updatedAt.toISOString() });
     expect(verified.active).toBe(true);
     expect((await catalog.list(admin.id)).map(row => row.reference)).toContain("DEM-900");
-    await catalog.archive(admin.id, item.id);
+    await catalog.archive(admin.id, item.id, verified.updatedAt.toISOString());
     expect(await catalog.list(admin.id)).toHaveLength(0);
     expect((await catalog.list(admin.id, true))[0]?.active).toBe(false);
   });
@@ -42,7 +42,7 @@ describe("CatalogUseCases — administración exclusiva", () => {
   it("bloquea la activación sin trazabilidad, vigencia o precio positivo", async () => {
     const { admin, catalog } = await setup();
     const item = await catalog.create(admin.id, input);
-    await expect(catalog.update(admin.id, item.id, { reviewStatus: "verified" })).rejects.toThrow("no puede activarse");
+    await expect(catalog.update(admin.id, item.id, { reviewStatus: "verified", expectedUpdatedAt: item.updatedAt.toISOString() })).rejects.toThrow("no puede activarse");
   });
 
   it("rechaza tipos de IVA fuera de la política fiscal vigente", async () => {
@@ -60,7 +60,7 @@ describe("CatalogUseCases — administración exclusiva", () => {
   it("usa reviewStatus como único contrato para activar o archivar", async () => {
     const { admin, catalog } = await setup();
     const item = await catalog.create(admin.id, traceable);
-    await expect(catalog.update(admin.id, item.id, { active: true })).rejects.toBeInstanceOf(ValidationError);
+    await expect(catalog.update(admin.id, item.id, { active: true, expectedUpdatedAt: item.updatedAt.toISOString() })).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("rechaza costes sin fuente y fecha de contraste", async () => {
@@ -98,7 +98,7 @@ describe("CatalogUseCases — administración exclusiva", () => {
     expect(item.salePrice).toBe(116.88);
     expect(item.priceVersion).toBe(1);
     const revised = await catalog.update(admin.id, item.id, {
-      costBreakdown: { ...item.costBreakdown, overheadPercent: 12 },
+      costBreakdown: { ...item.costBreakdown, overheadPercent: 12 }, expectedUpdatedAt: item.updatedAt.toISOString(),
     });
     expect(revised.priceVersion).toBe(2);
     expect(revised.salePrice).toBe(119);
@@ -120,17 +120,33 @@ describe("CatalogUseCases — administración exclusiva", () => {
       update: async (_id: number, changes: Record<string, unknown>) => { received = changes; return { ...stored, ...changes }; },
     } as unknown as ICatalogRepository;
 
-    await new CatalogUseCases(users, repository).update(admin.id, stored.id, { description: "  Nueva partida  " });
+    await new CatalogUseCases(users, repository).update(admin.id, stored.id, { description: "  Nueva partida  ", expectedUpdatedAt: stored.updatedAt.toISOString() });
     expect(received).toEqual({ description: "Nueva partida" });
+  });
+
+  it("rechaza una edición basada en una versión obsoleta", async () => {
+    const { admin, catalog } = await setup();
+    const item = await catalog.create(admin.id, traceable);
+    const revised = await catalog.update(admin.id, item.id, { description: "Primera edición", expectedUpdatedAt: item.updatedAt.toISOString() });
+    await expect(catalog.update(admin.id, item.id, { description: "Edición atrasada", expectedUpdatedAt: item.updatedAt.toISOString() })).rejects.toThrow("ha cambiado");
+    expect(revised.description).toBe("Primera edición");
+  });
+
+  it("rechaza una edición basada en una versión obsoleta", async () => {
+    const { admin, catalog } = await setup();
+    const item = await catalog.create(admin.id, traceable);
+    const revised = await catalog.update(admin.id, item.id, { description: "Primera edición", expectedUpdatedAt: item.updatedAt.toISOString() });
+    await expect(catalog.update(admin.id, item.id, { description: "Edición atrasada", expectedUpdatedAt: item.updatedAt.toISOString() })).rejects.toThrow("ha cambiado");
+    expect(revised.description).toBe("Primera edición");
   });
 
   it("searches verified items with bounded pagination without exposing inactive rows", async () => {
     const { admin, catalog } = await setup();
     const first = await catalog.create(admin.id, { ...traceable, reference: "FON-901", description: "Instalación de lavabo", searchTerms: ["grifo baño"] });
     const second = await catalog.create(admin.id, { ...traceable, reference: "FON-902", description: "Instalación de ducha" });
-    await catalog.update(admin.id, first.id, { reviewStatus: "verified" });
-    await catalog.update(admin.id, second.id, { reviewStatus: "verified" });
-    await catalog.archive(admin.id, second.id);
+    await catalog.update(admin.id, first.id, { reviewStatus: "verified", expectedUpdatedAt: first.updatedAt.toISOString() });
+    const verifiedSecond = await catalog.update(admin.id, second.id, { reviewStatus: "verified", expectedUpdatedAt: second.updatedAt.toISOString() });
+    await catalog.archive(admin.id, second.id, verifiedSecond.updatedAt.toISOString());
 
     const result = await catalog.search(admin.id, { search: "lavabo", category: "", page: 0, limit: 12 });
 

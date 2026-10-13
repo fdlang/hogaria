@@ -6,7 +6,7 @@
  * a11y-compliant. Call `ask({ ... })` and await a boolean.
  */
 
-import { createContext, useCallback, useContext, useRef, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { Modal, Button } from "../ui";
 
 export interface ConfirmOptions {
@@ -29,9 +29,15 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 
   const ask = useCallback((o: ConfirmOptions) => {
     return new Promise<boolean>(resolve => {
+      resolverRef.current?.(false);
       resolverRef.current = resolve;
       setOpts(o);
     });
+  }, []);
+
+  useEffect(() => () => {
+    resolverRef.current?.(false);
+    resolverRef.current = null;
   }, []);
 
   const settle = useCallback((v: boolean) => {

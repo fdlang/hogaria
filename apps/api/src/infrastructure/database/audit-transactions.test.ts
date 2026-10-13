@@ -100,6 +100,8 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
       "archived-work-history-hardening.sql",
       "change-order-optimistic-locking.sql",
       "blob-cleanup-outbox.sql",
+      "work-entry-assignment-guard.sql",
+      "account-access-outbox.sql",
     ])
       await db.exec(
         await readFile(
@@ -235,9 +237,22 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     await expect(query("DELETE FROM projects WHERE id=$1", [project.id])).rejects.toThrow("histórico");
     expect(await projects.findById(project.id)).not.toBeNull();
   });
+  it("enforces the current professional assignment when a work entry is inserted", async () => {
+    const professional = await users.save({ id:0,email:Email.of("worker-guard@test.es"),nombre:"Profesional",rol:"profesional",profesion:"albanil",activo:true,createdAt:new Date() });
+    const project = await projects.save({ id:0,estimateId,clienteId:clientId,nombre:"Obra activa",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"en_curso",progreso:Percentage.zero(),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date() });
+    const payload = (id: string) => ({ id,professionalId:professional.id,projectId:project.id,status:"abierto",revision:1,startedAt:"2026-10-01T08:00:00.000Z",endedAt:null,pauses:[],breakSeconds:0,units:null,notes:"",rate:{rateUnit:"hora",rateCents:2000},approvedCostCents:null,approvedBy:null,approvedAt:null,reviewReason:"",createdAt:"2026-10-01T08:00:00.000Z" });
+    const insert = (id: string) => query("INSERT INTO work_entries(id,professional_id,project_id,started_at,status,seconds,payload) VALUES($1,$2,$3,$4,'abierto',0,$5)", [id,professional.id,project.id,new Date("2026-10-01T08:00:00Z"),payload(id)]);
+
+    await expect(insert(crypto.randomUUID())).rejects.toThrow("no esta asignado");
+    const assigned = await projects.update(project.id, { profesionalesAsignados:[{ userId:professional.id,profesion:"albanil" }] }, project.revision ?? 0);
+    const entryId = crypto.randomUUID();
+    await expect(insert(entryId)).resolves.toBeDefined();
+    await projects.update(project.id, { profesionalesAsignados:[] }, assigned.revision ?? 0);
+    await expect(query("INSERT INTO work_entries(id,professional_id,project_id,started_at,status,seconds,payload) VALUES($1,$2,$3,$4,'abierto',0,$5) ON CONFLICT(id) DO UPDATE SET payload=EXCLUDED.payload", [entryId,professional.id,project.id,new Date("2026-10-01T08:00:00Z"),payload(entryId)])).resolves.toBeDefined();
+  });
   it("protects archived project files, labour forecasts and project truncation in the database", async () => {
-    const project = await projects.save({ id:0,estimateId,clienteId:clientId,nombre:"Obra archivada",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"pausado",progreso:Percentage.of(20),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[],hitos:[],createdAt:new Date() });
     const professional = await users.save({ id:0,email:Email.of("worker-history@test.es"),nombre:"Profesional",rol:"profesional",activo:true,createdAt:new Date() });
+    const project = await projects.save({ id:0,estimateId,clienteId:clientId,nombre:"Obra archivada",descripcion:"",direccion:"Madrid",tipo:"Reforma",estado:"en_curso",progreso:Percentage.of(20),presupuesto:Money.of(100),fechaInicio:new Date(),fechaFinPrevista:new Date(),profesionalesAsignados:[{ userId:professional.id,profesion:"albanil" }],hitos:[],createdAt:new Date() });
     const entryId = crypto.randomUUID();
     const openPayload = { id:entryId,professionalId:professional.id,projectId:project.id,status:"abierto",revision:1,startedAt:"2026-10-01T08:00:00.000Z",endedAt:null,pauses:[],breakSeconds:0,units:null,notes:"",rate:{rateUnit:"hora",rateCents:2000},approvedCostCents:null,approvedBy:null,approvedAt:null,reviewReason:"",createdAt:"2026-10-01T08:00:00.000Z" };
     await query("INSERT INTO work_entries(id,professional_id,project_id,started_at,status,seconds,payload) VALUES($1,$2,$3,$4,'abierto',0,$5)", [entryId, professional.id, project.id, new Date("2026-10-01T08:00:00Z"), openPayload]);
@@ -419,6 +434,29 @@ describe("Audit: PostgreSQL transactions and outbox (PGlite)", () => {
     );
     expect(await tokens.findValid("token", new Date())).not.toBeNull();
     expect((await users.findById(clientId))?.activo).toBe(false);
+  });
+  it("stores the access token and its delivery atomically and keeps ambiguous sends retryable", async () => {
+    const tokens = new PostgresActivationTokenRepository(pool);
+    await users.update(clientId, { accountStatus: "archived", activo: false });
+    const expiresAt = new Date(Date.now() + 60_000);
+    const delivery = { id:crypto.randomUUID(),tokenHash:"queued-token",to:"client@example.test",name:"Client",activationUrl:"https://hogaria.test/#/activar-cuenta?token=secret",expiresAt,purpose:"activation" as const };
+    await expect(tokens.reserve({ userId:clientId,tokenHash:delivery.tokenHash,expiresAt,usedAt:null }, new Date(), delivery, true)).resolves.toBe(true);
+    await expect(users.findById(clientId)).resolves.toMatchObject({ accountStatus:"pending_activation" });
+    await expect(tokens.claimDelivery(delivery.tokenHash)).resolves.toMatchObject({ id:delivery.id,activationUrl:delivery.activationUrl });
+    await tokens.finishDelivery(delivery.id, "pending");
+    expect(await tokens.findValid(delivery.tokenHash, new Date())).not.toBeNull();
+
+    await tokens.discard(delivery.tokenHash);
+    await users.update(clientId, { accountStatus: "archived", activo: false });
+    await db.exec("CREATE FUNCTION fail_access_outbox() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'outbox unavailable'; END $$; CREATE TRIGGER access_outbox_failure BEFORE INSERT ON account_access_outbox FOR EACH ROW EXECUTE FUNCTION fail_access_outbox();");
+    try {
+      const failed = { ...delivery, id:crypto.randomUUID(),tokenHash:"rolled-back-token" };
+      await expect(tokens.reserve({ userId:clientId,tokenHash:failed.tokenHash,expiresAt,usedAt:null }, new Date(Date.now()+120_000), failed, true)).rejects.toThrow("outbox unavailable");
+      expect(await tokens.findValid(failed.tokenHash, new Date())).toBeNull();
+      await expect(users.findById(clientId)).resolves.toMatchObject({ accountStatus:"archived" });
+    } finally {
+      await db.exec("DROP TRIGGER access_outbox_failure ON account_access_outbox; DROP FUNCTION fail_access_outbox();");
+    }
   });
   it("only one concurrent activation wins and expired links cannot be consumed", async () => {
     const tokens = new PostgresActivationTokenRepository(pool);

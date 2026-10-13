@@ -5,15 +5,26 @@ import { ACCOUNT_PASSWORD_REQUIREMENTS, isValidAccountPassword } from "@reformap
 import type { IEventEmitter } from "@reformapro/domain/events";
 
 export interface ActivationToken { userId: number; tokenHash: string; expiresAt: Date; usedAt: Date | null; }
+export interface ActivationDelivery {
+  id: string;
+  tokenHash: string;
+  to: string;
+  name: string;
+  activationUrl: string;
+  expiresAt: Date;
+  purpose: "activation" | "password_reset";
+}
 export interface IActivationTokenRepository {
   /** Atomically reserve one current invitation per user. */
-  reserve(token: ActivationToken, now: Date): Promise<boolean>;
+  reserve(token: ActivationToken, now: Date, delivery?: ActivationDelivery, markPendingActivation?: boolean): Promise<boolean>;
   stage(token: ActivationToken): Promise<void>;
   promote(userId: number, tokenHash: string): Promise<void>;
   discard(tokenHash: string): Promise<void>;
   findValid(tokenHash: string, now: Date): Promise<ActivationToken | null>;
   /** Consume a still-valid link and activate its account in one transaction. */
   complete(tokenHash: string, passwordHash: string): Promise<void>;
+  claimDelivery(tokenHash?: string): Promise<ActivationDelivery | null>;
+  finishDelivery(id: string, state: "accepted" | "pending"): Promise<void>;
 }
 export interface ITransactionalEmail { isConfigured(): boolean; sendActivation(input: { to: string; name: string; activationUrl: string; expiresAt: Date; purpose?: "activation" | "password_reset" }): Promise<void>; }
 
@@ -67,23 +78,35 @@ export class AccountActivationUseCases {
     const reactivating = user.accountStatus === "archived";
     const token = newToken(); const expiresAt = new Date(Date.now() + this.ttlMs); const hash = await tokenHash(token);
     const activationUrl = `${this.appUrl.replace(/\/$/, "")}/#/activar-cuenta?token=${encodeURIComponent(token)}`;
-    try {
-      const reserved = await this.tokens.reserve({ userId: user.id, tokenHash: hash, expiresAt, usedAt: null }, new Date());
-      if (!reserved) {
-        return { sent: false as const, status: "existing_or_in_progress" as const, email: user.email.value, requestedBy: context.ip };
-      }
-      // Only the reservation winner changes the archived account. Doing this
-      // before delivery prevents a fast activation from being overwritten.
-      if (reactivating) await this.users.update(user.id, { accountStatus: "pending_activation" });
-      await this.email.sendActivation({ to: user.email.value, name: user.nombre, activationUrl, expiresAt, purpose });
-    } catch (error) {
-      await this.tokens.discard(hash).catch(() => undefined);
-      throw error;
+    const delivery: ActivationDelivery = { id: crypto.randomUUID(), tokenHash: hash, to: user.email.value, name: user.nombre, activationUrl, expiresAt, purpose };
+    const reserved = await this.tokens.reserve({ userId: user.id, tokenHash: hash, expiresAt, usedAt: null }, new Date(), delivery, reactivating);
+    if (!reserved) {
+      return { sent: false as const, status: "existing_or_in_progress" as const, email: user.email.value, requestedBy: context.ip };
     }
-    // Once the email has been delivered, never fail the request or discard its
-    // token. A staged token is already valid; promotion only retires older links.
-    await this.tokens.promote(user.id, hash).catch(() => undefined);
-    return { sent: true as const, status: "sent" as const, expiresAt, email: user.email.value, requestedBy: context.ip };
+    const sent = await this.deliver(hash);
+    return { sent, status: sent ? "sent" as const : "queued" as const, expiresAt, email: user.email.value, requestedBy: context.ip };
+  }
+  private async deliver(tokenHash?: string) {
+    const delivery = await this.tokens.claimDelivery(tokenHash);
+    if (!delivery) return false;
+    try {
+      await this.email.sendActivation(delivery);
+      await this.tokens.finishDelivery(delivery.id, "accepted");
+      return true;
+    } catch {
+      await this.tokens.finishDelivery(delivery.id, "pending").catch(() => undefined);
+      return false;
+    }
+  }
+  async retry(limit = 20) {
+    try { this.ensureConfigured(); } catch { return { processed: 0, configured: false }; }
+    let processed = 0;
+    const deadline = Date.now() + 40_000;
+    while (processed < Math.min(20, Math.max(1, limit)) && Date.now() < deadline && await this.deliver()) {
+      processed++;
+      await new Promise(resolve => setTimeout(resolve, 600));
+    }
+    return { processed, configured: true };
   }
   async activate(token: string, password: string) {
     if (typeof token !== "string" || token.length < 40 || token.length > 200) throw new ValidationError("Enlace de activación no válido", "token");

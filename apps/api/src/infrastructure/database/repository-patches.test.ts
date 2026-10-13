@@ -36,6 +36,16 @@ describe("PostgreSQL partial updates", () => {
     expect(query.mock.calls[0]?.[0]).not.toContain("description=");
   });
 
+  it("uses the expected timestamp to reject stale catalogue writes", async () => {
+    const query = vi.fn(async () => ({ rows: [], rowCount: 0 }));
+    const expectedUpdatedAt = new Date("2026-10-13T10:00:00.000Z");
+
+    await expect(new PostgresCatalogRepository(poolWith(query)).update(4, { salePrice: 25 }, expectedUpdatedAt)).rejects.toBeInstanceOf(ConflictError);
+
+    expect(query.mock.calls[0]?.[0]).toContain("date_trunc('milliseconds',updated_at)");
+    expect(query.mock.calls[0]?.[1]).toEqual([4, 25, expectedUpdatedAt]);
+  });
+
   it("changes a request status only while it is pending", async () => {
     const query = vi.fn(async () => ({ rows: [], rowCount: 0 }));
     await expect(new PostgresSolicitudRepository(poolWith(query)).update(3, { estado: "contactado", motivo: null })).rejects.toThrow();

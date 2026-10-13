@@ -1,6 +1,7 @@
 -- Full Hogaria reset. Every application table and its rows are removed.
 -- Platform-managed objects outside this explicit list are never touched.
 BEGIN;
+DROP TABLE IF EXISTS account_access_outbox CASCADE;
 DROP TABLE IF EXISTS
   user_notifications,
   notification_event_outbox,

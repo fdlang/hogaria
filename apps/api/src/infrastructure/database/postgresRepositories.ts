@@ -10,6 +10,7 @@ import type { ISolicitudRepository } from "../../application/use-cases/solicitud
 import { createFiscalSnapshot } from "@reformapro/domain";
 
 type Row = Record<string, any>;
+const LOGIN_DUMMY_HASH = "$2a$12$86OJUCQ24qCL8ZbIgPWwc.qmeldCwtoTkqEWKfbbxEIc0sX7XvWhu";
 const date = (value: string | Date) => new Date(value);
 const projectPayload = (p: Project) => ({ ...p, progreso: p.progreso.value, presupuesto: p.presupuesto.amount, fiscalSnapshots: p.fiscalSnapshots?.map(snapshot => ({ ...snapshot, capturedAt: snapshot.capturedAt.toISOString() })), fechaInicio: p.fechaInicio.toISOString(), fechaFinPrevista: p.fechaFinPrevista.toISOString(), archivedAt: p.archivedAt?.toISOString() ?? null, createdAt: p.createdAt.toISOString(), hitos: p.hitos.map(h => ({ ...h, fecha: h.fecha.toISOString() })) });
 const restoreProject = (id: number, p: any): Project => ({ ...p, id, progreso: Percentage.of(p.progreso), presupuesto: Money.of(p.presupuesto), fiscalSnapshots: Array.isArray(p.fiscalSnapshots) ? p.fiscalSnapshots.map((snapshot: any) => ({ ...snapshot, capturedAt: date(snapshot.capturedAt) })) : undefined, fechaInicio: date(p.fechaInicio), fechaFinPrevista: date(p.fechaFinPrevista), archivedAt: p.archivedAt ? date(p.archivedAt) : null, archiveReason: p.archiveReason ?? null, createdAt: date(p.createdAt), hitos: p.hitos.map((h: any) => ({ ...h, fecha: date(h.fecha) })) });
@@ -66,7 +67,7 @@ export class PostgresUserRepository implements IUserRepository {
     } finally { if (ownsConnection) client.release(); }
   }
   async delete(id: number) { await this.pool.query("DELETE FROM users WHERE id=$1", [id]); }
-  async verifyPassword(email: string, plaintext: string) { const r = await this.pool.query("SELECT * FROM users WHERE lower(email)=lower($1)", [email]); if (!r.rows[0] || !(await this.hasher.verify(plaintext, r.rows[0].password_hash))) return null; return this.map(r.rows[0]); }
+  async verifyPassword(email: string, plaintext: string) { const r = await this.pool.query("SELECT * FROM users WHERE lower(email)=lower($1)", [email]); const valid=await this.hasher.verify(plaintext,r.rows[0]?.password_hash||LOGIN_DUMMY_HASH);if(!r.rows[0]||!valid)return null;return this.map(r.rows[0]); }
   async updatePassword(id: number, hash: string) { await this.update(id, {}, hash); }
   async revokeSessions(id: number) {
     const result = await this.pool.query("UPDATE users SET session_version=session_version+1 WHERE id=$1 RETURNING id", [id]);
@@ -212,7 +213,7 @@ export class PostgresCatalogRepository implements ICatalogRepository {
       JSON.stringify(composition.materials),JSON.stringify(composition.auxiliaries),item.tariffZone,item.priceVersion]);
     return this.map(result.rows[0]);
   }
-  async update(id: number, changes: Partial<Omit<CatalogItem, "id" | "createdAt" | "updatedAt">>) {
+  async update(id: number, changes: Partial<Omit<CatalogItem, "id" | "createdAt" | "updatedAt">>, expectedUpdatedAt?: Date) {
     const flat: Record<string, unknown> = { ...changes };
     delete flat.costBreakdown; delete flat.costComposition; delete flat.evidence; delete flat.priceVersion;
     if (changes.costBreakdown) Object.assign(flat, changes.costBreakdown);
@@ -231,11 +232,13 @@ export class PostgresCatalogRepository implements ICatalogRepository {
       auxiliaryBreakdown: "auxiliary_breakdown", tariffZone: "tariff_zone",
     };
     const entries = Object.entries(flat).filter(([key, value]) => columns[key] && value !== undefined);
-    if (!entries.length) { const current = await this.findById(id); if (!current) throw new NotFoundError("Partida de catálogo"); return current; }
+    if (!entries.length) { const current = await this.findById(id); if (!current) throw new NotFoundError("Partida de catálogo"); if (expectedUpdatedAt && current.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw new ConflictError("La partida ha cambiado. Actualiza los datos antes de guardar."); return current; }
     const values: unknown[] = [id];
     const assignments = entries.map(([key, value]) => { values.push(value); return `${columns[key]}=$${values.length}`; });
-    const result = await this.pool.query(`UPDATE catalog_items SET ${assignments.join(",")},updated_at=NOW() WHERE id=$1 RETURNING *`, values);
-    if (!result.rows[0]) throw new NotFoundError("Partida de catálogo");
+    if (expectedUpdatedAt) values.push(expectedUpdatedAt);
+    const expectedClause = expectedUpdatedAt ? ` AND date_trunc('milliseconds',updated_at)=date_trunc('milliseconds',$${values.length}::timestamptz)` : "";
+    const result = await this.pool.query(`UPDATE catalog_items SET ${assignments.join(",")},updated_at=GREATEST(clock_timestamp(),updated_at + INTERVAL '1 millisecond') WHERE id=$1${expectedClause} RETURNING *`, values);
+    if (!result.rows[0]) throw expectedUpdatedAt ? new ConflictError("La partida ha cambiado. Actualiza los datos antes de guardar.") : new NotFoundError("Partida de catálogo");
     return this.map(result.rows[0]);
   }
 }

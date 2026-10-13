@@ -93,7 +93,7 @@ function ProfessionalDocumentsModal({ api, professional, onClose }: { api: Users
     finally { setUploading(false); if (inputRef.current) inputRef.current.value = ""; }
   };
   const download = async (document: ProfessionalDocumentDTO) => {
-    try { const blob = await api.downloadProfessionalDocument(document.id); const url = URL.createObjectURL(blob); const link = window.document.createElement("a"); link.href = url; link.download = document.nombre; link.click(); URL.revokeObjectURL(url); }
+    try { const blob = await api.downloadProfessionalDocument(document.id); const url = URL.createObjectURL(blob); const link = window.document.createElement("a"); link.href = url; link.download = document.nombre; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 60_000); }
     catch (error) { push((error as { message?: string }).message ?? "No se pudo descargar el documento", "error"); }
   };
   const remove = async (document: ProfessionalDocumentDTO) => {

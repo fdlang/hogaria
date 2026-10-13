@@ -29,11 +29,18 @@ export const MIGRATIONS = [
   "archived-work-history-hardening.sql",
   "change-order-optimistic-locking.sql",
   "blob-cleanup-outbox.sql",
+  "work-entry-assignment-guard.sql",
+  "account-access-outbox.sql",
 ];
 
 const sha256 = (sql) => createHash("sha256").update(sql).digest("hex");
 export const normalizeMigrationSql = (sql) => sql.replace(/\r\n?/g, "\n");
 export const migrationChecksum = (sql) => sha256(normalizeMigrationSql(sql));
+export function unwrapMigrationTransaction(sql) {
+  const normalized = normalizeMigrationSql(sql);
+  const match = normalized.match(/^\s*BEGIN\s*;([\s\S]*?)COMMIT\s*;\s*$/i);
+  return match ? match[1] : normalized;
+}
 export function migrationChecksumCandidates(name, sql) {
   const normalized = normalizeMigrationSql(sql);
   return new Set([
@@ -66,17 +73,21 @@ export async function applyMigrations(pool, load = (name) =>
         throw new Error(`La migracion aplicada ${name} ha cambiado; crea una migracion incremental nueva`);
       }
       if (previous) continue;
-      await client.query(sql);
-      await client.query(
-        "INSERT INTO schema_migrations(name,checksum) VALUES($1,$2)",
-        [name, digest],
-      );
+      await client.query("BEGIN");
+      try {
+        await client.query(unwrapMigrationTransaction(sql));
+        await client.query(
+          "INSERT INTO schema_migrations(name,checksum) VALUES($1,$2)",
+          [name, digest],
+        );
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      }
       completed.push(name);
     }
     return completed;
-  } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw error;
   } finally {
     await client.query("SELECT pg_advisory_unlock(48127, 9026)").catch(() => undefined);
     client.release?.();

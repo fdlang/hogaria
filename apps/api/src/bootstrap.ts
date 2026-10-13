@@ -273,7 +273,7 @@ export async function buildApp(): Promise<AppDependencies> {
     notifications,
     userNotifications,
     createUser:                 new CreateUserUseCase(users, hasher, generateTempPassword, events, activation),
-    updateUser:                 new UpdateUserUseCase(users, events),
+    updateUser:                 new UpdateUserUseCase(users),
     deleteUser:                 new DeleteUserUseCase(users, events),
     listUsers:                  new ListUsersUseCase(users),
     updateProject:              new UpdateProjectUseCase(users, projects, events),

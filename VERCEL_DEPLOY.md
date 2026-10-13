@@ -49,10 +49,6 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
    - `CLIENT_NOTIFICATIONS_ENABLED`: `true` para activar el correo de los avisos por rol; la campana no depende de este interruptor.
    - `CRON_SECRET`: secreto aleatorio de al menos 32 caracteres usado por el cron de Vercel.
    - `NOTIFICATION_RETRY_SECRET`: secreto alternativo de al menos 32 caracteres, distinto del cron, si se usa el workflow de GitHub.
-   - `VITE_EMAILJS_SERVICE_ID`, `VITE_EMAILJS_AUTOREPLY_TEMPLATE_ID` y
-     `VITE_EMAILJS_PUBLIC_KEY`: opcionales. Habilitan el email de confirmación
-     de EmailJS tras registrar una solicitud. La clave pública puede estar en
-     el frontend; no añadas contraseñas de correo ni claves privadas.
 
 ## Activar jornadas y costes
 

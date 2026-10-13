@@ -28,15 +28,16 @@ interface ModalProps {
 export function Modal({ open, onClose, title, children, width = 520, unclosable = false, className = "" }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const focusableElements = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+    'button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])'
+  ) ?? []).filter(element => !element.hidden && element.getAttribute("aria-hidden") !== "true" && element.offsetParent !== null);
 
   useEffect(() => {
     if (!open) return;
     const handle = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !unclosable && onClose) onClose();
       if (e.key === "Tab") {
-        const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])'
-        ) ?? []);
+        const focusable = focusableElements();
         if (!focusable.length) { e.preventDefault(); dialogRef.current?.focus(); return; }
         const first = focusable[0]!, last = focusable[focusable.length - 1]!;
         if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -52,10 +53,8 @@ export function Modal({ open, onClose, title, children, width = 520, unclosable 
   useEffect(() => {
     if (!open) return;
     const previousFocus = document.activeElement as HTMLElement | null;
-    const first = dialogRef.current?.querySelector<HTMLElement>(
-      'button,input,select,textarea,a[href],[tabindex]:not([tabindex="-1"])'
-    );
-    first?.focus();
+    const first = focusableElements()[0];
+    (first ?? dialogRef.current)?.focus();
     return () => { previousFocus?.focus(); };
   }, [open]);
 

@@ -23,11 +23,20 @@ const draft: EstimateDraftDTO = {
 };
 
 describe("SalesApi", () => {
-  it("uses the public catalogue endpoint for the estimate wizard", () => {
+  it("uses the public catalogue endpoint for the estimate wizard", async () => {
     const http = createHttp();
+    vi.mocked(http.get).mockResolvedValue([]);
     const api = new SalesApi(http);
-    api.catalog();
+    await api.catalog();
     expect(http.get).toHaveBeenCalledWith("/catalog");
+  });
+
+  it("rejects malformed catalogue responses instead of trusting a TypeScript cast", async () => {
+    const http = createHttp();
+    vi.mocked(http.get).mockResolvedValue([{ id: "invalid" }]);
+    const api = new SalesApi(http);
+
+    await expect(api.catalog()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
 
   it("creates an estimate linked to an opportunity", () => {

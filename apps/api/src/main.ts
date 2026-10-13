@@ -29,6 +29,7 @@ import { ValidationError } from "@reformapro/domain/errors";
 import { notificationRetryController } from "./interfaces/http/notificationRetryController.js";
 import { userNotificationController } from "./interfaces/http/userNotificationController.js";
 import { authenticateBeforeBody } from "./interfaces/http/requestPipeline.js";
+import { isApiMaintenanceModeEnabled, maintenanceResponse } from "./interfaces/http/maintenance.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
@@ -114,11 +115,13 @@ function getRuntime(): Promise<Runtime> {
   // Commercial pipeline: opportunity -> versioned estimate -> project.
   route("GET", "/estimates/:id/pdf", documents.pdf, { protected:true }),
   route("GET", "/internal/notifications/retry", notificationRetryController({retry:async()=>{
+      const access=await app.useCases.activation.retry();
+      if(process.env.CLIENT_NOTIFICATIONS_ENABLED!=="true")return {processed:access.processed,configured:access.configured};
       const legacy=await app.useCases.notifications.retry();
       const current=await app.useCases.userNotifications.retry();
-      return {processed:legacy.processed+current.events+current.emails,configured:legacy.configured||current.configured};
+      return {processed:access.processed+legacy.processed+current.events+current.emails,configured:access.configured||legacy.configured||current.configured};
     }},
-    () => ({secret:process.env.CRON_SECRET,retrySecret:process.env.NOTIFICATION_RETRY_SECRET,enabled:process.env.CLIENT_NOTIFICATIONS_ENABLED==="true"}),
+    () => ({secret:process.env.CRON_SECRET,retrySecret:process.env.NOTIFICATION_RETRY_SECRET,enabled:process.env.CLIENT_NOTIFICATIONS_ENABLED==="true"||Boolean(process.env.RESEND_API_KEY&&process.env.EMAIL_FROM&&process.env.APP_URL)}),
     app.useCases.retryPendingDeletions)),
   route("GET", "/notifications", req => userNotifications.list(req as never), { protected:true }),
   route("GET", "/notifications/unread-count", req => userNotifications.unread(req as never), { protected:true }),
@@ -223,6 +226,10 @@ export async function apiHandler(req: IncomingMessage, res: ServerResponse): Pro
     // Vercel forwards requests through /api/:path*. Local development may call
     // the API directly, so normalize both forms before route matching.
     const pathname = url.pathname.replace(/^\/api(?=\/|$)/, "") || "/";
+    if (isApiMaintenanceModeEnabled(process.env.MAINTENANCE_MODE) && pathname !== "/internal/notifications/retry") {
+      res.writeHead(maintenanceResponse.status, maintenanceResponse.headers).end(JSON.stringify(maintenanceResponse.body));
+      return;
+    }
     const match = routes.find(r => r.method === req.method && r.pattern.test(pathname));
 
     if (!match) { res.writeHead(404).end(JSON.stringify({ code: "NOT_FOUND", message: "Ruta no encontrada" })); return; }

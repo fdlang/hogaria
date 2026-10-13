@@ -13,12 +13,12 @@ interface Props {
   onError?: (error: Error, info: ErrorInfo) => void;
 }
 
-interface State { error: Error | null }
+interface State { error: Error | null; revision: number }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  state: State = { error: null, revision: 0 };
 
-  static getDerivedStateFromError(error: Error): State { return { error }; }
+  static getDerivedStateFromError(error: Error): Partial<State> { return { error }; }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     // In production, ship to Sentry/Datadog here
@@ -26,7 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
     this.props.onError?.(error, info);
   }
 
-  reset = (): void => this.setState({ error: null });
+  reset = (): void => this.setState(state => ({ error: null, revision: state.revision + 1 }));
 
   render(): ReactNode {
     if (this.state.error) {
@@ -41,6 +41,6 @@ export class ErrorBoundary extends Component<Props, State> {
         </div>
       );
     }
-    return this.props.children;
+    return <div key={this.state.revision} style={{ display: "contents" }}>{this.props.children}</div>;
   }
 }

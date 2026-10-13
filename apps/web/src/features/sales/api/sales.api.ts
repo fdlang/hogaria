@@ -25,7 +25,7 @@ export type CatalogItemDTO = {
 };
 export type CatalogPickerItemDTO = Pick<CatalogItemDTO, "id" | "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate" | "priceVersion"> & { unitCost: number | null };
 export type CatalogPickerPageDTO = { items: CatalogPickerItemDTO[]; total: number; page: number; limit: number; pages: number };
-export type CatalogWriteDTO = Pick<CatalogItemDTO, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate"> & Partial<Pick<CatalogItemDTO, "itemType" | "costBreakdown" | "costComposition" | "pricingMode" | "tariffZone" | "evidence" | "searchTerms" | "reviewStatus" | "replacementReference" | "reviewNote">>;
+  export type CatalogWriteDTO = Pick<CatalogItemDTO, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate"> & Partial<Pick<CatalogItemDTO, "itemType" | "costBreakdown" | "costComposition" | "pricingMode" | "tariffZone" | "evidence" | "searchTerms" | "reviewStatus" | "replacementReference" | "reviewNote">> & { expectedUpdatedAt?: string };
 export type AdminEstimateDTO = { id: number; oportunidadId: number; estado: string; borrador: EstimateDraftDTO; updatedAt: string };
 export type ChangeOrderDTO = { id: number; revision: number; numero: string; estado: string; payload?: EstimateDraftDTO; propuesta?: Pick<PublicProposalDTO, "titulo" | "partidas" | "condicionesPago"> };
 
@@ -40,6 +40,30 @@ export const parseEstimateList = (value: unknown): EstimateDTO[] => {
     typeof item.createdAt !== "string" || typeof item.updatedAt !== "string"
   )) throw new ApiContractError("los presupuestos");
   return value.map(item => ({ ...item, motivoAnulacion: item.motivoAnulacion ?? null })) as EstimateDTO[];
+};
+
+const isCatalogItem = (item: unknown): item is CatalogItemDTO => isRecord(item) &&
+  Number.isSafeInteger(item.id) && typeof item.reference === "string" && typeof item.category === "string" &&
+  typeof item.description === "string" && ["m²", "ml", "ud", "h", "global"].includes(String(item.unit)) &&
+  typeof item.salePrice === "number" && Number.isFinite(item.salePrice) && typeof item.vatRate === "number" &&
+  typeof item.active === "boolean" && ["simple", "composite"].includes(String(item.itemType)) &&
+  ["pending_review", "verified", "archived"].includes(String(item.reviewStatus)) &&
+  isRecord(item.costBreakdown) && isRecord(item.costComposition) && isRecord(item.evidence) &&
+  Number.isSafeInteger(item.priceVersion) && Array.isArray(item.searchTerms) &&
+  item.searchTerms.every(term => typeof term === "string") && typeof item.updatedAt === "string";
+
+export const parseCatalogList = (value: unknown): CatalogItemDTO[] => {
+  if (!Array.isArray(value) || value.some(item => !isCatalogItem(item))) throw new ApiContractError("el catálogo");
+  return value;
+};
+
+const parseCatalogPickerPage = (value: unknown): CatalogPickerPageDTO => {
+  if (!isRecord(value) || !Array.isArray(value.items) || value.items.some(item => !isRecord(item) ||
+    !Number.isSafeInteger(item.id) || typeof item.reference !== "string" || typeof item.category !== "string" ||
+    typeof item.description !== "string" || typeof item.salePrice !== "number" || typeof item.vatRate !== "number" ||
+    !Number.isSafeInteger(item.priceVersion)) || !Number.isSafeInteger(value.total) || !Number.isSafeInteger(value.page) ||
+    !Number.isSafeInteger(value.limit) || !Number.isSafeInteger(value.pages)) throw new ApiContractError("la búsqueda del catálogo");
+  return value as unknown as CatalogPickerPageDTO;
 };
 
 const ensurePdf = (blob: Blob): Blob => {
@@ -67,16 +91,16 @@ export class SalesApi {
     return this.http.get<OpportunityPageDTO>(`/opportunities?${params.toString()}`);
   }
   updateOpportunity(id: number, input: Partial<OpportunityDTO>, expectedUpdatedAt: string) { return this.http.patch<OpportunityDTO>(`/opportunities/${id}`, { ...input, expectedUpdatedAt }); }
-  catalog() { return this.http.get<CatalogItemDTO[]>("/catalog"); }
+  async catalog() { return parseCatalogList(await this.http.get<unknown>("/catalog")); }
   catalogSearch(search: string, references: string[] = [], page = 0, limit = 12) {
     const params = new URLSearchParams({ picker: "true", search, page: String(page), limit: String(limit) });
     if (references.length) params.set("references", references.join(","));
-    return this.http.get<CatalogPickerPageDTO>(`/catalog?${params.toString()}`);
+    return this.http.get<unknown>(`/catalog?${params.toString()}`).then(parseCatalogPickerPage);
   }
-  adminCatalog() { return this.http.get<CatalogItemDTO[]>("/catalog?includeInactive=true"); }
+  async adminCatalog() { return parseCatalogList(await this.http.get<unknown>("/catalog?includeInactive=true")); }
   createCatalogItem(input: CatalogWriteDTO) { return this.http.post<CatalogItemDTO>("/catalog", input); }
   updateCatalogItem(id: number, input: Partial<CatalogWriteDTO>) { return this.http.patch<CatalogItemDTO>(`/catalog/${id}`, input); }
-  archiveCatalogItem(id: number) { return this.http.delete<CatalogItemDTO>(`/catalog/${id}`); }
+    archiveCatalogItem(id: number, expectedUpdatedAt: string) { return this.http.delete<CatalogItemDTO>(`/catalog/${id}?expectedUpdatedAt=${encodeURIComponent(expectedUpdatedAt)}`); }
   createOpportunity(input: Omit<OpportunityDTO, "id" | "createdAt" | "updatedAt">) { return this.http.post<OpportunityDTO>("/opportunities", input); }
   async estimates(page = 0, search = "", status = "") { return parseEstimateList(await this.http.get<unknown>(`/estimates?page=${page}&search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`)); }
   async estimatesPage(page = 0, search = "", status = "") {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { IUserRepository } from "@reformapro/domain/repositories";
 import { LoginUseCase } from "./auth.use-cases.js";
+import { InMemoryUserRepository } from "../../infrastructure/database/inMemoryRepositories.js";
 
 describe("LoginUseCase abuse controls", () => {
   it("limits both the source IP and the normalized account", async () => {
@@ -34,5 +35,13 @@ describe("LoginUseCase abuse controls", () => {
     await expect(login.execute("user@example.com", "ñ".repeat(37), { ip: "203.0.113.7", userAgent: "vitest" }))
       .rejects.toThrow("72 bytes");
     expect(users.verifyPassword).not.toHaveBeenCalled();
+  });
+
+  it("performs a password verification even when the account does not exist", async () => {
+    const verify = vi.fn(async () => false);
+    const users = new InMemoryUserRepository({ hash: vi.fn(async value => value), verify });
+    await expect(users.verifyPassword("missing@example.com", "password")).resolves.toBeNull();
+    expect(verify).toHaveBeenCalledOnce();
+    expect(verify.mock.calls[0]?.[1]).toMatch(/^\$2a\$12\$/);
   });
 });

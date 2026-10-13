@@ -10,13 +10,20 @@ import {
 
 type CatalogBaseInput = Pick<CatalogItem, "reference" | "category" | "description" | "unit" | "salePrice" | "vatRate">;
 type CatalogInput = CatalogBaseInput & Partial<Pick<CatalogItem, "itemType" | "costBreakdown" | "costComposition" | "pricingMode" | "tariffZone" | "evidence" | "searchTerms" | "replacementReference" | "reviewNote">>;
-type CatalogPatch = Partial<CatalogInput & Pick<CatalogItem, "reviewStatus">>;
+type CatalogPatch = Partial<CatalogInput & Pick<CatalogItem, "reviewStatus">> & { expectedUpdatedAt?: string };
 
 const emptyCosts = (): CatalogCostBreakdown => ({ laborCost: null, materialCost: null, auxiliaryCost: null, overheadPercent: null, targetMarginPercent: null });
 const emptyComposition = (): CatalogCostComposition => ({ labor: [], materials: [], auxiliaries: [] });
 const emptyEvidence = (): CatalogPriceEvidence => ({ sourceName: null, sourceUrl: null, priceDate: null, validFrom: null, validUntil: null });
 
 function assertAdmin(user: User | null): asserts user is User { if (!user || user.rol !== "admin") throw new ForbiddenError(); }
+
+function expectedVersion(value: unknown): Date {
+  if (typeof value !== "string" || !value.trim()) throw new ValidationError("Falta la versión de la partida", "expectedUpdatedAt");
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) throw new ValidationError("Versión de partida inválida", "expectedUpdatedAt");
+  return parsed;
+}
 
 function assertCatalogPayload(input: unknown): asserts input is CatalogPatch {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new ValidationError("Cuerpo de catálogo inválido");
@@ -143,6 +150,7 @@ export class CatalogUseCases {
   async update(actorId: number, id: number, input: unknown) {
     assertAdmin(await this.users.findById(actorId)); const current = await this.catalog.findById(id); if (!current) throw new NotFoundError("Partida de catálogo");
     assertCatalogPayload(input);
+    const expectedUpdatedAt = expectedVersion(input.expectedUpdatedAt);
     const reviewStatus = input.reviewStatus === undefined ? current.reviewStatus : assertReviewStatus(input.reviewStatus);
     const candidate = normalize({
       reference: input.reference ?? current.reference, category: input.category ?? current.category,
@@ -175,7 +183,7 @@ export class CatalogUseCases {
     }
     if (input.reviewStatus !== undefined) changes.reviewStatus = reviewStatus;
     if (input.reviewStatus !== undefined) changes.active = reviewStatus === "verified";
-    return this.catalog.update(id, changes);
+    return this.catalog.update(id, changes, expectedUpdatedAt);
   }
-  async archive(actorId: number, id: number) { assertAdmin(await this.users.findById(actorId)); if (!(await this.catalog.findById(id))) throw new NotFoundError("Partida de catálogo"); return this.catalog.update(id, { active: false, reviewStatus: "archived" }); }
+  async archive(actorId: number, id: number, expectedUpdatedAt: unknown) { assertAdmin(await this.users.findById(actorId)); if (!(await this.catalog.findById(id))) throw new NotFoundError("Partida de catálogo"); return this.catalog.update(id, { active: false, reviewStatus: "archived" }, expectedVersion(expectedUpdatedAt)); }
 }

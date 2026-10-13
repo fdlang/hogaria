@@ -19,7 +19,7 @@ async function setup() {
   const admin = await users.save({ id: 0, email: Email.of("admin@test.es"), nombre: "Admin", rol: "admin", activo: true, createdAt: new Date() });
   const client = await users.save({ id: 0, email: Email.of("client@test.es"), nombre: "Client", rol: "cliente", activo: false, createdAt: new Date() });
   const events = new InMemoryEventEmitter();
-  return { users, admin, client, events, update: new UpdateUserUseCase(users, events) };
+  return { users, admin, client, events, update: new UpdateUserUseCase(users) };
 }
 
 describe("Security and integrity regressions", () => {

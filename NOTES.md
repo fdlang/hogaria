@@ -1,15 +1,14 @@
-- Estado: auditoría funcional corregida; mantenimiento propio activable sin pausar Vercel.
-- Corregido: cambios rápidos de obra o profesional no mezclan respuestas tardías.
-- Corregido: obras archivadas preservan documentos, jornadas, costes y órdenes como histórico.
-- Corregido: solo se permite cerrar una jornada ya abierta o revisar un parte enviado al archivar.
-- Corregido: segundos, pausas, coste y trazabilidad de aprobación/rechazo se validan en base de datos.
-- Corregido: órdenes de cambio usan revisión optimista, identidad inmutable y orden uniforme de bloqueos.
-- Corregido: la migración de órdenes mantiene compatibilidad con el despliegue anterior durante el rollout.
-- Corregido: cargas Blob se registran antes de subir, tienen gracia inicial, referencias seguras y backoff.
-- Corregido: avisos, rutas privadas, errores recuperables y estados de interfaz quedan sincronizados.
-- Migraciones nuevas: archived-work-history-hardening.sql, change-order-optimistic-locking.sql y blob-cleanup-outbox.sql.
-- Validación: typecheck, 272 pruebas API, 82 web, 37 dominio y builds correctos.
-- Validación navegador: 140 escenarios generales y 2 específicos de mantenimiento correctos.
-- Auditorías finales frontend, backend y seguridad sin bloqueos de código confirmados.
-- Commit validado: 5adefd4 (`fix: harden private workflows and retained history`).
-- Pendiente: migrar producción con el runner versionado y desplegar el mismo commit.
+- Estado: bloque de auditoría corregido y validado localmente; no desplegado.
+- Seguridad: el reset solo admite PostgreSQL local y las migraciones se aplican de forma atómica.
+- Seguridad: fichajes nuevos exigen obra activa y profesional activo y asignado desde la base de datos.
+- Accesos: invitación y correo se reservan juntos; los fallos de envío quedan reintentables sin borrar la cuenta.
+- Operación: recuperación auditada de dead letters para avisos, campana, correos y accesos.
+- Concurrencia: catálogo, obras, campana y carga de datos rechazan o ignoran respuestas obsoletas.
+- UX: borradores no se pisan al paginar, firmas sobreviven al redimensionado y los errores son recuperables.
+- Frontend: vídeo con autoplay móvil, reintento real del catálogo y confirmaciones sin promesas abandonadas.
+- Infraestructura: PostgreSQL de Docker solo publica en localhost y Vite queda en 6.4.4.
+- Limpieza: retirados EmailJS obsoleto, dependencia de eventos sin uso y 4,75 MB de imágenes no referenciadas.
+- Migraciones nuevas: work-entry-assignment-guard.sql y account-access-outbox.sql.
+- Validación: typecheck completo, 292 pruebas API, 83 web, 37 dominio y build de producción correctos.
+- Pendiente: aplicar las migraciones con el runner versionado en el entorno objetivo y desplegar el mismo commit.
+- Pendiente externo: plazos fiscales y de privacidad siguen sujetos a validación de gestor o DPD.
