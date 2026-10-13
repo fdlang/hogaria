@@ -82,6 +82,10 @@ realiza una comprobación funcional de landing, acceso y una ruta `/api`.
 - Producción falla al arrancar si faltan PostgreSQL o el secreto HMAC.
 - No se inicia un proceso HTTP persistente dentro de Vercel.
 - Cabeceras básicas de protección se aplican al despliegue.
+- `apps/web/public/503.html` aporta una pantalla estática de mantenimiento con
+  la referencia y el código de Vercel. La sustitución de errores de plataforma,
+  incluido `DEPLOYMENT_PAUSED`, requiere que el proyecto use la función de
+  páginas de error personalizadas disponible en Vercel Enterprise.
 
 Los archivos binarios usan Vercel Blob privado. Sin `BLOB_READ_WRITE_TOKEN`, las
 cargas y descargas privadas deben considerarse no disponibles.

@@ -76,7 +76,7 @@ npm run build
 npm run test:browser --workspace @reformapro/web
 ```
 
-La referencia validada el 13/10/2026 ejecuta 389 pruebas unitarias y 138 pruebas
+La referencia validada el 13/10/2026 ejecuta 389 pruebas unitarias y 140 pruebas
 de navegador en Chromium y WebKit. El build de Production comprueba además la
 configuración crítica antes de sustituir la versión estable.
 

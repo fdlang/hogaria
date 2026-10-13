@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#f5eee5" />
+    <title>Mantenimiento | Hogaria</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #24211d;
+        background: #f7f3ee;
+      }
+      * { box-sizing: border-box; }
+      body {
+        min-width: 280px;
+        min-height: 100vh;
+        margin: 0;
+        background:
+          radial-gradient(circle at 88% 10%, rgba(190, 116, 68, .11), transparent 28rem),
+          linear-gradient(145deg, #fffdf9 0%, #f7f1ea 100%);
+      }
+      main {
+        display: grid;
+        min-height: 100vh;
+        place-items: center;
+        padding: clamp(20px, 5vw, 64px);
+      }
+      .maintenance {
+        position: relative;
+        width: min(100%, 760px);
+        overflow: hidden;
+        border: 1px solid #dfc8b4;
+        border-radius: 18px;
+        background: rgba(255, 252, 247, .96);
+        box-shadow: 0 24px 70px rgba(54, 44, 35, .12);
+      }
+      .maintenance::after {
+        position: absolute;
+        top: -115px;
+        right: -100px;
+        width: 260px;
+        height: 260px;
+        border: 1px solid rgba(172, 96, 49, .22);
+        border-radius: 50%;
+        content: "";
+        pointer-events: none;
+      }
+      header {
+        padding: clamp(24px, 5vw, 44px) clamp(24px, 6vw, 52px) 18px;
+        border-bottom: 1px solid #eaded3;
+        background: #f4e8dc;
+      }
+      .brand {
+        display: block;
+        width: min(100%, 290px);
+        height: auto;
+      }
+      .content { padding: clamp(28px, 6vw, 54px); }
+      .eyebrow {
+        margin: 0 0 14px;
+        color: #a6572f;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: .18em;
+        text-transform: uppercase;
+      }
+      h1 {
+        max-width: 650px;
+        margin: 0;
+        font-size: clamp(32px, 7vw, 56px);
+        line-height: 1.02;
+        letter-spacing: -.045em;
+      }
+      .message {
+        max-width: 590px;
+        margin: 24px 0 0;
+        color: #62594f;
+        font-size: clamp(16px, 2.4vw, 19px);
+        line-height: 1.65;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 30px;
+      }
+      .button {
+        display: inline-flex;
+        min-height: 46px;
+        align-items: center;
+        justify-content: center;
+        padding: 11px 18px;
+        border: 1px solid #a6572f;
+        border-radius: 8px;
+        color: #fff;
+        background: #a6572f;
+        font-size: 15px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .button--secondary { color: #70452f; background: transparent; }
+      .technical {
+        margin: 32px 0 0;
+        padding-top: 18px;
+        border-top: 1px solid #eaded3;
+        color: #81776d;
+        font-size: 12px;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+      }
+      .technical span { display: block; }
+      @media (max-width: 520px) {
+        main { align-items: start; padding: 14px; }
+        .maintenance { margin-top: 7vh; border-radius: 14px; }
+        header { padding: 22px 22px 16px; }
+        .brand { width: 230px; }
+        .content { padding: 30px 22px; }
+        .actions { display: grid; }
+        .button { width: 100%; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * { scroll-behavior: auto !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="maintenance" aria-labelledby="maintenance-title">
+        <header>
+          <img class="brand" src="/brand/hogaria-wordmark-480.png" alt="Hogaria, reformas integrales" />
+        </header>
+        <div class="content">
+          <p class="eyebrow">Mantenimiento temporal</p>
+          <h1 id="maintenance-title">Volvemos enseguida.</h1>
+          <p class="message">
+            Estamos realizando una intervención para mantener el servicio en las mejores condiciones.
+            Inténtalo de nuevo dentro de unos minutos.
+          </p>
+          <div class="actions" aria-label="Opciones">
+            <a class="button" href="">Volver a intentar</a>
+            <a class="button button--secondary" href="mailto:info@hogaria.design">Contactar con Hogaria</a>
+          </div>
+          <p class="technical">
+            <span>Código: ::vercel:ERROR_CODE::</span>
+            <span>Referencia: ::vercel:REQUEST_ID::</span>
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

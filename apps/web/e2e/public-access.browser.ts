@@ -45,6 +45,18 @@ test('public footer actions form a readable column on mobile', async ({ page }) 
   expect(client!.y).toBeGreaterThanOrEqual(privacy!.y + privacy!.height);
 });
 
+test('maintenance page is branded, useful and responsive', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto('/503.html');
+  await expect(page).toHaveTitle('Mantenimiento | Hogaria');
+  await expect(page.getByRole('heading', { name: 'Volvemos enseguida.' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Volver a intentar' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Contactar con Hogaria' })).toHaveAttribute('href', 'mailto:info@hogaria.design');
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex,nofollow');
+  await expect(page.getByText('Código: ::vercel:ERROR_CODE::')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('portfolio media keeps its orientation and the video starts automatically in view', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');

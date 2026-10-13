@@ -1,4 +1,4 @@
-- Estado: auditoría funcional completa corregida y validación final superada.
+- Estado: auditoría funcional completa corregida; vista estática 503 de mantenimiento añadida.
 - Corregido: cambios rápidos de obra o profesional no mezclan respuestas tardías.
 - Corregido: obras archivadas preservan documentos, jornadas, costes y órdenes como histórico.
 - Corregido: solo se permite cerrar una jornada ya abierta o revisar un parte enviado al archivar.
@@ -9,7 +9,7 @@
 - Corregido: avisos, rutas privadas, errores recuperables y estados de interfaz quedan sincronizados.
 - Migraciones nuevas: archived-work-history-hardening.sql, change-order-optimistic-locking.sql y blob-cleanup-outbox.sql.
 - Validación: typecheck, 272 pruebas API, 80 web, 37 dominio y builds correctos.
-- Validación navegador: 138 escenarios Chromium/WebKit correctos.
+- Validación navegador: 140 escenarios Chromium/WebKit correctos.
 - Auditorías finales frontend, backend y seguridad sin bloqueos de código confirmados.
 - Commit validado: 5adefd4 (`fix: harden private workflows and retained history`).
 - Pendiente: migrar producción con el runner versionado y desplegar el mismo commit.
