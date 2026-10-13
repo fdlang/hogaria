@@ -1,0 +1,117 @@
+.maintenance-page {
+  display: grid;
+  min-width: 280px;
+  min-height: 100vh;
+  place-items: center;
+  padding: clamp(20px, 5vw, 64px);
+  background:
+    radial-gradient(circle at 88% 10%, rgba(190, 116, 68, .11), transparent 28rem),
+    linear-gradient(145deg, #fffdf9 0%, #f7f1ea 100%);
+}
+
+.maintenance-card {
+  position: relative;
+  width: min(100%, 760px);
+  overflow: hidden;
+  border: 1px solid #dfc8b4;
+  border-radius: 18px;
+  background: rgba(255, 252, 247, .96);
+  box-shadow: 0 24px 70px rgba(54, 44, 35, .12);
+}
+
+.maintenance-card::after {
+  position: absolute;
+  top: -115px;
+  right: -100px;
+  width: 260px;
+  height: 260px;
+  border: 1px solid rgba(172, 96, 49, .22);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.maintenance-card__header {
+  padding: clamp(24px, 5vw, 44px) clamp(24px, 6vw, 52px) 18px;
+  border-bottom: 1px solid #eaded3;
+  background: #f4e8dc;
+}
+
+.maintenance-card__brand {
+  display: block;
+  width: min(100%, 290px);
+  height: auto;
+}
+
+.maintenance-card__content { padding: clamp(28px, 6vw, 54px); }
+
+.maintenance-card__eyebrow {
+  margin: 0 0 14px;
+  color: #a6572f;
+  font: 700 12px "DM Mono", monospace;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.maintenance-card h1 {
+  max-width: 650px;
+  margin: 0;
+  font-size: clamp(32px, 7vw, 56px);
+  line-height: 1.02;
+  letter-spacing: -.045em;
+}
+
+.maintenance-card__message {
+  max-width: 590px;
+  margin: 24px 0 0;
+  color: #62594f;
+  font-size: clamp(16px, 2.4vw, 19px);
+  line-height: 1.65;
+}
+
+.maintenance-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.maintenance-card__actions button,
+.maintenance-card__actions a {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 18px;
+  border: 1px solid #a6572f;
+  border-radius: 8px;
+  color: #fff;
+  background: #a6572f;
+  font: 700 15px "DM Sans", Arial, sans-serif;
+  text-decoration: none;
+}
+
+.maintenance-card__actions a { color: #70452f; background: transparent; }
+
+.maintenance-card__actions button:hover,
+.maintenance-card__actions button:focus-visible {
+  color: #fff;
+  background: var(--graphite-deep);
+  border-color: var(--graphite-deep);
+}
+
+.maintenance-card__actions a:hover,
+.maintenance-card__actions a:focus-visible {
+  color: #70452f !important;
+  background: rgba(193, 113, 72, .1);
+}
+
+@media (max-width: 520px) {
+  .maintenance-page { align-items: start; padding: 14px; }
+  .maintenance-card { margin-top: 7vh; border-radius: 14px; }
+  .maintenance-card__header { padding: 22px 22px 16px; }
+  .maintenance-card__brand { width: 230px; }
+  .maintenance-card__content { padding: 30px 22px; }
+  .maintenance-card__actions { display: grid; }
+  .maintenance-card__actions > * { width: 100%; }
+}

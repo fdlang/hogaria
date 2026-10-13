@@ -23,58 +23,80 @@ import { NotificationsProvider } from "@/shared/ui/notifications";
 import { ConfirmProvider } from "@/shared/ui/confirm";
 import { ErrorBoundary } from "@/shared/ui/error-boundary";
 import { UserNotificationsApi } from "@/features/notifications/api/notifications.api";
+import { MaintenancePage } from "@/features/maintenance/MaintenancePage";
+import { isMaintenanceModeEnabled } from "@/features/maintenance/maintenance-config";
 
-// 1) Transport layer — single instance, shared across features
-//    Forward-declare authStore so onUnauthorized can reference it
-let authStore: AuthStore;
-const api = new ApiClient({
-  baseUrl: import.meta.env.VITE_API_URL ?? "/api",
-  onUnauthorized: () => {
-    authStore?.expireSession();
-    window.location.hash = "#/login";
-  },
-});
+const root = ReactDOM.createRoot(document.getElementById("root")!);
 
-// 2) Auth store — owns session state
-const salesApi = new SalesApi(api);
-authStore = new AuthStore(api);
+if (isMaintenanceModeEnabled(import.meta.env.VITE_MAINTENANCE_MODE)) {
+  document.title = "Mantenimiento | Hogaria";
+  const robotsMeta = document.querySelector<HTMLMetaElement>('meta[name="robots"]')
+    ?? document.head.appendChild(document.createElement("meta"));
+  robotsMeta.name = "robots";
+  robotsMeta.content = "noindex,nofollow";
 
-// 3) Feature APIs — each receives the shared transport
-const apis = {
-  work:             new WorkApi(api),
-  projects:         new ProjectsApi(api),
-  users:            new UsersApi(api),
-  files:            new FilesApi(api),
-  audit:            new AuditApi(api),
-  solicitudes:      new SolicitudesApi(api),
-  adminSolicitudes: new AdminSolicitudesApi(api),
-  sales:            salesApi,
-  notifications:    new UserNotificationsApi(api),
-};
+  root.render(
+    <React.StrictMode>
+      <MaintenancePage />
+    </React.StrictMode>
+  );
+} else {
+  renderApplication();
+}
 
-let cachedUserId: number | null = null;
-authStore.subscribe(state => {
-  const userId = state.status === "authenticated" ? state.user?.id ?? null : null;
-  if (userId !== cachedUserId) {
-    salesApi.clearPdfCache();
-    cachedUserId = userId;
-  }
-});
+function renderApplication() {
+  // 1) Transport layer — single instance, shared across features
+  //    Forward-declare authStore so onUnauthorized can reference it
+  let authStore: AuthStore;
+  const api = new ApiClient({
+    baseUrl: import.meta.env.VITE_API_URL ?? "/api",
+    onUnauthorized: () => {
+      authStore?.expireSession();
+      window.location.hash = "#/login";
+    },
+  });
 
-// 4) Restore session on boot (best-effort; failures silently sign out)
-authStore.restore().catch(() => { /* logged inside store */ });
+  // 2) Auth store — owns session state
+  const salesApi = new SalesApi(api);
+  authStore = new AuthStore(api);
 
-// 5) Render React tree
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <AuthStoreProvider value={authStore}>
-        <NotificationsProvider>
-          <ConfirmProvider>
-            <App apis={apis} />
-          </ConfirmProvider>
-        </NotificationsProvider>
-      </AuthStoreProvider>
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+  // 3) Feature APIs — each receives the shared transport
+  const apis = {
+    work:             new WorkApi(api),
+    projects:         new ProjectsApi(api),
+    users:            new UsersApi(api),
+    files:            new FilesApi(api),
+    audit:            new AuditApi(api),
+    solicitudes:      new SolicitudesApi(api),
+    adminSolicitudes: new AdminSolicitudesApi(api),
+    sales:            salesApi,
+    notifications:    new UserNotificationsApi(api),
+  };
+
+  let cachedUserId: number | null = null;
+  authStore.subscribe(state => {
+    const userId = state.status === "authenticated" ? state.user?.id ?? null : null;
+    if (userId !== cachedUserId) {
+      salesApi.clearPdfCache();
+      cachedUserId = userId;
+    }
+  });
+
+  // 4) Restore session on boot (best-effort; failures silently sign out)
+  authStore.restore().catch(() => { /* logged inside store */ });
+
+  // 5) Render React tree
+  root.render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <AuthStoreProvider value={authStore}>
+          <NotificationsProvider>
+            <ConfirmProvider>
+              <App apis={apis} />
+            </ConfirmProvider>
+          </NotificationsProvider>
+        </AuthStoreProvider>
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
+}

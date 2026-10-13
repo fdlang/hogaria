@@ -42,6 +42,9 @@ función `api/index.ts` sirve la API en el mismo dominio bajo `/api`.
    - `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`: opcionales,
      sólo para crear el primer administrador.
    - `VITE_API_URL`: opcional. Déjalo vacío para usar `/api` en el mismo dominio.
+   - `VITE_MAINTENANCE_MODE`: `true` muestra la pantalla de mantenimiento en
+     toda la web. Es una variable de compilación: cada cambio requiere un nuevo
+     despliegue y el proyecto debe permanecer activo.
    - `BLOB_READ_WRITE_TOKEN`: obligatorio para documentos privados.
    - `CLIENT_NOTIFICATIONS_ENABLED`: `true` para activar el correo de los avisos por rol; la campana no depende de este interruptor.
    - `CRON_SECRET`: secreto aleatorio de al menos 32 caracteres usado por el cron de Vercel.
@@ -75,6 +78,15 @@ push, comprueba que el despliegue esté `Ready`,
 que los alias `hogaria.design` y `www.hogaria.design` apunten a esa versión y
 realiza una comprobación funcional de landing, acceso y una ruta `/api`.
 
+## Modo de mantenimiento
+
+No pauses el proyecto en Vercel para mostrar la pantalla de Hogaria: una pausa
+produce `DEPLOYMENT_PAUSED` antes de que se ejecute la aplicación. Configura
+`VITE_MAINTENANCE_MODE=true` en Production y redespliega la versión actual. Para
+recuperar el servicio, cambia el valor a `false` (o elimina la variable) y
+redespliega. El modo evita restaurar sesiones y crear clientes de API en el
+navegador mientras está activo.
+
 ## Garantías incluidas
 
 - Las rutas `/api/*` se envían a la función serverless.
@@ -82,10 +94,10 @@ realiza una comprobación funcional de landing, acceso y una ruta `/api`.
 - Producción falla al arrancar si faltan PostgreSQL o el secreto HMAC.
 - No se inicia un proceso HTTP persistente dentro de Vercel.
 - Cabeceras básicas de protección se aplican al despliegue.
-- `apps/web/public/503.html` aporta una pantalla estática de mantenimiento con
-  la referencia y el código de Vercel. La sustitución de errores de plataforma,
-  incluido `DEPLOYMENT_PAUSED`, requiere que el proyecto use la función de
-  páginas de error personalizadas disponible en Vercel Enterprise.
+- `VITE_MAINTENANCE_MODE=true` aporta una pantalla propia sin depender del plan
+  de Vercel. `apps/web/public/503.html` queda como página de error estática para
+  planes con errores personalizados; sustituir `DEPLOYMENT_PAUSED` desde la
+  plataforma requiere Vercel Enterprise.
 
 Los archivos binarios usan Vercel Blob privado. Sin `BLOB_READ_WRITE_TOKEN`, las
 cargas y descargas privadas deben considerarse no disponibles.

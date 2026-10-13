@@ -114,6 +114,7 @@ npm run preflight:database
 | `SEED_ADMIN_PASSWORD` | Contraseña del administrador inicial. |
 | `SEED_ADMIN_NAME` | Nombre del administrador inicial. |
 | `VITE_API_URL` | URL de API para el frontend. En Vercel puede omitirse para usar `/api`. |
+| `VITE_MAINTENANCE_MODE` | Muestra la pantalla de mantenimiento al construir con `true`. Requiere redesplegar y mantener el proyecto activo. |
 
 ## Despliegue en Vercel
 
